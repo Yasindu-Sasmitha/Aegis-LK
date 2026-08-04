@@ -239,3 +239,4 @@ docker-compose up
 - API: `http://localhost:5000/swagger`
 - React: `http://localhost:3000`
 - PostgreSQL: `localhost:5432`
+
