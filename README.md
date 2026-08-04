@@ -149,10 +149,58 @@ anything bigger in the group chat before merging:
 
 ## Branching & PR workflow
 
-- Branch naming: `feature/<your-name>-<short-description>` (e.g. `feature/kasundi-incident-crud`)
-- Open a PR into `main`, get at least one review before merging
+**One branch per task, not one branch per person.** Each of us creates a new short-lived branch
+for each chunk of work, merges it, deletes it, then starts the next one from an updated `main`.
+Nobody keeps a single branch open for their whole module across the whole project — small,
+reviewable, frequently-merged branches are the actual industry standard (called "feature
+branching"), and they also give much stronger individual Git-history evidence for the assignment
+than one giant branch merged at the end.
+
+**Branch naming:** `feature/<your-IT-ID>-<short-description>`
+
+Examples: `feature/IT24100876-incident-entities`, `feature/IT24100876-incident-api`,
+`feature/IT24100876-incident-agent`.
+
+Rule of thumb for branch size: if you can describe it in one sentence without using "and" more
+than once, it's the right size. `IT24100876-incident-entities` — good.
+`IT24100876-incident-everything` — split it up.
+
+**ID → module mapping** (fill in once, keep here as the single source of truth):
+
+| IT ID | Module |
+|---|---|
+| ITxxxxxxxx | Weather |
+| ITxxxxxxxx | Incident |
+| ITxxxxxxxx | Resource |
+| ITxxxxxxxx | Recovery |
+
+**The loop, every time:**
+
+```powershell
+git checkout main
+git pull
+git checkout -b feature/<your-IT-ID>-<task>
+
+# ... do the work, commit as you go ...
+
+git add .
+git commit -m "..."
+git push -u origin feature/<your-IT-ID>-<task>
+```
+
+Open a PR into `main` on GitHub, get at least one review, merge it. Then clean up and start the
+next task fresh:
+
+```powershell
+git checkout main
+git pull
+git branch -d feature/<your-IT-ID>-<task>
+```
+
 - Keep commits scoped to your own module where possible — makes review and individual Git-history
   evidence (required for the assignment) much cleaner
+- `main` should always be in a working state — that's the point of small, frequently-merged
+  branches instead of one long-lived branch per person
 
 ---
 
