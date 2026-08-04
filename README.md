@@ -158,12 +158,12 @@ than one giant branch merged at the end.
 
 **Branch naming:** `feature/<your-IT-ID>-<short-description>`
 
-Examples: `feature/IT24100876-incident-entities`, `feature/IT24100876-incident-api`,
-`feature/IT24100876-incident-agent`.
+Examples: `feature/IT24XXXXXX-incident-entities`, `feature/IT24XXXXXX-incident-api`,
+`feature/IT24XXXXXX-incident-agent`.
 
 Rule of thumb for branch size: if you can describe it in one sentence without using "and" more
-than once, it's the right size. `IT24100876-incident-entities` — good.
-`IT24100876-incident-everything` — split it up.
+than once, it's the right size. `IT24XXXXXX-incident-entities` — good.
+`IT24XXXXXX-incident-everything` — split it up.
 
 **ID → module mapping** (fill in once, keep here as the single source of truth):
 
