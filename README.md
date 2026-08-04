@@ -158,12 +158,12 @@ than one giant branch merged at the end.
 
 **Branch naming:** `feature/<your-IT-ID>-<short-description>`
 
-Examples: `feature/IT24XXXXXX-incident-entities`, `feature/IT24XXXXXX-incident-api`,
-`feature/IT24XXXXXX-incident-agent`.
+Examples: `feature/ITxxxxxxxx-incident-entities`, `feature/ITxxxxxxxx-incident-api`,
+`feature/ITxxxxxxxx-incident-agent`.
 
 Rule of thumb for branch size: if you can describe it in one sentence without using "and" more
-than once, it's the right size. `IT24XXXXXX-incident-entities` — good.
-`IT24XXXXXX-incident-everything` — split it up.
+than once, it's the right size. `ITxxxxxxxx-incident-entities` — good.
+`ITxxxxxxxx-incident-everything` — split it up.
 
 **ID → module mapping** (fill in once, keep here as the single source of truth):
 
@@ -188,13 +188,37 @@ git commit -m "..."
 git push -u origin feature/<your-IT-ID>-<task>
 ```
 
-Open a PR into `main` on GitHub, get at least one review, merge it. Then clean up and start the
-next task fresh:
+**If your branch runs more than a day or two, keep it updated with `main`** so you're not
+resolving a huge pile of conflicts at the end:
+
+```powershell
+git checkout main
+git pull
+git checkout feature/<your-IT-ID>-<task>
+git merge main
+```
+
+Use `merge` here, not `rebase`. Rebase rewrites commit history, which causes real problems the
+moment a branch has already been pushed and someone else might look at it (exactly our
+situation, since branches get pushed for review) — merge is the safe, non-destructive option for
+any branch that isn't purely local and private to you. If `git merge main` shows a conflict, fix
+the conflicting lines in the flagged files, then `git add .` and `git commit` to finish the merge.
+
+**Before opening a PR, a quick self-check:**
+- Does it build and run locally?
+- Is it scoped to one task (not several unrelated changes bundled together)?
+- PR description says *what* changed and *why*, not just "updates"
+- Tests pass, if you've added any for this piece
+
+Open a PR into `main` on GitHub, get at least one review, merge it. Then clean up **both** the
+local and the remote branch — GitHub's merge screen has a "Delete branch" button that does the
+remote side for you, or do it manually:
 
 ```powershell
 git checkout main
 git pull
 git branch -d feature/<your-IT-ID>-<task>
+git push origin --delete feature/<your-IT-ID>-<task>
 ```
 
 - Keep commits scoped to your own module where possible — makes review and individual Git-history
