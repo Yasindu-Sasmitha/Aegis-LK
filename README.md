@@ -228,6 +228,108 @@ git push origin --delete feature/<your-IT-ID>-<task>
 
 ---
 
+---
+
+## Module boundaries & borders — full detail
+
+### Member 1 — Weather module
+
+**Owns, full stop:**
+- Entities: `WeatherStation`, `WeatherObservation`, `HistoricalWeather`, `Prediction`, `ForecastHistory`, `WeatherAlert`
+- Endpoints: `GET /api/weather/forecast/{district}`, `POST /api/weather/predict`, `GET /api/weather/alerts`, `GET /api/weather/history/{district}`
+- Agent: Weather Prediction Agent — input `{ district }`, output `{ floodProbability, confidence, alert? }`
+- Third-party call: Open-Meteo API — this integration lives entirely inside this module, nobody else touches it
+- React: forecast dashboard, prediction graphs, alert list
+- Flutter: current weather screen, rain alerts, district search
+
+**Explicitly NOT this module's job:**
+- Deciding what a citizen does with a warning (that's Incident's UI choice, not Weather's)
+- Anything with GPS-tagged reports or photos — that's a citizen report, not a forecast
+- No `Incident`, `RescueMission`, or any other module's table gets touched, read, or joined against, ever
+
+**Borders:**
+- Outbound only, and it's soft. Weather may optionally expose `GET /api/weather/alerts?district=X` for another module's UI to display — e.g. Incident's report screen might show "active alert in this district" as read-only context. That's the entire relationship. No other module's logic depends on Weather having run.
+- Nothing flows in. Weather never calls another module's API and never reads another module's data.
+
+**The exact line:** if you find yourself writing code in the Weather module that creates an `Incident`, or code in Incident that reads `WeatherObservation` rows directly from the database — stop, that's the border being crossed wrong. The only legal crossing is an HTTP GET to Weather's own alerts endpoint.
+
+---
+
+### Member 2 — Incident module
+
+**Owns, full stop:**
+- Entities: `Incident`, `Victim`, `Volunteer`, `RescueTeam`, `RescueMission`, `MissionLog`, `DamageReport`
+- Endpoints: `POST /api/incidents`, `GET /api/incidents`, `POST /api/incidents/{id}/assess`, `POST /api/incidents/{id}/approve`, `POST /api/incidents/{id}/damage-report`
+- Agent: Incident Assessment Agent — input `{ disasterType, severityReported, description, location }`, output `{ severityAssessed, teamsRequired, recommendation }`
+- React: incident dashboard, approve/reject controls, mission tracking
+- Flutter: report-disaster form (photo, GPS, description — this is your device-feature requirement), SOS button, track-rescue-team screen
+
+**Explicitly NOT this module's job:**
+- Actually sourcing food/water/vehicles/boats — you decide how many teams are needed, Resource decides how to get them there
+- Managing shelters or long-term recovery — once the mission is done and damage is logged, your module's involvement ends
+- Reading Weather's tables directly to "check if there's a warning" — if you want that context, call Weather's API, don't touch its DB
+
+**Borders:**
+- Inbound (optional): you may call `GET /api/weather/alerts?district=X` purely to show context on the report screen. Nothing in your agent logic should require this to succeed — if that call fails or Weather isn't built yet, your module still works.
+- Outbound to Resource (hard border, you own this contract): the moment an officer approves a mission, you POST to Resource:
+  ```
+  POST /api/resource/dispatch-requests
+  { "missionId": "...", "teamsRequired": 3, "location": { "lat": ..., "lng": ... } }
+  ```
+  You send exactly this — not the citizen's photo, not the full description, not victim names. Resource has no business seeing that.
+- Outbound to Recovery (hard border): once damage is logged and the incident closes, Recovery pulls:
+  ```
+  GET /api/incident/{id}/damage-report
+  → { "incidentId": "...", "housesDamaged": 40, "displacedFamilies": 120, "infrastructureDamage": [...] }
+  ```
+  You expose this endpoint; Recovery calls it, not the other way around.
+
+**The exact line:** your module's responsibility ends the moment you've told Resource "here's what's needed and where," and ends again the moment you've told Recovery "here's what got damaged." You never plan a dispatch route and you never allocate a shelter — those verbs belong to your neighbors.
+
+---
+
+### Member 3 — Resource module
+
+**Owns, full stop:**
+- Entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`
+- Endpoints: `POST /api/resource/dispatch-requests`, `GET /api/resource/dispatch/{id}`, `POST /api/resource/dispatch/{id}/approve`, `GET /api/resource/inventory`
+- Agent: Resource Allocation Agent — input `{ missionId, teamsRequired, location }`, output `{ dispatchPlan, estimatedArrival }`
+- Third-party call: Maps/routing API for road closures and route calculation — lives here, nowhere else
+- React: warehouse/inventory/dispatch dashboards
+- Flutter: delivery tracking, QR delivery confirmation
+
+**Explicitly NOT this module's job:**
+- Deciding whether a rescue mission is needed — that decision was already made and approved by the time you see a `missionId`
+- Knowing anything about the citizen, the incident description, or victims — you only ever see `missionId + teamsRequired + location`
+- Allocating displaced families to shelters — that's a different kind of "allocation," owned by Recovery
+
+**Borders:**
+- Inbound from Incident (hard border, you're the receiver): you implement `POST /api/resource/dispatch-requests` exactly as Incident's contract above. Your agent starts here — this is your trigger, you don't poll or watch for incidents yourself.
+- Nothing flows onward to Recovery. This is a common mistake to avoid: it feels natural to think "Resource dispatches supplies, so Resource should also handle post-disaster resource needs for recovery" — it shouldn't. Recovery gets its information from Incident's damage report, not from you. If Recovery genuinely needs to request more supplies during rebuilding, that's a new `ResourceRequest` coming through your same public endpoint, initiated by Recovery's officer through normal UI action — not a special direct pipe between your two modules.
+
+**The exact line:** your module starts at "here's a mission that needs resources" and ends at "resources have been dispatched, here's an ETA." You never touch a `RescueMission` row and you never look ahead to what happens after delivery.
+
+---
+
+### Member 4 — Recovery module
+
+**Owns, full stop:**
+- Entities: `Shelter`, `AidRequest`, `Donation`, `Compensation`, `RecoveryTask`, `InfrastructureDamage`, `NGO`, `RecoveryReport`
+- Endpoints: `GET /api/recovery/plan/{incidentId}`, `POST /api/recovery/shelters`, `POST /api/recovery/aid-requests`, `POST /api/recovery/plan/{id}/approve`
+- Agent: Recovery Planning Agent — input `{ incidentId, damageReport }`, output `{ recoveryPlan, shelterAllocations, budgetEstimate }`
+- React: shelter/donation/compensation dashboards
+- Flutter: find-shelter, request-aid, donate, report-damage screens
+
+**Explicitly NOT this module's job:**
+- Anything before the incident closes — you don't assess severity, you don't approve missions, you don't know about rescue teams at all
+- Dispatch logistics — if a shelter needs supplies, that's Resource's `ResourceRequest` flow, not something you build a parallel version of
+
+**Borders:**
+- Inbound from Incident (hard border): you call `GET /api/incident/{id}/damage-report` when an incident closes. This is the only data you pull from another module — everything else in your workflow (shelters, donations, budget) is entirely your own domain.
+- Nothing flows onward — Recovery is the end of the chain. No module downstream of you needs anything you produce.
+
+**The exact line:** you only ever look backward to Incident's damage report, never sideways to Resource, never forward to anything (there's nothing after you).
+
 ## Running the project locally
 
 _(fill in once docker-compose and the API host are set up)_
@@ -239,4 +341,3 @@ docker-compose up
 - API: `http://localhost:5000/swagger`
 - React: `http://localhost:3000`
 - PostgreSQL: `localhost:5432`
-
