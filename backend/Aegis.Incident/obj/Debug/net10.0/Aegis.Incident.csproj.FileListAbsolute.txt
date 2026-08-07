@@ -1,0 +1,16 @@
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.csproj.AssemblyReference.cache
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.AssemblyInfoInputs.cache
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.AssemblyInfo.cs
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.csproj.CoreCompileInputs.cache
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.sourcelink.json
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\bin\Debug\net10.0\Aegis.Incident.deps.json
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\bin\Debug\net10.0\Aegis.Incident.dll
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\bin\Debug\net10.0\Aegis.Incident.pdb
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\bin\Debug\net10.0\Aegis.Shared.dll
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\bin\Debug\net10.0\Aegis.Shared.pdb
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.In.975C419C.Up2Date
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.dll
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\refint\Aegis.Incident.dll
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\Aegis.Incident.pdb
+C:\Users\dsaje\Projects\Aegis-LK\backend\Aegis.Incident\obj\Debug\net10.0\ref\Aegis.Incident.dll
