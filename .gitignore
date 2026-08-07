@@ -1,0 +1,36 @@
+# === .NET ===
+bin/
+obj/
+*.user
+*.suo
+
+# === Node / React ===
+node_modules/
+dist/
+build/
+.env
+.env.local
+
+# === Flutter / Dart ===
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/build/
+*.iml
+
+# === Python / Agentic AI ===
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# === Editor / OS ===
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# === Secrets (defense in depth) ===
+appsettings.*.local.json
+*.pfx
