@@ -36,10 +36,14 @@ public static class WeatherEndpoints
             return Results.Ok(new
             {
                 district.Name,
+                district.IsLandslideProne,
                 forecast.RainfallMmNext3Days,
+                forecast.WindSpeedKmhNext3Days,
                 forecast.FetchedAt,
-                HistoricalThresholdMm = baseline?.FloodThresholdMm,
-                HistoricalAvgMm = baseline?.AvgRainfallMm
+                FloodThresholdMm = baseline?.FloodThresholdMm,
+                LandslideThresholdMm = baseline?.LandslideThresholdMm,
+                HighWindThresholdKmh = baseline?.HighWindThresholdKmh,
+                HistoricalAvgRainfallMm = baseline?.AvgRainfallMm
             });
         });
     }
