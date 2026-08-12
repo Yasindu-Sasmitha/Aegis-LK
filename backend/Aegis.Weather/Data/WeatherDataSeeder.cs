@@ -7,9 +7,11 @@ public static class WeatherDataSeeder
 {
     public static async Task SeedAsync(WeatherDbContext context)
     {
-        if (await context.Districts.AnyAsync()) return; // already seeded, skip
+        if (await context.Districts.AnyAsync()) return;
 
-        var districts = new (string Name, string Province, double Lat, double Lon, double AvgRainfall, double Threshold)[]
+        var landslideProne = new HashSet<string> { "Kandy", "Matale", "Nuwara Eliya", "Badulla", "Kegalle", "Ratnapura" };
+
+        var districts = new (string Name, string Province, double Lat, double Lon, double AvgRainfall, double FloodThreshold)[]
         {
             ("Colombo", "Western", 6.9271, 79.8612, 55, 90),
             ("Gampaha", "Western", 7.0873, 80.0144, 50, 85),
@@ -42,7 +44,12 @@ public static class WeatherDataSeeder
 
         foreach (var d in districts)
         {
-            var district = new District { Name = d.Name, Province = d.Province, Latitude = d.Lat, Longitude = d.Lon };
+            var isProne = landslideProne.Contains(d.Name);
+            var district = new District
+            {
+                Name = d.Name, Province = d.Province, Latitude = d.Lat, Longitude = d.Lon,
+                IsLandslideProne = isProne
+            };
             context.Districts.Add(district);
 
             context.HistoricalWeather.Add(new HistoricalWeather
@@ -50,8 +57,10 @@ public static class WeatherDataSeeder
                 DistrictId = district.Id,
                 Month = currentMonth,
                 AvgRainfallMm = d.AvgRainfall,
-                FloodThresholdMm = d.Threshold,
-                Source = "Dept. of Meteorology (approximate seed baseline)"
+                FloodThresholdMm = d.FloodThreshold,
+                LandslideThresholdMm = isProne ? 100 : null,  // NBRO-style cumulative rainfall alert level
+                HighWindThresholdKmh = 60,
+                Source = "Dept. of Meteorology / NBRO (approximate seed baseline)"
             });
         }
 

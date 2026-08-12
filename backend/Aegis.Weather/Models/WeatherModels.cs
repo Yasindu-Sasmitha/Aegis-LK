@@ -7,6 +7,7 @@ public class District
     public string Province { get; set; } = string.Empty;
     public double Latitude { get; set; }
     public double Longitude { get; set; }
+    public bool IsLandslideProne { get; set; } = false;
 }
 
 public class HistoricalWeather
@@ -17,6 +18,8 @@ public class HistoricalWeather
     public int Month { get; set; }
     public double AvgRainfallMm { get; set; }
     public double FloodThresholdMm { get; set; }
+    public double? LandslideThresholdMm { get; set; }   // null if district isn't landslide-prone
+    public double HighWindThresholdKmh { get; set; } = 60;
     public string Source { get; set; } = string.Empty;
 }
 
@@ -49,10 +52,12 @@ public class Prediction
     public Guid DistrictId { get; set; }
     public District? District { get; set; }
     public Guid AgentRunId { get; set; }
-    public double FloodProbabilityPct { get; set; }
+    public string HazardType { get; set; } = string.Empty;   // "Flood" | "Landslide" | "StrongWind"
+    public double RiskProbabilityPct { get; set; }
     public double ConfidencePct { get; set; }
-    public double ForecastRainfallMm { get; set; }
-    public double HistoricalThresholdMm { get; set; }
+    public double ForecastValue { get; set; }                // rainfall mm, or wind speed km/h
+    public double HistoricalThreshold { get; set; }          // same unit as ForecastValue
+    public string Unit { get; set; } = "mm";                  // "mm" or "km/h"
     public string Status { get; set; } = "Completed";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public WeatherAlert? Alert { get; set; }
@@ -65,6 +70,7 @@ public class WeatherAlert
     public District? District { get; set; }
     public Guid PredictionId { get; set; }
     public Prediction? Prediction { get; set; }
+    public string HazardType { get; set; } = string.Empty;
     public string Severity { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string Status { get; set; } = "PendingReview";
@@ -79,8 +85,8 @@ public class ForecastHistory
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid PredictionId { get; set; }
     public Prediction? Prediction { get; set; }
-    public bool? ActualFloodOccurred { get; set; }
-    public double? ActualRainfallMm { get; set; }
+    public bool? ActualDisasterOccurred { get; set; }
+    public double? ActualValue { get; set; }
     public Guid? ConfirmedByUserId { get; set; }
     public DateTime? ConfirmedAt { get; set; }
 }

@@ -24,7 +24,7 @@ public class WeatherDbContext : DbContext
         builder.Entity<HistoricalWeather>().HasIndex(h => new { h.DistrictId, h.Month }).IsUnique();
         builder.Entity<Prediction>().HasOne(p => p.Alert).WithOne(a => a.Prediction!)
             .HasForeignKey<WeatherAlert>(a => a.PredictionId);
-        builder.Entity<Prediction>().HasIndex(p => new { p.DistrictId, p.CreatedAt });
-        builder.Entity<WeatherAlert>().HasIndex(a => new { a.DistrictId, a.Status });
+        builder.Entity<Prediction>().HasIndex(p => new { p.DistrictId, p.HazardType, p.CreatedAt });
+        builder.Entity<WeatherAlert>().HasIndex(a => new { a.DistrictId, a.HazardType, a.Status });
     }
 }
