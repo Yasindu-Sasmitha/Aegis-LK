@@ -16,6 +16,11 @@ builder.Services.AddDbContext<WeatherDbContext>(options =>
 
 builder.Services.AddHttpClient<Aegis.Weather.Services.OpenMeteoService>();
 
+builder.Services.AddHttpClient<Aegis.Weather.Services.WeatherAgentClient>(client =>
+{
+    client.BaseAddress = new Uri("http://127.0.0.1:8001");
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
