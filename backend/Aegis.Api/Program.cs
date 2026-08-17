@@ -1,4 +1,7 @@
 using Aegis.Incident.Data;
+using Aegis.Recovery.Data;
+using Aegis.Recovery.Endpoints;
+using Aegis.Recovery.Services;
 using Aegis.Weather.Data;
 using Aegis.Weather.Endpoints;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +17,12 @@ builder.Services.AddDbContext<IncidentDbContext>(options =>
 builder.Services.AddDbContext<WeatherDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddDbContext<RecoveryDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddHttpClient<Aegis.Weather.Services.OpenMeteoService>();
+builder.Services.AddHttpClient<IIncidentIntegrationService, IncidentIntegrationService>();
+builder.Services.AddSingleton<RecoveryAgentClientService>();
 
 builder.Services.AddHttpClient<Aegis.Weather.Services.WeatherAgentClient>(client =>
 {
@@ -28,6 +36,9 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var weatherDb = scope.ServiceProvider.GetRequiredService<WeatherDbContext>();
     await WeatherDataSeeder.SeedAsync(weatherDb);
+
+    var recoveryDb = scope.ServiceProvider.GetRequiredService<RecoveryDbContext>();
+    await RecoveryDataSeeder.SeedAsync(recoveryDb);
 }
 
 if (app.Environment.IsDevelopment())
@@ -39,6 +50,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapWeatherEndpoints();
+app.MapRecoveryEndpoints();
 
 var summaries = new[]
 {
