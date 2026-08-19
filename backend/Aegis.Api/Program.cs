@@ -52,8 +52,6 @@ app.UseHttpsRedirection();
 
 app.MapWeatherEndpoints();
 app.MapRecoveryEndpoints();
-app.MapWeatherEndpoints();
-app.MapRecoveryEndpoints();
 app.MapIncidentEndpoints();
 
 var summaries = new[]
