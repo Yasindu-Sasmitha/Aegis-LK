@@ -1,4 +1,5 @@
 using Aegis.Incident.Data;
+using Aegis.Incident.Endpoints;
 using Aegis.Recovery.Data;
 using Aegis.Incident.Endpoints;
 using Aegis.Recovery.Endpoints;
@@ -52,6 +53,9 @@ app.UseHttpsRedirection();
 
 app.MapWeatherEndpoints();
 app.MapRecoveryEndpoints();
+app.MapWeatherEndpoints();
+app.MapRecoveryEndpoints();
+app.MapIncidentEndpoints();
 
 app.MapIncidentEndpoints();
 
