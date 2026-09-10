@@ -146,5 +146,125 @@ public static class WeatherEndpoints
             await db.SaveChangesAsync();
             return Results.Ok(new { district.Name, AgentRunId = agentRunId, Results = results });
         });
+
+        group.MapPost("/alerts/{id:guid}/review", async (Guid id, AlertReviewRequest body, WeatherDbContext db) =>
+        {
+            if (body.Decision is not ("Approved" or "Rejected"))
+                return Results.BadRequest(new { error = "Decision must be 'Approved' or 'Rejected'." });
+
+            var alert = await db.WeatherAlerts.FindAsync(id);
+            if (alert is null) return Results.NotFound();
+            if (alert.Status != "PendingReview")
+                return Results.BadRequest(new { error = $"Alert is not PendingReview — current status: {alert.Status}" });
+
+            // Stub reviewer GUID — replace with real JWT claim once Aegis.Shared wires up auth
+            alert.ReviewedByUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            alert.ReviewedAt = DateTime.UtcNow;
+
+            if (body.Decision == "Approved")
+            {
+                alert.Status = "Published";
+                alert.PublishedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                alert.Status = "Rejected";
+            }
+
+            if (!string.IsNullOrWhiteSpace(body.ReviewNotes))
+                alert.Message += $"\n[Officer note: {body.ReviewNotes}]";
+
+            await db.SaveChangesAsync();
+            return Results.Ok(new
+            {
+                alert.Id, alert.HazardType, alert.Status,
+                alert.ReviewedAt, alert.PublishedAt, alert.ReviewedByUserId
+            });
+        });
+
+        group.MapGet("/alerts", async (
+            WeatherDbContext db,
+            string? status,
+            Guid? districtId,
+            string? hazardType,
+            int page = 1,
+            int pageSize = 20) =>
+        {
+            var query = db.WeatherAlerts
+                .Include(a => a.District)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(a => a.Status == status);
+            if (districtId.HasValue)
+                query = query.Where(a => a.DistrictId == districtId.Value);
+            if (!string.IsNullOrWhiteSpace(hazardType))
+                query = query.Where(a => a.HazardType == hazardType);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(a => a.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(a => new
+                {
+                    a.Id, a.DistrictId,
+                    DistrictName = a.District != null ? a.District.Name : null,
+                    a.HazardType, a.Severity, a.Message, a.Status,
+                    a.ReviewedByUserId, a.ReviewedAt, a.PublishedAt, a.CreatedAt
+                })
+                .ToListAsync();
+
+            return Results.Ok(new { total, page, pageSize, items });
+        });
+
+        group.MapGet("/analytics/accuracy", async (WeatherDbContext db) =>
+        {
+            var predictions = await db.Predictions.ToListAsync();
+            var outcomes = await db.ForecastHistory.ToListAsync();
+            var outcomeMap = outcomes.ToDictionary(o => o.PredictionId);
+
+            int totalPredictions = predictions.Count;
+            int withOutcome = 0, correct = 0;
+            var byHazard = new Dictionary<string, (int total, int withOutcome, int correct)>();
+
+            foreach (var p in predictions)
+            {
+                if (!byHazard.ContainsKey(p.HazardType)) byHazard[p.HazardType] = (0, 0, 0);
+                var (ht, hwO, hc) = byHazard[p.HazardType];
+                ht++;
+
+                if (outcomeMap.TryGetValue(p.Id, out var outcome) && outcome.ActualDisasterOccurred.HasValue)
+                {
+                    withOutcome++; hwO++;
+                    bool predictedRisk = p.RiskProbabilityPct >= 50;
+                    bool actualRisk = outcome.ActualDisasterOccurred.Value;
+                    if (predictedRisk == actualRisk) { correct++; hc++; }
+                }
+                byHazard[p.HazardType] = (ht, hwO, hc);
+            }
+
+            double overallAccuracy = withOutcome == 0 ? 0 : Math.Round((double)correct / withOutcome * 100, 1);
+            var byHazardResult = byHazard.Select(kvp => new
+            {
+                hazardType = kvp.Key,
+                total = kvp.Value.total,
+                withOutcomeRecorded = kvp.Value.withOutcome,
+                correct = kvp.Value.correct,
+                accuracyPct = kvp.Value.withOutcome == 0
+                    ? 0 : Math.Round((double)kvp.Value.correct / kvp.Value.withOutcome * 100, 1)
+            }).ToList();
+
+            return Results.Ok(new
+            {
+                totalPredictions,
+                withOutcomeRecorded = withOutcome,
+                correctPredictions = correct,
+                accuracyPct = overallAccuracy,
+                byHazardType = byHazardResult
+            });
+        });
     }
 }
+
+public record AlertReviewRequest(string Decision, string? ReviewNotes);
