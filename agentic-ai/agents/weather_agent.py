@@ -1,11 +1,21 @@
+import os
+from pathlib import Path
 from typing import TypedDict, Optional
 from pydantic import BaseModel, Field
-from langchain_ollama import ChatOllama
+from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END
 import json
 from datetime import datetime, timezone
 
-# ---------- Structured output — the LLM must return exactly this shape ----------
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
+API_KEY = os.getenv("GOOGLE_API_KEY", "")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-2.5-flash-lite")
+assert API_KEY and "XXXX" not in API_KEY, (
+    "GOOGLE_API_KEY missing: copy .env.example -> .env and paste your Google AI Studio key"
+)
+
 
 class HazardAssessment(BaseModel):
     hazard_type: str = Field(description="One of: Flood, Landslide, StrongWind")
@@ -17,8 +27,6 @@ class HazardAssessment(BaseModel):
 class WeatherAgentOutput(BaseModel):
     hazards: list[HazardAssessment]
 
-
-# ---------- LangGraph state — this is what flows through the graph ----------
 
 class WeatherAgentState(TypedDict):
     district_id: str
@@ -36,14 +44,17 @@ class WeatherAgentState(TypedDict):
     error: Optional[str]
 
 
-llm = ChatOllama(model="minimax-m3:cloud", temperature=0)
+llm = ChatGoogleGenerativeAI(
+    model=CHAT_MODEL,
+    google_api_key=API_KEY,
+    temperature=0,
+    timeout=60,
+    max_retries=3,   # absorbs transient 429s automatically, same as the labs
+)
 structured_llm = llm.with_structured_output(WeatherAgentOutput)
 
 
-# ---------- Node 1: the LLM reasons, read-only, no DB access ----------
-
 def compute_risk(state: WeatherAgentState) -> WeatherAgentState:
-    started = datetime.now(timezone.utc)
     hazards_to_assess = ["Flood", "StrongWind"]
     if state["is_landslide_prone"]:
         hazards_to_assess.append("Landslide")
@@ -60,33 +71,34 @@ Historical thresholds for this district:
 - Strong wind threshold: {state['wind_threshold_kmh']} km/h
 
 Assess ONLY these hazards: {hazards_to_assess}.
-
-Respond with ONLY a valid JSON object, nothing else — no markdown, no headers, no commentary,
-no explanation outside the JSON. Exact shape:
-{{"hazards": [{{"hazard_type": "Flood", "risk_probability_pct": 0, "confidence_pct": 0, "reasoning_summary": "...", "recommended_action": "publish_alert"}}]}}
-
-reasoning_summary must be under 250 characters, conclusion only. recommended_action must be
-exactly one of: publish_alert, flag_for_review, no_action.
+Base probability mainly on how far the forecast exceeds the threshold. Reflect genuine
+uncertainty honestly in confidence_pct rather than defaulting to a high number.
 """
 
-    try:
-        response = llm.invoke(prompt)
-        parsed = WeatherAgentOutput.model_validate_json(response.content)
-        step = {
-            "step": "compute_risk", "tool": "ollama:minimax-m3:cloud",
-            "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
-            "status": "success",
-        }
-        return {**state, "llm_output": parsed.model_dump(), "steps": state["steps"] + [step]}
-    except Exception as e:
-        step = {
-            "step": "compute_risk", "tool": "ollama:minimax-m3:cloud",
-            "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
-            "status": "failed", "error": str(e),
-        }
-        return {**state, "error": str(e), "steps": state["steps"] + [step], "overall_status": "Failed"}
+    steps = list(state["steps"])
+    last_error = None
 
-# ---------- Node 2: code decides, not the model — the actual safety gate ----------
+    # Try once, retry once — mirrors the grade/rewrite self-correction pattern from Lab 06.
+    for attempt in range(1, 3):
+        started = datetime.now(timezone.utc)
+        try:
+            result: WeatherAgentOutput = structured_llm.invoke(prompt)
+            steps.append({
+                "step": "compute_risk", "tool": f"gemini:{CHAT_MODEL}", "attempt": attempt,
+                "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
+                "status": "success",
+            })
+            return {**state, "llm_output": result.model_dump(), "steps": steps}
+        except Exception as e:
+            last_error = str(e)
+            steps.append({
+                "step": "compute_risk", "tool": f"gemini:{CHAT_MODEL}", "attempt": attempt,
+                "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
+                "status": "failed", "error": last_error,
+            })
+
+    return {**state, "error": f"Failed after 2 attempts: {last_error}", "steps": steps, "overall_status": "Failed"}
+
 
 def validate_and_decide(state: WeatherAgentState) -> WeatherAgentState:
     if state.get("error"):
@@ -94,11 +106,10 @@ def validate_and_decide(state: WeatherAgentState) -> WeatherAgentState:
 
     started = datetime.now(timezone.utc)
     validated_hazards = []
-
     threshold_map = {
-    "Flood": (sum(state["forecast_rainfall_mm"]), state["flood_threshold_mm"]),
-    "Landslide": (sum(state["forecast_rainfall_mm"]), state.get("landslide_threshold_mm")),
-    "StrongWind": (max(state["forecast_wind_kmh"]), state["wind_threshold_kmh"]),
+        "Flood": (sum(state["forecast_rainfall_mm"]), state["flood_threshold_mm"]),
+        "Landslide": (sum(state["forecast_rainfall_mm"]), state.get("landslide_threshold_mm")),
+        "StrongWind": (max(state["forecast_wind_kmh"]), state["wind_threshold_kmh"]),
     }
 
     for hazard in state["llm_output"]["hazards"]:
@@ -108,10 +119,8 @@ def validate_and_decide(state: WeatherAgentState) -> WeatherAgentState:
 
         forecast_value, threshold = threshold_map.get(h["hazard_type"], (None, None))
 
-        # The real gate — confidence threshold enforced by code, not the model's own claim
         if h["confidence_pct"] < 70:
             h["recommended_action"] = "flag_for_review"
-        # Anomaly safety net — model under-called an obvious risk
         elif (threshold is not None and forecast_value is not None
               and forecast_value >= threshold * 1.3 and h["recommended_action"] == "no_action"):
             h["recommended_action"] = "flag_for_review"
@@ -127,8 +136,6 @@ def validate_and_decide(state: WeatherAgentState) -> WeatherAgentState:
     return {**state, "hazards": validated_hazards, "steps": state["steps"] + [step], "overall_status": "Success"}
 
 
-# ---------- Graph wiring ----------
-
 graph = StateGraph(WeatherAgentState)
 graph.add_node("compute_risk", compute_risk)
 graph.add_node("validate_and_decide", validate_and_decide)
@@ -139,26 +146,13 @@ graph.add_edge("validate_and_decide", END)
 weather_agent = graph.compile()
 
 
-# ---------- Standalone test — hardcoded numbers, no API/DB needed yet ----------
-
 if __name__ == "__main__":
     test_state: WeatherAgentState = {
-        "district_id": "test-kandy",
-        "district_name": "Kandy",
-        "is_landslide_prone": False,
-        "forecast_rainfall_mm": [30.0, 35.0, 40.0],
-        "forecast_wind_kmh": [25.0, 30.0, 28.0],
-        "flood_threshold_mm": 80.0,
-        "landslide_threshold_mm": 100.0,
-        "wind_threshold_kmh": 60.0,
-        "llm_output": None,
-        "hazards": [],
-        "steps": [],
-        "overall_status": "Success",
-        "error": None,
+        "district_id": "test-kandy", "district_name": "Kandy", "is_landslide_prone": True,
+        "forecast_rainfall_mm": [45.0, 60.0, 70.0], "forecast_wind_kmh": [25.0, 30.0, 28.0],
+        "flood_threshold_mm": 80.0, "landslide_threshold_mm": 100.0, "wind_threshold_kmh": 60.0,
+        "llm_output": None, "hazards": [], "steps": [], "overall_status": "Success", "error": None,
     }
-
     final_state = weather_agent.invoke(test_state)
     print(json.dumps(final_state["hazards"], indent=2))
-    print("\n--- Execution steps (this is what feeds AgentExecutionLog) ---")
     print(json.dumps(final_state["steps"], indent=2))
