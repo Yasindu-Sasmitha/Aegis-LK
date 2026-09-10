@@ -11,7 +11,8 @@ class RecoveryService {
     final uri = Uri.parse('$baseUrl/shelters${district != null ? '?district=$district' : ''}');
     final response = await http.get(uri);
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      final List data = decoded is List ? decoded : (decoded['items'] ?? []);
       return data.map((e) => ShelterModel.fromJson(e)).toList();
     }
     throw Exception('Failed to load shelters');
@@ -50,7 +51,8 @@ class RecoveryService {
   Future<List<AidRequestModel>> fetchMyAidRequests() async {
     final response = await http.get(Uri.parse('$baseUrl/aid-requests'));
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      final List data = decoded is List ? decoded : (decoded['items'] ?? []);
       return data.map((e) => AidRequestModel.fromJson(e)).toList();
     }
     throw Exception('Failed to load aid requests');
@@ -75,5 +77,17 @@ class RecoveryService {
       }),
     );
     return response.statusCode == 201;
+  }
+
+  Future<Map<String, dynamic>> submitDamageIntake(DamageIntakeModel intake) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/intake-damage'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(intake.toJson()),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    }
+    throw Exception(jsonDecode(response.body)['error'] ?? 'Failed to submit damage report');
   }
 }
