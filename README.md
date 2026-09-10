@@ -9,6 +9,7 @@ without merge conflicts, while the final product ships as one integrated applica
 ## Jump to your section
 
 - [How this repo is organized](#how-this-repo-is-organized)
+- [Local setup gotchas — read this before you open an issue](#local-setup-gotchas--read-this-before-you-open-an-issue)
 - [Member 1 — Weather Intelligence](#member-1--weather-intelligence)
 - [Member 2 — Incident & Rescue Operations](#member-2--incident--rescue-operations)
 - [Member 3 — Resource & Logistics](#member-3--resource--logistics)
@@ -51,25 +52,54 @@ open a PR. If it touches anything in "Shared files" below, flag it in the group 
 
 ---
 
+## Local setup gotchas — read this before you open an issue
+
+Real problems the group has already hit, so nobody loses an hour rediscovering them:
+
+- **A fresh `git pull` can crash your local run if you don't also update your database.** If a
+  teammate's PR adds a new DbContext + migration + seeder call in `Program.cs`, pulling their code
+  is not enough — their tables don't exist on *your* local Postgres until you also run **their**
+  `dotnet ef database update`. After every pull, check `Program.cs` for `AddDbContext<...>()` lines
+  you don't recognize, and run that module's migration too.
+- **`dotnet new classlib` silently uses whatever SDK is installed on your machine.** If you only
+  have .NET 8, it creates a net8.0 project even though this whole repo targets net10.0 — and
+  everything downstream (NuGet restore, `dotnet sln add`) fails with confusing errors that don't
+  mention .NET versions at all. Install the .NET 10 SDK before you start (`dotnet --list-sdks`
+  should show `10.x`).
+- **"More than one DbContext was found"** on any `dotnet ef` command → you forgot `--context
+  <YourModule>DbContext`. The solution has multiple DbContexts; EF can't guess which one you mean.
+- **No classic Swagger UI.** This repo uses .NET's newer `AddOpenApi()`/`MapOpenApi()`. The
+  interactive docs page is `/scalar/v1`, not `/swagger`.
+- **PRs go into `dev`, not `main`.** `dev` is our actual integration branch — see below.
+
+---
+
 ## Member 1 — Weather Intelligence
 
-**Owns:** `backend/Aegis.Weather/`, `react/src/features/weather/`, `flutter/lib/features/weather/`,
-`agentic-ai/agents/weather_agent.py`
+**Owns:** `backend/Aegis.Weather/`, `react/src/features/weather/` (not started),
+`flutter/lib/features/weather/` (not started), `agentic-ai/agents/weather_agent.py` +
+`weather_agent_service.py`
 
-**What this module does:** predicts severe weather and issues early warnings for a district.
+**What this module does:** predicts three hazard types per district — **Flood, Strong Wind, and
+Landslide** (landslide only for seeded landslide-prone hill districts) — using live Open-Meteo
+forecast data compared against seeded historical thresholds. Deliberately excludes Drought (needs
+long-term trend data, not a 3-day forecast) and Tsunami (a seismic phenomenon, not a weather one)
+— both documented decisions, not gaps. Full detail in `docs/weather-module-notes.md`.
 
-**Database entities:** WeatherStation, WeatherObservation, HistoricalWeather, Prediction,
-ForecastHistory, WeatherAlert.
+**Database entities:** District, HistoricalWeather, WeatherStation, WeatherObservation,
+Prediction, WeatherAlert, ForecastHistory, AgentExecutionLog.
 
-**Agent — Weather Prediction Agent:** given a district, collects historical + regional weather
-data, runs a prediction model, calculates a confidence score, requests officer review if
-confidence is low, generates an early warning.
+**Agent — Weather Prediction Agent:** given a district's forecast and historical thresholds,
+returns a risk assessment per relevant hazard (probability, confidence, recommended action).
+Built with LangGraph + Gemini (`gemini-2.5-flash-lite`, free tier). Code — not the LLM — makes
+the final publish/review decision.
 
-**Third-party integration:** Open-Meteo API (free, no key required) for live/historical weather.
+**Third-party integration:** Open-Meteo API (free, no key required) for live weather forecasts.
 
 **Runs independently?** Yes — this module has no hard dependency on the other three. It produces
 warnings that *other* modules (like Incident) can optionally consume, but it doesn't need
-anything from them to function or be demoed on its own.
+anything from them to function or be demoed on its own. District/forecast/predict endpoints are
+live; officer-review and analytics endpoints are still in progress.
 
 ---
 
@@ -126,6 +156,10 @@ InfrastructureDamage, NGO, RecoveryReport.
 
 **Agent — Recovery Planning Agent:** given damage reports, prioritizes infrastructure repairs,
 allocates families to shelters, estimates budget, assigns NGOs — recovery officer approves.
+**Status note:** entities, endpoints and migration are live; the actual agent reasoning is
+currently a placeholder in `RecoveryAgentClientService.cs` (simulated, not yet calling
+`recovery_agent.py`) — needs to be wired up the same way Weather's `WeatherAgentClient` calls its
+Python service, for a real Agentic AI contribution.
 
 **Runs independently?** Yes for early development (shelters, donations, aid requests all work
 standalone). It naturally consumes Incident's damage data in the full workflow, same caveat as
@@ -149,8 +183,10 @@ anything bigger in the group chat before merging:
 
 ## Branching & PR workflow
 
+**Our integration branch is `dev`, not `main`.** Everything below targets `dev`.
+
 **One branch per task, not one branch per person.** Each of us creates a new short-lived branch
-for each chunk of work, merges it, deletes it, then starts the next one from an updated `main`.
+for each chunk of work, merges it, deletes it, then starts the next one from an updated `dev`.
 Nobody keeps a single branch open for their whole module across the whole project — small,
 reviewable, frequently-merged branches are the actual industry standard (called "feature
 branching"), and they also give much stronger individual Git-history evidence for the assignment
@@ -177,7 +213,7 @@ than once, it's the right size. `ITxxxxxxxx-incident-entities` — good.
 **The loop, every time:**
 
 ```powershell
-git checkout main
+git checkout dev
 git pull
 git checkout -b feature/<your-IT-ID>-<task>
 
@@ -188,20 +224,20 @@ git commit -m "..."
 git push -u origin feature/<your-IT-ID>-<task>
 ```
 
-**If your branch runs more than a day or two, keep it updated with `main`** so you're not
+**If your branch runs more than a day or two, keep it updated with `dev`** so you're not
 resolving a huge pile of conflicts at the end:
 
 ```powershell
-git checkout main
+git checkout dev
 git pull
 git checkout feature/<your-IT-ID>-<task>
-git merge main
+git merge dev
 ```
 
 Use `merge` here, not `rebase`. Rebase rewrites commit history, which causes real problems the
 moment a branch has already been pushed and someone else might look at it (exactly our
 situation, since branches get pushed for review) — merge is the safe, non-destructive option for
-any branch that isn't purely local and private to you. If `git merge main` shows a conflict, fix
+any branch that isn't purely local and private to you. If `git merge dev` shows a conflict, fix
 the conflicting lines in the flagged files, then `git add .` and `git commit` to finish the merge.
 
 **Before opening a PR, a quick self-check:**
@@ -210,12 +246,12 @@ the conflicting lines in the flagged files, then `git add .` and `git commit` to
 - PR description says *what* changed and *why*, not just "updates"
 - Tests pass, if you've added any for this piece
 
-Open a PR into `main` on GitHub, get at least one review, merge it. Then clean up **both** the
+Open a PR into **`dev`** on GitHub, get at least one review, merge it. Then clean up **both** the
 local and the remote branch — GitHub's merge screen has a "Delete branch" button that does the
 remote side for you, or do it manually:
 
 ```powershell
-git checkout main
+git checkout dev
 git pull
 git branch -d feature/<your-IT-ID>-<task>
 git push origin --delete feature/<your-IT-ID>-<task>
@@ -223,10 +259,10 @@ git push origin --delete feature/<your-IT-ID>-<task>
 
 - Keep commits scoped to your own module where possible — makes review and individual Git-history
   evidence (required for the assignment) much cleaner
-- `main` should always be in a working state — that's the point of small, frequently-merged
+- `dev` should always be in a working state — that's the point of small, frequently-merged
   branches instead of one long-lived branch per person
-
----
+- `main` is reserved for the final, submitted state of the project — nobody pushes to it directly
+  until the group agrees it's time to promote `dev` → `main` near the deadline
 
 ---
 
@@ -235,12 +271,12 @@ git push origin --delete feature/<your-IT-ID>-<task>
 ### Member 1 — Weather module
 
 **Owns, full stop:**
-- Entities: `WeatherStation`, `WeatherObservation`, `HistoricalWeather`, `Prediction`, `ForecastHistory`, `WeatherAlert`
-- Endpoints: `GET /api/weather/forecast/{district}`, `POST /api/weather/predict`, `GET /api/weather/alerts`, `GET /api/weather/history/{district}`
-- Agent: Weather Prediction Agent — input `{ district }`, output `{ floodProbability, confidence, alert? }`
+- Entities: `District`, `HistoricalWeather`, `WeatherStation`, `WeatherObservation`, `Prediction`, `WeatherAlert`, `ForecastHistory`, `AgentExecutionLog`
+- Endpoints: `GET /api/weather/districts`, `GET /api/weather/districts/{id}/historical`, `GET /api/weather/forecast/{districtId}`, `POST /api/weather/predict/{districtId}`, `POST /api/weather/alerts/{id}/review` (in progress), `GET /api/weather/alerts` (in progress), `GET /api/weather/analytics/accuracy` (in progress)
+- Agent: Weather Prediction Agent — input `{ districtName, isLandslideProne, forecastRainfallMm[], forecastWindKmh[], floodThresholdMm, landslideThresholdMm, windThresholdKmh }`, output `{ hazards: [{ hazardType, riskProbabilityPct, confidencePct, reasoningSummary, recommendedAction }] }` — one entry per relevant hazard (Flood + StrongWind always; Landslide only if the district is landslide-prone)
 - Third-party call: Open-Meteo API — this integration lives entirely inside this module, nobody else touches it
-- React: forecast dashboard, prediction graphs, alert list
-- Flutter: current weather screen, rain alerts, district search
+- React: forecast dashboard, prediction graphs, alert review queue (not started)
+- Flutter: current weather screen, rain/wind alerts, district search (not started)
 
 **Explicitly NOT this module's job:**
 - Deciding what a citizen does with a warning (that's Incident's UI choice, not Weather's)
@@ -272,16 +308,16 @@ git push origin --delete feature/<your-IT-ID>-<task>
 **Borders:**
 - Inbound (optional): you may call `GET /api/weather/alerts?district=X` purely to show context on the report screen. Nothing in your agent logic should require this to succeed — if that call fails or Weather isn't built yet, your module still works.
 - Outbound to Resource (hard border, you own this contract): the moment an officer approves a mission, you POST to Resource:
-  ```
+```
   POST /api/resource/dispatch-requests
   { "missionId": "...", "teamsRequired": 3, "location": { "lat": ..., "lng": ... } }
-  ```
+```
   You send exactly this — not the citizen's photo, not the full description, not victim names. Resource has no business seeing that.
 - Outbound to Recovery (hard border): once damage is logged and the incident closes, Recovery pulls:
-  ```
+```
   GET /api/incident/{id}/damage-report
   → { "incidentId": "...", "housesDamaged": 40, "displacedFamilies": 120, "infrastructureDamage": [...] }
-  ```
+```
   You expose this endpoint; Recovery calls it, not the other way around.
 
 **The exact line:** your module's responsibility ends the moment you've told Resource "here's what's needed and where," and ends again the moment you've told Recovery "here's what got damaged." You never plan a dispatch route and you never allocate a shelter — those verbs belong to your neighbors.
@@ -330,15 +366,44 @@ git push origin --delete feature/<your-IT-ID>-<task>
 
 **The exact line:** you only ever look backward to Incident's damage report, never sideways to Resource, never forward to anything (there's nothing after you).
 
+---
+
 ## Running the project locally
 
-_(fill in once docker-compose and the API host are set up)_
+There's no `docker-compose.yml` yet (still on the group's to-do list) — for now, everyone runs
+PostgreSQL locally themselves. This is the current, actually-working setup:
 
+1. Install .NET 10 SDK (`dotnet --list-sdks` must show `10.x`) — the whole solution targets net10.0.
+2. Install PostgreSQL (pgAdmin4 is fine) and create one database, e.g. `aegis_lk`.
+3. Set your connection string via user-secrets — **do not** edit `appsettings.Development.json`,
+   it's a shared file reserved for the eventual `docker-compose.yml` setup:
+```powershell
+   cd backend/Aegis.Api
+   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=aegis_lk;Username=postgres;Password=YOUR_PASSWORD"
 ```
-docker-compose up
+4. Run the API:
+```powershell
+   cd backend
+   dotnet run --project Aegis.Api
 ```
+   API docs UI: `http://localhost:5012/scalar/v1` — this repo uses .NET's newer `AddOpenApi()`/
+   `MapOpenApi()`, **not classic Swagger**, so there's no `/swagger` page.
+5. Each module owns its own DbContext and migrations — always specify `--context` on `dotnet ef`
+   commands:
+```powershell
+   dotnet ef migrations add <Name> --project Aegis.<YourModule> --startup-project Aegis.Api --context <YourModule>DbContext
+   dotnet ef database update --project Aegis.<YourModule> --startup-project Aegis.Api --context <YourModule>DbContext
+```
+6. **If your module has a Python agent** (FastAPI + LangGraph), run it as its own loopback-only
+   process, called internally by `Aegis.Api` — never by React/Flutter directly. Port convention so
+   we don't collide: **Weather = 8001** (already running). Pick the next free port (8002, 8003…)
+   for your own agent service and add it to this list once it's live:
+```powershell
+   cd agentic-ai/agents
+   uvicorn <your>_agent_service:app --host 127.0.0.1 --port 800X
+```
+   Free-tier Gemini (`gemini-2.5-flash-lite` or `models/gemini-3.1-flash-lite-preview` via `langchain-google-genai`) is the recommended model
+   for any agent — same setup used in the SE3090 labs, well-documented free-tier limits, no local
+   GPU or Ollama installation needed.
 
-- API: `http://localhost:5000/swagger`
-- React: `http://localhost:3000`
-- PostgreSQL: `localhost:5432`
-
+React: `http://localhost:3000` (once scaffolded). Flutter: run via your emulator/device of choice.

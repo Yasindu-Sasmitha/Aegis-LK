@@ -1,7 +1,6 @@
 using Aegis.Incident.Data;
 using Aegis.Incident.Endpoints;
 using Aegis.Recovery.Data;
-using Aegis.Incident.Endpoints;
 using Aegis.Recovery.Endpoints;
 using Aegis.Recovery.Services;
 using Aegis.Weather.Data;
@@ -55,7 +54,6 @@ app.MapWeatherEndpoints();
 app.MapRecoveryEndpoints();
 app.MapIncidentEndpoints();
 
-app.MapIncidentEndpoints();
 
 var summaries = new[]
 {
