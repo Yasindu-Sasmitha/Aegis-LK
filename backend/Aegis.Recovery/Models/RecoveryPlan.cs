@@ -15,6 +15,13 @@ public class RecoveryPlan
     public string? ReviewedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ReviewedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>Number of times the workflow has been revised and re-run.</summary>
+    public int RevisionCount { get; set; }
 
     public ICollection<RecoveryTask> Tasks { get; set; } = new List<RecoveryTask>();
+
+    /// <summary>One-to-one agentic execution log for observability.</summary>
+    public RecoveryWorkflowLog? WorkflowLog { get; set; }
 }

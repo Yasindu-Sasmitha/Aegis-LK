@@ -10,7 +10,7 @@ export const RecoveryReportsPage: React.FC = () => {
     async function load() {
       try {
         const data = await fetchReports();
-        setReports(data);
+        setReports(Array.isArray(data) ? data : (data as any).items || []);
       } catch (err) {
         console.error(err);
       } finally {

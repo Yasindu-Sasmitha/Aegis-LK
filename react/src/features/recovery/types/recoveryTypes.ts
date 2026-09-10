@@ -89,6 +89,51 @@ export interface TaskDto {
   targetCompletionDate?: string;
 }
 
+// ── Agentic Workflow Observability ──────────────────────────────────────────
+
+export interface AgentStepDto {
+  agentName: string;
+  role: string;
+  inputSummary: string;
+  outputSummary: string;
+  durationMs: number;
+  status: 'success' | 'failed' | 'skipped';
+  errorMessage?: string;
+}
+
+export interface ToolCallDto {
+  toolName: string;
+  inputJson: string;
+  outputJson: string;
+  durationMs: number;
+  status: 'success' | 'failed' | 'validation_error';
+  errorMessage?: string;
+}
+
+export interface ValidationResultDto {
+  ruleName: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface WorkflowTrace {
+  workflowLogId: string;
+  recoveryPlanId: string;
+  executionStatus: string;
+  totalDurationMs: number;
+  retryCount: number;
+  executionSummary: string;
+  agentSteps: AgentStepDto[];
+  toolCalls: ToolCallDto[];
+  validationResults: ValidationResultDto[];
+  errors: string;
+  approvedBy?: string;
+  approvalDecision?: string;
+  approvalTimestamp?: string;
+  approvalNotes?: string;
+  createdAt: string;
+}
+
 export interface RecoveryPlan {
   id: string;
   incidentId: string;
@@ -100,7 +145,29 @@ export interface RecoveryPlan {
   reviewedBy?: string;
   createdAt: string;
   reviewedAt?: string;
+  revisionCount: number;
   tasks: TaskDto[];
+  workflowTrace?: WorkflowTrace;
+}
+
+// ── Damage Intake Form ───────────────────────────────────────────────────────
+
+export interface InfrastructureItemInput {
+  assetName: string;
+  assetType: string;
+  damageLevel: string;
+  estimatedCost: number;
+}
+
+export interface DamageIntakeFormData {
+  district: string;
+  disasterType: string;
+  housesDamaged: number;
+  displacedFamilies: number;
+  infrastructureDamage: InfrastructureItemInput[];
+  reporterName?: string;
+  reporterContact?: string;
+  additionalNotes?: string;
 }
 
 export interface RecoveryReport {
@@ -113,4 +180,18 @@ export interface RecoveryReport {
   totalBudgetSpent: number;
   reportSummary: string;
   generatedAt: string;
+}
+
+export interface WorkflowListItem {
+  id: string;
+  incidentId: string;
+  planName: string;
+  status: string;
+  estimatedTotalBudget: number;
+  revisionCount: number;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  workflowStatus?: string;
+  totalAgentDurationMs?: number;
 }

@@ -23,7 +23,7 @@ export const ShelterManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchShelters();
-      setShelters(data);
+      setShelters(Array.isArray(data) ? data : (data as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {

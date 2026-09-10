@@ -11,7 +11,7 @@ export const CompensationPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchCompensations();
-      setClaims(data);
+      setClaims(Array.isArray(data) ? data : (data as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {
