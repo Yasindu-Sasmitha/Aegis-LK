@@ -25,7 +25,7 @@ export const DonationsPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchDonations();
-      setDonations(data);
+      setDonations(Array.isArray(data) ? data : (data as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {

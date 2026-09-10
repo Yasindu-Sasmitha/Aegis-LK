@@ -100,3 +100,63 @@ class AidRequestModel {
     );
   }
 }
+
+class InfrastructureDamageItem {
+  final String assetName;
+  final String assetType;
+  final String damageLevel;
+  final double estimatedCost;
+  final String? description;
+
+  InfrastructureDamageItem({
+    required this.assetName,
+    required this.assetType,
+    required this.damageLevel,
+    required this.estimatedCost,
+    this.description,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'assetName': assetName,
+        'assetType': assetType,
+        'damageLevel': damageLevel,
+        'estimatedCost': estimatedCost,
+        'description': description ?? '',
+      };
+}
+
+class DamageIntakeModel {
+  final String district;
+  final String disasterType;
+  final String location;
+  final int housesDamaged;
+  final int displacedFamilies;
+  final String reportedBy;
+  final String reporterContact;
+  final String? notes;
+  final List<InfrastructureDamageItem> infrastructureDamage;
+
+  DamageIntakeModel({
+    required this.district,
+    required this.disasterType,
+    required this.location,
+    required this.housesDamaged,
+    required this.displacedFamilies,
+    required this.reportedBy,
+    required this.reporterContact,
+    this.notes,
+    required this.infrastructureDamage,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'district': district,
+        'disasterType': disasterType,
+        'location': location,
+        'housesDamaged': housesDamaged,
+        'displacedFamilies': displacedFamilies,
+        'reportedBy': reportedBy,
+        'reporterContact': reporterContact,
+        'notes': notes,
+        'infrastructureDamage': infrastructureDamage.map((e) => e.toJson()).toList(),
+      };
+}

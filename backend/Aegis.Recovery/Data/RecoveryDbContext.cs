@@ -16,6 +16,7 @@ public class RecoveryDbContext : DbContext
     public DbSet<RecoveryPlan> RecoveryPlans => Set<RecoveryPlan>();
     public DbSet<RecoveryTask> RecoveryTasks => Set<RecoveryTask>();
     public DbSet<RecoveryReport> RecoveryReports => Set<RecoveryReport>();
+    public DbSet<RecoveryWorkflowLog> RecoveryWorkflowLogs => Set<RecoveryWorkflowLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -98,6 +99,18 @@ public class RecoveryDbContext : DbContext
         builder.Entity<RecoveryTask>()
             .Property(t => t.EstimatedCost)
             .HasPrecision(18, 2);
+
+        // RecoveryWorkflowLog — 1:1 with RecoveryPlan
+        builder.Entity<RecoveryWorkflowLog>()
+            .HasOne(w => w.RecoveryPlan)
+            .WithOne(p => p.WorkflowLog)
+            .HasForeignKey<RecoveryWorkflowLog>(w => w.RecoveryPlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<RecoveryWorkflowLog>()
+            .HasIndex(w => w.ExecutionStatus);
+        builder.Entity<RecoveryWorkflowLog>()
+            .HasIndex(w => w.RecoveryPlanId)
+            .IsUnique();
 
         // RecoveryReport
         builder.Entity<RecoveryReport>()

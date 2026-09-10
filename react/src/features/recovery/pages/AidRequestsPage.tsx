@@ -11,7 +11,7 @@ export const AidRequestsPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await fetchAidRequests();
-      setRequests(data);
+      setRequests(Array.isArray(data) ? data : (data as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {

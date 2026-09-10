@@ -4,6 +4,7 @@ import 'aid_request_screen.dart';
 import 'my_aid_requests_screen.dart';
 import 'donate_screen.dart';
 import 'recovery_plan_status_screen.dart';
+import 'citizen_damage_report_screen.dart';
 
 class RecoveryHomeScreen extends StatelessWidget {
   const RecoveryHomeScreen({Key? key}) : super(key: key);
@@ -24,10 +25,19 @@ class RecoveryHomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Find shelter, apply for emergency aid, or support affected communities.',
+            'Find shelter, report damage, apply for aid, or support affected communities.',
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 20),
+          _buildCard(
+            context,
+            title: 'Report Disaster Damage (AI Trigger)',
+            subtitle: 'Submit localized damage & trigger autonomous AI recovery planning.',
+            icon: Icons.report_problem_outlined,
+            color: Colors.red[700]!,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CitizenDamageReportScreen())),
+          ),
+          const SizedBox(height: 12),
           _buildCard(
             context,
             title: 'Find Emergency Shelters',
