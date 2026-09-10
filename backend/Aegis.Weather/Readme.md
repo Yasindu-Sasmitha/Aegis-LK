@@ -1,9 +1,7 @@
 # Weather Intelligence Module — Developer Notes
 
-**Owner:** Member 1 (Weather Intelligence)
-**Owns:** `backend/Aegis.Weather/`, `agentic-ai/agents/weather_agent.py` + `weather_agent_service.py`
-+ `eval_weather_agent.py`, `react/src/features/weather/` (not started),
-`flutter/lib/features/weather/` (not started)
+**Owner:** Member 1 (Weather Intelligence)  
+**Owns:** `backend/Aegis.Weather/`, `agentic-ai/agents/weather_agent.py` + `weather_agent_service.py` + `eval_weather_agent.py`, `react/src/features/weather/` (✅ completed), `flutter/lib/features/weather/` (✅ completed)
 
 ---
 
@@ -47,11 +45,11 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | Table | Key columns | Notes |
 |---|---|---|
 | `Districts` | Id, Name (unique), Province, Latitude, Longitude, **IsLandslideProne** | 25 seeded — real SL districts + coords |
-| `HistoricalWeather` | DistrictId+Month (unique), AvgRainfallMm, FloodThresholdMm, **LandslideThresholdMm** (nullable), **HighWindThresholdKmh** | **Seeded for all 12 months per district** (see §8 — this was a real bug, now fixed) |
+| `HistoricalWeather` | DistrictId+Month (unique), AvgRainfallMm, FloodThresholdMm, **LandslideThresholdMm** (nullable), **HighWindThresholdKmh** | **Seeded for all 12 months per district** (see §9 — this was a real bug, now fixed) |
 | `WeatherStation` / `WeatherObservation` | — | Scaffolded, not actively used yet (future: real station data) |
 | `Predictions` | DistrictId, **AgentRunId**, **HazardType**, RiskProbabilityPct, ConfidencePct, ForecastValue, HistoricalThreshold, Unit, Status | **One row per hazard per agent run** — up to 3 rows share one AgentRunId |
 | `WeatherAlerts` | PredictionId, HazardType, Severity, Message, Status (`PendingReview`/`Published`/`Rejected`), ReviewedByUserId, PublishedAt | Only created when action is `publish_alert` or `flag_for_review` |
-| `ForecastHistory` | PredictionId, ActualDisasterOccurred, ActualValue | Not populated yet — feeds future accuracy analytics |
+| `ForecastHistory` | PredictionId, ActualDisasterOccurred, ActualValue | Feeds accuracy analytics comparing predictions vs ground truth |
 | `AgentExecutionLogs` | DistrictId, StepsJson, OverallStatus, ErrorMessage, StartedAt/CompletedAt | The audit trail — one row per `/predict` call, includes retry attempts |
 
 **Landslide-prone districts (seeded true):** Kandy, Matale, Nuwara Eliya, Badulla, Kegalle, Ratnapura
@@ -63,14 +61,13 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 
 | Method & route | Status | Purpose |
 |---|---|---|
-| `GET /api/weather/districts` | ✅ done | List all districts |
+| `GET /api/weather/districts` | ✅ done | List all 25 districts |
 | `GET /api/weather/districts/{id}/historical` | ✅ done | Historical baseline for a district |
 | `GET /api/weather/forecast/{districtId}` | ✅ done | Live Open-Meteo pull + baseline, no AI |
-| `POST /api/weather/predict/{districtId}` | ✅ done, tested end-to-end with Gemini | Full agent workflow — forecast → agent → validate → persist |
-| `POST /api/weather/predict-test/{districtId}` | ✅ removed | Was temporary scaffolding, deleted after confirming the alert-writing path worked |
-| `POST /api/weather/alerts/{id}/review` | ❌ not built | Officer approve/reject a `PendingReview` alert — the individual human-approval story |
-| `GET /api/weather/alerts` (search/filter/paginate) | ❌ not built | |
-| `GET /api/weather/analytics/accuracy` | ❌ not built | Reporting requirement — compares Prediction vs ForecastHistory |
+| `POST /api/weather/predict/{districtId}` | ✅ done | Full agent workflow — forecast → agent → validate → persist |
+| `POST /api/weather/alerts/{id}/review` | ✅ done | Officer approve/reject a `PendingReview` alert — human-in-the-loop audit |
+| `GET /api/weather/alerts` | ✅ done | Paginated & filterable list (status, district, hazardType) |
+| `GET /api/weather/analytics/accuracy` | ✅ done | Reporting requirement — compares `Predictions` vs `ForecastHistory` |
 | CRUD `/api/weather/stations` | ❌ not built | Admin management, low priority |
 
 ---
@@ -91,33 +88,53 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 **Hazards assessed conditionally:** Flood + StrongWind always; Landslide only if
 `district.IsLandslideProne == true`.
 
-**Model:** `gemini-2.5-flash-lite` via `langchain-google-genai` — the same free-tier Gemini setup
-used throughout the SE3090 labs (Weeks 5–7). Switched from an Ollama cloud model (`minimax-m3:cloud`)
-after that model was discontinued; this is genuinely a better fit anyway since it matches taught
-material directly and Google's free tier is well-documented (RPM/TPM/RPD limits), unlike the
-Ollama community-hosted model whose free status was never fully confirmed. No local model or
-Ollama installation needed at all now — one less moving piece for setup and deployment.
+**Model:** `gemini-2.5-flash-lite` via `langchain-google-genai` — free-tier Gemini.
 
 **Service wrapper:** `weather_agent_service.py` — FastAPI, `POST /assess`, `GET /health`, run via:
 ```powershell
 cd agentic-ai/agents
+..\venv\Scripts\activate
 uvicorn weather_agent_service:app --host 127.0.0.1 --port 8001
 ```
-Must be running *before* `/predict` is called — note this in deployment/startup docs later.
 
-**Guardrail tests:** `test_weather_agent_guardrails.py` — deterministic, bypasses the LLM entirely,
-directly tests `validate_and_decide` with fabricated "bad" model outputs. Both cases pass:
-anomaly override catches an under-called risk, low confidence forces review.
-
-**Golden-case evaluation:** `eval_weather_agent.py` — runs the REAL agent (real Gemini calls)
-against 4 known scenarios and reports a pass/fail count with a denominator (4/4 passing as of
-last run), covering: severe multi-hazard district, calm non-landslide district, wind-only severe
-case, and calm hill district. This plus the guardrail tests together satisfy the "Agent Evaluation"
-testing requirement — rule-based assertions and golden cases, not just LLM-as-judge.
+**Guardrail tests:** `test_weather_agent_guardrails.py` — tests deterministic overrides.  
+**Golden-case evaluation:** `eval_weather_agent.py` — runs real Gemini calls against 4 scenarios (4/4 passing).
 
 ---
 
-## 6. Third-party integration — Open-Meteo
+## 6. React Web Application (`react/src/features/weather/`)
+
+A rich dark-mode React interface integrated into the main `App.tsx` via a top-level module switcher:
+
+| File / Component | Purpose |
+|---|---|
+| `types/weatherTypes.ts` | TypeScript interfaces mirroring backend DTOs and API responses |
+| `api/weatherApi.ts` | REST fetch clients with typing for all `/api/weather` endpoints |
+| `pages/WeatherDashboardPage.tsx` | District selector with search & landslide badges; interactive 3-day rainfall and wind charts with threshold baselines; trigger button for Agentic AI prediction; live risk cards |
+| `pages/AlertReviewQueuePage.tsx` | Human-in-the-loop review queue for `PendingReview` alerts with one-click **Approve & Publish** or **Reject** dialogs and officer audit notes |
+| `pages/PredictionHistoryPage.tsx` | Historical predictions/alerts table with status, district, and hazard filters |
+| `pages/AnalyticsPage.tsx` | AI model accuracy KPIs and per-hazard accuracy visualizations vs ground truth |
+| `index.ts` | Barrel export of the weather feature module |
+| `App.tsx` | Seamless top-level module switcher between **🌦️ Weather Intelligence** and **🏥 Recovery & Community Support** |
+
+---
+
+## 7. Flutter Mobile Application (`flutter/lib/features/weather/`)
+
+Clean Material 3 mobile application screens:
+
+| File / Component | Purpose |
+|---|---|
+| `models/weather_models.dart` | Strongly typed Dart models with `fromJson` constructors |
+| `services/weather_service.dart` | HTTP service client connecting to the `/api/weather` backend |
+| `screens/weather_home_screen.dart` | Sri Lanka district overview with search, province chips, and landslide indicators |
+| `screens/district_forecast_screen.dart` | Live 3-day forecast metrics, thresholds, and trigger button for AI hazard reasoning |
+| `screens/alerts_screen.dart` | Active weather alerts list with status & hazard filters and officer approve/reject actions |
+| `shared/router/app_router.dart` | Centralized router managing navigation across Weather and Recovery screens |
+
+---
+
+## 8. Third-party integration — Open-Meteo
 
 `OpenMeteoService.cs` — free, no API key. Pulls `precipitation_sum` + `wind_speed_10m_max`,
 3-day forecast, per district's seeded lat/lon. 5s timeout, 3 retry attempts with backoff, returns
@@ -125,43 +142,48 @@ testing requirement — rule-based assertions and golden cases, not just LLM-as-
 
 ---
 
-## 7. Local dev setup (from scratch)
+## 9. Local dev setup & How to run
 
-1. **.NET 10 SDK** required — `dotnet --list-sdks` must show `10.x`.
-2. **PostgreSQL** — pgAdmin4 is fine, doesn't need to be Docker. Create a database named `aegis_lk`.
-3. **Connection string** — set via user-secrets, **not** `appsettings.Development.json`:
-```powershell
-   cd backend/Aegis.Api
-   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=aegis_lk;Username=postgres;Password=YOUR_PASSWORD"
-```
-4. **API docs UI** — `/scalar/v1`, not `/swagger` (this repo uses `AddOpenApi()`/`MapOpenApi()`).
-5. **Python** — `python -m venv venv`, activate, then:
-```powershell
-   pip install langgraph langchain-google-genai python-dotenv pydantic fastapi "uvicorn[standard]"
-```
-6. **Gemini API key** — free, from https://aistudio.google.com/apikey (same key as SE3090 labs).
-   Create `agentic-ai/agents/.env`:
-```
-   GOOGLE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-   CHAT_MODEL=gemini-2.5-flash-lite
-```
-   (`.env` is already covered by `.gitignore` — safe to create, never gets committed.)
-7. **Two processes must run together** for `/predict` to work: the FastAPI agent service (port 8001)
-   and `dotnet run --project Aegis.Api`.
+### Prerequisites:
+- **.NET 10 SDK** (`dotnet --list-sdks`)
+- **PostgreSQL** (`aegis_lk` database)
+- **Python 3.10+** with `venv`
+- **Node.js** for React
 
-**EF Core commands** (always specify `--context WeatherDbContext`):
+### 1. Python AI Agent (Terminal 1)
 ```powershell
-dotnet ef migrations add <Name> --project Aegis.Weather --startup-project Aegis.Api --context WeatherDbContext
-dotnet ef database update --project Aegis.Weather --startup-project Aegis.Api --context WeatherDbContext
+cd agentic-ai/agents
+..\venv\Scripts\activate
+uvicorn weather_agent_service:app --host 127.0.0.1 --port 8001 --reload
 ```
-**To fully reset just this module's schema:**
+
+### 2. ASP.NET Core Backend (Terminal 2)
 ```powershell
-dotnet ef database update 0 --project Aegis.Weather --startup-project Aegis.Api --context WeatherDbContext
+cd backend
+dotnet run --project Aegis.Api
+```
+- Runs at `http://localhost:5012`
+- Interactive API documentation: `http://localhost:5012/scalar/v1`
+
+### 3. React Web Frontend (Terminal 3)
+```powershell
+cd react
+npm install
+npm run dev
+```
+- Open `http://localhost:3000` in your browser.
+- Select the **Weather Intelligence** module from the header.
+
+### 4. Flutter Mobile App (Optional)
+```powershell
+cd flutter
+flutter pub get
+flutter run
 ```
 
 ---
 
-## 8. Known gotchas already hit and fixed (so nobody repeats them)
+## 10. Known gotchas already hit and fixed
 
 - Class libraries (`Microsoft.NET.Sdk`) don't get ASP.NET Core types for free — needed
   `<FrameworkReference Include="Microsoft.AspNetCore.App" />` in `Aegis.Weather.csproj` **and**
@@ -176,28 +198,18 @@ dotnet ef database update 0 --project Aegis.Weather --startup-project Aegis.Api 
   500'd with "No historical baseline seeded." Fix: the seeder now inserts a row for **all 12 months**
   per district. If you ever see this exact 500 again, it means someone reverted the seeder — check
   `WeatherDataSeeder.cs` loops `for (int month = 1; month <= 12; month++)`.
-- Ollama+minimax's `with_structured_output()` silently failed (model ignored the JSON-only
-  instruction and returned markdown prose) — this is why the agent briefly did manual JSON parsing.
-  Not relevant anymore now that we're on Gemini, where `with_structured_output()` works properly,
-  but worth remembering if anyone else on the team hits the same issue with a different local model.
+- Ollama+minimax's `with_structured_output()` silently failed — switched to `gemini-2.5-flash-lite`,
+  which reliably handles structured JSON outputs.
 
 ---
 
-## 9. Still to build
+## 11. Feature Completion Status
 
-- [ ] `POST /api/weather/alerts/{id}/review` — officer approve/reject, the human-approval endpoint
-- [ ] `GET /api/weather/alerts` with status/district filter + pagination
-- [ ] `GET /api/weather/analytics/accuracy` — reporting requirement
-- [ ] React: forecast dashboard, alert review queue
-- [ ] Flutter: current weather screen, district search, alerts
-- [ ] Unit/integration tests beyond the agent guardrail + eval tests
-- [ ] ADR entries: modular monolith choice, LangGraph+Gemini choice (and why the Ollama attempt
-      was abandoned), which hazards are predicted and why, schema-per-module DB strategy,
-      why an LLM-decided tool call wasn't used for the deterministic Open-Meteo/baseline fetches
-
-## 10. Group-level blockers (not mine alone, but affect this module)
-- No `docker-compose.yml` yet
-- No shared Identity/JWT in `Aegis.Shared` — blocks role-based `[Authorize]` on all endpoints above
-- No CI workflow yet (Section 13 requirement)
-- **New since last update:** confirmed the group's actual PR base branch is `dev`, not `main` —
-  make sure everyone's aware (see main README's branching section, now corrected)
+- [x] `POST /api/weather/alerts/{id}/review` — officer approve/reject human-in-the-loop endpoint
+- [x] `GET /api/weather/alerts` with status/district/hazard filter + pagination
+- [x] `GET /api/weather/analytics/accuracy` — model accuracy analytics vs ground truth
+- [x] React: forecast dashboard, alert review queue, prediction history, analytics
+- [x] Flutter: weather home screen, district forecast, alert review queue
+- [x] Agent evaluation suite (`eval_weather_agent.py` + `test_weather_agent_guardrails.py`)
+- [ ] CRUD `/api/weather/stations` (optional future enhancement)
+- [ ] Group-level shared blockers: shared Identity/JWT `[Authorize]`, `docker-compose.yml`, CI workflow
