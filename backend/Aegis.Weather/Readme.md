@@ -1,16 +1,17 @@
 # Weather Intelligence Module — Developer Notes
 
 **Owner:** Member 1 (Weather Intelligence)
-**Owns:** `backend/Aegis.Weather/`, `agentic-ai/agents/weather_agent.py` + `weather_agent_service.py`,
-`react/src/features/weather/` (not started), `flutter/lib/features/weather/` (not started)
+**Owns:** `backend/Aegis.Weather/`, `agentic-ai/agents/weather_agent.py` + `weather_agent_service.py`
++ `eval_weather_agent.py`, `react/src/features/weather/` (not started),
+`flutter/lib/features/weather/` (not started)
 
 ---
 
 ## 1. What this module does
 
-Predicts three hazard types per Sri Lanka district — **Flood, Landslide, Strong Wind** — using live
-Open-Meteo forecast data compared against seeded historical thresholds. A LangGraph agent reasons
-over the numbers; deterministic code (not the LLM) makes the final publish/review decision.
+Predicts three hazard types per Sri Lanka district — **Flood, Strong Wind, and Landslide** — using
+live Open-Meteo forecast data compared against seeded historical thresholds. A LangGraph agent
+reasons over the numbers; deterministic code (not the LLM) makes the final publish/review decision.
 Low-confidence or under-called risks get routed to a human officer instead of auto-publishing.
 
 **Explicitly out of scope** (documented decision, not an oversight):
@@ -34,7 +35,7 @@ credentials at all** — pure stateless reasoning in, JSON out. All persistence 
 ```
 Flutter/React → ASP.NET Core (Aegis.Api) → WeatherDbContext (PostgreSQL, schema "weather")
                               ↓ internal HTTP call only
-                   Python FastAPI (127.0.0.1:8001) → LangGraph → Ollama
+                   Python FastAPI (127.0.0.1:8001) → LangGraph → Gemini (gemini-2.5-flash-lite)
 ```
 
 ---
@@ -46,12 +47,12 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | Table | Key columns | Notes |
 |---|---|---|
 | `Districts` | Id, Name (unique), Province, Latitude, Longitude, **IsLandslideProne** | 25 seeded — real SL districts + coords |
-| `HistoricalWeather` | DistrictId+Month (unique), AvgRainfallMm, FloodThresholdMm, **LandslideThresholdMm** (nullable), **HighWindThresholdKmh** | Landslide threshold null for non-hill districts |
+| `HistoricalWeather` | DistrictId+Month (unique), AvgRainfallMm, FloodThresholdMm, **LandslideThresholdMm** (nullable), **HighWindThresholdKmh** | **Seeded for all 12 months per district** (see §8 — this was a real bug, now fixed) |
 | `WeatherStation` / `WeatherObservation` | — | Scaffolded, not actively used yet (future: real station data) |
-| `Predictions` | DistrictId, **AgentRunId**, **HazardType**, RiskProbabilityPct, ConfidencePct, ForecastValue, HistoricalThreshold, Unit, Status | **One row per hazard per agent run** — 3 rows share one AgentRunId |
+| `Predictions` | DistrictId, **AgentRunId**, **HazardType**, RiskProbabilityPct, ConfidencePct, ForecastValue, HistoricalThreshold, Unit, Status | **One row per hazard per agent run** — up to 3 rows share one AgentRunId |
 | `WeatherAlerts` | PredictionId, HazardType, Severity, Message, Status (`PendingReview`/`Published`/`Rejected`), ReviewedByUserId, PublishedAt | Only created when action is `publish_alert` or `flag_for_review` |
 | `ForecastHistory` | PredictionId, ActualDisasterOccurred, ActualValue | Not populated yet — feeds future accuracy analytics |
-| `AgentExecutionLogs` | DistrictId, StepsJson, OverallStatus, ErrorMessage, StartedAt/CompletedAt | The audit trail — one row per `/predict` call |
+| `AgentExecutionLogs` | DistrictId, StepsJson, OverallStatus, ErrorMessage, StartedAt/CompletedAt | The audit trail — one row per `/predict` call, includes retry attempts |
 
 **Landslide-prone districts (seeded true):** Kandy, Matale, Nuwara Eliya, Badulla, Kegalle, Ratnapura
 (real Sri Lanka hill country, matches how NBRO actually issues landslide warnings).
@@ -65,8 +66,8 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | `GET /api/weather/districts` | ✅ done | List all districts |
 | `GET /api/weather/districts/{id}/historical` | ✅ done | Historical baseline for a district |
 | `GET /api/weather/forecast/{districtId}` | ✅ done | Live Open-Meteo pull + baseline, no AI |
-| `POST /api/weather/predict/{districtId}` | ✅ done | Full agent workflow — forecast → agent → validate → persist |
-| `POST /api/weather/predict-test/{districtId}` | ⚠️ **temporary, delete before submission** | Feeds hardcoded high-risk numbers through same logic, proves alert-writing path |
+| `POST /api/weather/predict/{districtId}` | ✅ done, tested end-to-end with Gemini | Full agent workflow — forecast → agent → validate → persist |
+| `POST /api/weather/predict-test/{districtId}` | ✅ removed | Was temporary scaffolding, deleted after confirming the alert-writing path worked |
 | `POST /api/weather/alerts/{id}/review` | ❌ not built | Officer approve/reject a `PendingReview` alert — the individual human-approval story |
 | `GET /api/weather/alerts` (search/filter/paginate) | ❌ not built | |
 | `GET /api/weather/analytics/accuracy` | ❌ not built | Reporting requirement — compares Prediction vs ForecastHistory |
@@ -77,10 +78,9 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 ## 5. The agent — `weather_agent.py`
 
 **LangGraph, 2 nodes:**
-1. `compute_risk` — calls the LLM with forecast + thresholds, must return strict JSON
-   (`format="json"` on Ollama + manual Pydantic validation — do **not** rely on
-   `with_structured_output()`, it silently fails on models without proper tool-calling support
-   through Ollama; learned this the hard way, see §7).
+1. `compute_risk` — calls Gemini via `with_structured_output()`, **tries once, retries once** on
+   any failure (parse error, transient network issue) before giving up — a self-correction pattern
+   mirroring Lab 06's grade/rewrite loop. Every attempt (success or failure) is logged to `steps`.
 2. `validate_and_decide` — **code-side gate, not the LLM's own claim:**
    - `confidence_pct < 70` → forces `flag_for_review` regardless of what the model said
    - Anomaly override: if forecast value ≥ 1.3× the historical threshold but the model said
@@ -91,22 +91,29 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 **Hazards assessed conditionally:** Flood + StrongWind always; Landslide only if
 `district.IsLandslideProne == true`.
 
-**Model:** `minimax-m3:cloud` via Ollama (chosen for laptop hardware constraints — quality without a
-local GPU). **Open item:** confirm this is genuinely free/no-cost long-term, and keep a local fallback
-(`llama3.2` or `llama3.2:1b`) tested and ready, since cloud = internet-dependent = one more thing that
-can fail during a live demo. **This decision needs its own ADR entry.**
+**Model:** `gemini-2.5-flash-lite` via `langchain-google-genai` — the same free-tier Gemini setup
+used throughout the SE3090 labs (Weeks 5–7). Switched from an Ollama cloud model (`minimax-m3:cloud`)
+after that model was discontinued; this is genuinely a better fit anyway since it matches taught
+material directly and Google's free tier is well-documented (RPM/TPM/RPD limits), unlike the
+Ollama community-hosted model whose free status was never fully confirmed. No local model or
+Ollama installation needed at all now — one less moving piece for setup and deployment.
 
 **Service wrapper:** `weather_agent_service.py` — FastAPI, `POST /assess`, `GET /health`, run via:
 ```powershell
-cd agentic-ai\agents
+cd agentic-ai/agents
 uvicorn weather_agent_service:app --host 127.0.0.1 --port 8001
 ```
 Must be running *before* `/predict` is called — note this in deployment/startup docs later.
 
 **Guardrail tests:** `test_weather_agent_guardrails.py` — deterministic, bypasses the LLM entirely,
 directly tests `validate_and_decide` with fabricated "bad" model outputs. Both cases pass:
-anomaly override catches an under-called risk, low confidence forces review. This is the "rule-based
-assertion" evidence the Agent Evaluation section wants — LLM-as-judge alone isn't enough per spec.
+anomaly override catches an under-called risk, low confidence forces review.
+
+**Golden-case evaluation:** `eval_weather_agent.py` — runs the REAL agent (real Gemini calls)
+against 4 known scenarios and reports a pass/fail count with a denominator (4/4 passing as of
+last run), covering: severe multi-hazard district, calm non-landslide district, wind-only severe
+case, and calm hill district. This plus the guardrail tests together satisfy the "Agent Evaluation"
+testing requirement — rule-based assertions and golden cases, not just LLM-as-judge.
 
 ---
 
@@ -120,36 +127,37 @@ assertion" evidence the Agent Evaluation section wants — LLM-as-judge alone is
 
 ## 7. Local dev setup (from scratch)
 
-1. **.NET 10 SDK** required — `dotnet --list-sdks` must show `10.x`. (Repo targets net10.0; a
-   default `dotnet new classlib` on a machine with only .NET 8 will silently create a net8.0 project
-   and cascade into NuGet + `.slnx` parse errors — install .NET 10, don't fight it.)
+1. **.NET 10 SDK** required — `dotnet --list-sdks` must show `10.x`.
 2. **PostgreSQL** — pgAdmin4 is fine, doesn't need to be Docker. Create a database named `aegis_lk`.
-3. **Connection string** — set via user-secrets, **not** `appsettings.Development.json` (that file
-   assumes the team's eventual `docker-compose.yml` on port 5433 — don't touch it):
+3. **Connection string** — set via user-secrets, **not** `appsettings.Development.json`:
 ```powershell
    cd backend/Aegis.Api
    dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=aegis_lk;Username=postgres;Password=YOUR_PASSWORD"
 ```
-4. **API docs UI** — this repo uses .NET's newer `AddOpenApi()`/`MapOpenApi()`, not classic Swagger —
-   there's no `/swagger` page. `Scalar.AspNetCore` is added for an interactive UI at `/scalar/v1`.
-5. **Python** — `python -m venv venv`, activate, `pip install langgraph langchain-ollama pydantic fastapi "uvicorn[standard]"`.
-6. **Ollama** — install from ollama.com, `ollama pull llama3.2` (local fallback model).
+4. **API docs UI** — `/scalar/v1`, not `/swagger` (this repo uses `AddOpenApi()`/`MapOpenApi()`).
+5. **Python** — `python -m venv venv`, activate, then:
+```powershell
+   pip install langgraph langchain-google-genai python-dotenv pydantic fastapi "uvicorn[standard]"
+```
+6. **Gemini API key** — free, from https://aistudio.google.com/apikey (same key as SE3090 labs).
+   Create `agentic-ai/agents/.env`:
+```
+   GOOGLE_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   CHAT_MODEL=gemini-2.5-flash-lite
+```
+   (`.env` is already covered by `.gitignore` — safe to create, never gets committed.)
 7. **Two processes must run together** for `/predict` to work: the FastAPI agent service (port 8001)
    and `dotnet run --project Aegis.Api`.
 
-**EF Core commands** (always specify `--context WeatherDbContext`, since multiple DbContexts exist
-in this solution and EF can't disambiguate on its own):
+**EF Core commands** (always specify `--context WeatherDbContext`):
 ```powershell
 dotnet ef migrations add <Name> --project Aegis.Weather --startup-project Aegis.Api --context WeatherDbContext
 dotnet ef database update --project Aegis.Weather --startup-project Aegis.Api --context WeatherDbContext
 ```
-**To fully reset just this module's schema** (clean way, don't hand-drop schemas):
+**To fully reset just this module's schema:**
 ```powershell
 dotnet ef database update 0 --project Aegis.Weather --startup-project Aegis.Api --context WeatherDbContext
 ```
-(Manually dropping the schema without this leaves `__EFMigrationsHistory` — which lives in `public`,
-not `weather` — thinking migrations are already applied. Caused a real failure once; this command
-avoids it entirely.)
 
 ---
 
@@ -159,11 +167,19 @@ avoids it entirely.)
   `<FrameworkReference Include="Microsoft.AspNetCore.App" />` in `Aegis.Weather.csproj` **and**
   explicit usings (`Microsoft.AspNetCore.Builder`, `.Http`, `.Routing`) in any file using `WebApplication`.
 - "More than one DbContext was found" on any `dotnet ef` command → always pass `--context WeatherDbContext`.
-- LLM ignoring "return only JSON" → don't trust prompting alone; use `format="json"` + manual
-  Pydantic validation, don't assume `with_structured_output()` works with every Ollama model.
 - Guardrail bug (now fixed): Flood's anomaly check was comparing max-single-day rainfall against a
   cumulative threshold — inconsistent with how the prompt described it to the LLM. Now both Flood
   and Landslide sum all 3 days.
+- **Seeder bug (now fixed) — the important one:** `HistoricalWeather` was originally only seeded
+  for whichever month the seeder happened to first run in (e.g. August). Once the calendar rolled
+  into September, every baseline lookup returned null, `/forecast` showed nulls, and `/predict`
+  500'd with "No historical baseline seeded." Fix: the seeder now inserts a row for **all 12 months**
+  per district. If you ever see this exact 500 again, it means someone reverted the seeder — check
+  `WeatherDataSeeder.cs` loops `for (int month = 1; month <= 12; month++)`.
+- Ollama+minimax's `with_structured_output()` silently failed (model ignored the JSON-only
+  instruction and returned markdown prose) — this is why the agent briefly did manual JSON parsing.
+  Not relevant anymore now that we're on Gemini, where `with_structured_output()` works properly,
+  but worth remembering if anyone else on the team hits the same issue with a different local model.
 
 ---
 
@@ -172,14 +188,16 @@ avoids it entirely.)
 - [ ] `POST /api/weather/alerts/{id}/review` — officer approve/reject, the human-approval endpoint
 - [ ] `GET /api/weather/alerts` with status/district filter + pagination
 - [ ] `GET /api/weather/analytics/accuracy` — reporting requirement
-- [ ] Delete `/predict-test/{districtId}` before final submission
 - [ ] React: forecast dashboard, alert review queue
 - [ ] Flutter: current weather screen, district search, alerts
-- [ ] Unit/integration tests beyond the agent guardrail tests
-- [ ] ADR entries: modular monolith choice, LangGraph+Ollama choice (incl. cloud vs local model
-      tradeoff), which hazards are predicted and why, schema-per-module DB strategy
+- [ ] Unit/integration tests beyond the agent guardrail + eval tests
+- [ ] ADR entries: modular monolith choice, LangGraph+Gemini choice (and why the Ollama attempt
+      was abandoned), which hazards are predicted and why, schema-per-module DB strategy,
+      why an LLM-decided tool call wasn't used for the deterministic Open-Meteo/baseline fetches
 
 ## 10. Group-level blockers (not mine alone, but affect this module)
 - No `docker-compose.yml` yet
 - No shared Identity/JWT in `Aegis.Shared` — blocks role-based `[Authorize]` on all endpoints above
 - No CI workflow yet (Section 13 requirement)
+- **New since last update:** confirmed the group's actual PR base branch is `dev`, not `main` —
+  make sure everyone's aware (see main README's branching section, now corrected)
