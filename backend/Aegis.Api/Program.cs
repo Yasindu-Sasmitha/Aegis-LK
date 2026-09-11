@@ -35,6 +35,16 @@ builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentAgentClient>(clie
     client.BaseAddress = new Uri("http://127.0.0.1:8002");
 });
 
+
+var cloudinarySettings = new Aegis.Incident.Services.CloudinarySettings
+{
+    CloudName = builder.Configuration["Cloudinary:CloudName"] ?? "",
+    ApiKey = builder.Configuration["Cloudinary:ApiKey"] ?? "",
+    ApiSecret = builder.Configuration["Cloudinary:ApiSecret"] ?? ""
+};
+builder.Services.AddSingleton(cloudinarySettings);
+builder.Services.AddSingleton<Aegis.Incident.Services.CloudinaryService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
