@@ -30,6 +30,11 @@ builder.Services.AddHttpClient<Aegis.Weather.Services.WeatherAgentClient>(client
     client.BaseAddress = new Uri("http://127.0.0.1:8001");
 });
 
+builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentAgentClient>(client =>
+{
+    client.BaseAddress = new Uri("http://127.0.0.1:8002");
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

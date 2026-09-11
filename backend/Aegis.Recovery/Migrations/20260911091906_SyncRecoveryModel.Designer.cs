@@ -3,6 +3,7 @@ using System;
 using Aegis.Recovery.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aegis.Recovery.Migrations
 {
     [DbContext(typeof(RecoveryDbContext))]
-    partial class RecoveryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911091906_SyncRecoveryModel")]
+    partial class SyncRecoveryModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
