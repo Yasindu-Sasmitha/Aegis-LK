@@ -76,8 +76,8 @@ Real problems the group has already hit, so nobody loses an hour rediscovering t
 
 ## Member 1 — Weather Intelligence
 
-**Owns:** `backend/Aegis.Weather/`, `react/src/features/weather/` (not started),
-`flutter/lib/features/weather/` (not started), `agentic-ai/agents/weather_agent.py` +
+**Owns:** `backend/Aegis.Weather/`, `react/src/features/weather/` (✅ completed),
+`flutter/lib/features/weather/` (✅ completed), `agentic-ai/agents/weather_agent.py` +
 `weather_agent_service.py`
 
 **What this module does:** predicts three hazard types per district — **Flood, Strong Wind, and
@@ -96,10 +96,9 @@ the final publish/review decision.
 
 **Third-party integration:** Open-Meteo API (free, no key required) for live weather forecasts.
 
-**Runs independently?** Yes — this module has no hard dependency on the other three. It produces
-warnings that *other* modules (like Incident) can optionally consume, but it doesn't need
-anything from them to function or be demoed on its own. District/forecast/predict endpoints are
-live; officer-review and analytics endpoints are still in progress.
+**Runs independently?** Yes — this module has no hard dependency on the other three. All endpoints
+(district baselines, live Open-Meteo forecasts, Agentic AI prediction, human-in-the-loop officer alert
+review, and accuracy analytics) are live, fully functional, and secured with JWT role-based authorization.
 
 ---
 
@@ -178,6 +177,19 @@ anything bigger in the group chat before merging:
 - `flutter/lib/shared/`, `flutter/lib/shared/router/app_router.dart`
 - `agentic-ai/orchestrator/`
 - `docker-compose.yml`
+
+### Authentication & Role-Based Access Control (`Aegis.Shared`)
+
+A centralized, JWT-based authentication system runs in the `auth` PostgreSQL schema (`AuthDbContext`):
+- **Roles:** `Admin`, `DisasterOfficer`, `Responder`, `Citizen`.
+- **Public Registration:** `POST /api/auth/register` strictly creates `Citizen` accounts. Staff roles are provisioned by Admins via `POST /api/auth/admin/users`.
+- **Pre-Seeded Demo Accounts** (Password: `Aegis@123`):
+  - `admin@aegis.lk` (`Admin`)
+  - `officer@aegis.lk` (`DisasterOfficer`)
+  - `responder@aegis.lk` (`Responder`)
+  - `citizen@aegis.lk` (`Citizen`)
+- **Quick Demo Login:** Both React (`http://localhost:3000`) and Flutter feature one-click demo login buttons for each role for instant testing and viva demonstrations.
+- **Secret Storage:** `Jwt:SigningKey` is stored in `dotnet user-secrets` for `Aegis.Api`, never committed to git (satisfying Section 18.2).
 
 ---
 

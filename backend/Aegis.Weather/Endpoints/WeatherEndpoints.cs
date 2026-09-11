@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -145,9 +146,13 @@ public static class WeatherEndpoints
 
             await db.SaveChangesAsync();
             return Results.Ok(new { district.Name, AgentRunId = agentRunId, Results = results });
-        });
+        }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
 
-        group.MapPost("/alerts/{id:guid}/review", async (Guid id, AlertReviewRequest body, WeatherDbContext db) =>
+        group.MapPost("/alerts/{id:guid}/review", async (
+            Guid id,
+            AlertReviewRequest body,
+            WeatherDbContext db,
+            ClaimsPrincipal principal) =>
         {
             if (body.Decision is not ("Approved" or "Rejected"))
                 return Results.BadRequest(new { error = "Decision must be 'Approved' or 'Rejected'." });
@@ -157,8 +162,17 @@ public static class WeatherEndpoints
             if (alert.Status != "PendingReview")
                 return Results.BadRequest(new { error = $"Alert is not PendingReview — current status: {alert.Status}" });
 
-            // Stub reviewer GUID — replace with real JWT claim once Aegis.Shared wires up auth
-            alert.ReviewedByUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // Extract reviewer GUID from authenticated JWT claims
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(userIdClaim, out var officerId))
+            {
+                alert.ReviewedByUserId = officerId;
+            }
+            else
+            {
+                alert.ReviewedByUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            }
+
             alert.ReviewedAt = DateTime.UtcNow;
 
             if (body.Decision == "Approved")
@@ -180,7 +194,7 @@ public static class WeatherEndpoints
                 alert.Id, alert.HazardType, alert.Status,
                 alert.ReviewedAt, alert.PublishedAt, alert.ReviewedByUserId
             });
-        });
+        }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
 
         group.MapGet("/alerts", async (
             WeatherDbContext db,
