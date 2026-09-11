@@ -64,8 +64,8 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | `GET /api/weather/districts` | ✅ done | List all 25 districts |
 | `GET /api/weather/districts/{id}/historical` | ✅ done | Historical baseline for a district |
 | `GET /api/weather/forecast/{districtId}` | ✅ done | Live Open-Meteo pull + baseline, no AI |
-| `POST /api/weather/predict/{districtId}` | ✅ done | Full agent workflow — forecast → agent → validate → persist |
-| `POST /api/weather/alerts/{id}/review` | ✅ done | Officer approve/reject a `PendingReview` alert — human-in-the-loop audit |
+| `POST /api/weather/predict/{districtId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Full agent workflow — forecast → agent → validate → persist |
+| `POST /api/weather/alerts/{id}/review` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Officer approve/reject a `PendingReview` alert — human audit with real JWT `ReviewedByUserId` |
 | `GET /api/weather/alerts` | ✅ done | Paginated & filterable list (status, district, hazardType) |
 | `GET /api/weather/analytics/accuracy` | ✅ done | Reporting requirement — compares `Predictions` vs `ForecastHistory` |
 | CRUD `/api/weather/stations` | ❌ not built | Admin management, low priority |
@@ -211,5 +211,6 @@ flutter run
 - [x] React: forecast dashboard, alert review queue, prediction history, analytics
 - [x] Flutter: weather home screen, district forecast, alert review queue
 - [x] Agent evaluation suite (`eval_weather_agent.py` + `test_weather_agent_guardrails.py`)
+- [x] Shared Role-Based Authentication & Authorization (JWT) in `Aegis.Shared` & `Aegis.Api`
 - [ ] CRUD `/api/weather/stations` (optional future enhancement)
-- [ ] Group-level shared blockers: shared Identity/JWT `[Authorize]`, `docker-compose.yml`, CI workflow
+- [ ] Group-level shared blockers: `docker-compose.yml`, CI workflow (Section 13 requirement)
