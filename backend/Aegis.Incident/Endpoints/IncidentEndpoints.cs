@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Aegis.Incident.Data;
+using Aegis.Incident.Dtos;
+using Aegis.Incident.Models;
+using Aegis.Incident.Services;
 
 namespace Aegis.Incident.Endpoints;
 
@@ -12,13 +15,184 @@ public static class IncidentEndpoints
     {
         var group = app.MapGroup("/api/incidents").WithTags("Incidents");
 
+        // GET /api/incidents — list all
         group.MapGet("/", async (IncidentDbContext db) =>
             await db.Incidents.OrderByDescending(i => i.CreatedAt).ToListAsync());
 
+        // GET /api/incidents/{id} — single incident
         group.MapGet("/{id:guid}", async (Guid id, IncidentDbContext db) =>
         {
             var incident = await db.Incidents.FindAsync(id);
             return incident is null ? Results.NotFound() : Results.Ok(incident);
+        });
+
+        // POST /api/incidents — citizen creates a report
+        group.MapPost("/", async (CreateIncidentRequest request, IncidentDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.DisasterType))
+                return Results.BadRequest("disasterType is required.");
+            if (string.IsNullOrWhiteSpace(request.SeverityReported))
+                return Results.BadRequest("severityReported is required.");
+
+            var incident = new IncidentReport
+            {
+                DisasterType = request.DisasterType,
+                Description = request.Description,
+                SeverityReported = request.SeverityReported,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+                PhotoUrl = request.PhotoUrl,
+                ReportedByUserId = request.ReportedByUserId,
+                Status = "Reported"
+            };
+
+            db.Incidents.Add(incident);
+            await db.SaveChangesAsync();
+
+            return Results.Created($"/api/incidents/{incident.Id}", incident);
+        });
+
+        // POST /api/incidents/{id}/assess — calls the Incident Assessment Agent
+        group.MapPost("/{id:guid}/assess", async (Guid id, IncidentDbContext db, IncidentAgentClient agentClient) =>
+        {
+            var incident = await db.Incidents.FindAsync(id);
+            if (incident is null) return Results.NotFound();
+
+            var agentResult = await agentClient.AssessAsync(new AssessRequestDto
+            {
+                DisasterType = incident.DisasterType,
+                SeverityReported = incident.SeverityReported,
+                Description = incident.Description,
+                Latitude = incident.Latitude,
+                Longitude = incident.Longitude
+            });
+
+            if (agentResult is null || agentResult.OverallStatus != "Success")
+            {
+                db.MissionLogs.Add(new MissionLog
+                {
+                    IncidentId = id,
+                    Note = $"Assessment failed: {agentResult?.Error ?? "Agent service unreachable"}"
+                });
+                await db.SaveChangesAsync();
+                return Results.Problem("Agent assessment failed — logged for review.", statusCode: 502);
+            }
+
+            incident.SeverityAssessed = agentResult.SeverityAssessed;
+            incident.Status = "Assessed";
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = $"Assessed: severity={agentResult.SeverityAssessed}, teamsRequired={agentResult.TeamsRequired}. {agentResult.Recommendation}"
+            });
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new AssessIncidentResponse
+            {
+                IncidentId = id,
+                SeverityAssessed = agentResult.SeverityAssessed,
+                TeamsRequired = agentResult.TeamsRequired,
+                Recommendation = agentResult.Recommendation,
+                OverallStatus = agentResult.OverallStatus
+            });
+        });
+
+        // POST /api/incidents/{id}/approve — officer approves, creates RescueMission
+        group.MapPost("/{id:guid}/approve", async (Guid id, ApproveIncidentRequest request, IncidentDbContext db) =>
+        {
+            var incident = await db.Incidents
+                .Include(i => i.RescueMission)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (incident is null) return Results.NotFound();
+            if (incident.RescueMission is not null)
+                return Results.Conflict("This incident already has a rescue mission.");
+
+            var teamsRequired = request.TeamsRequiredOverride ?? 1;
+
+            var mission = new RescueMission
+            {
+                IncidentId = id,
+                TeamsRequired = teamsRequired,
+                Status = "Approved",
+                ApprovedByOfficerId = request.ApprovedByOfficerId,
+                ApprovedAt = DateTime.UtcNow
+            };
+
+            db.RescueMissions.Add(mission);
+            incident.Status = "MissionApproved";
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = $"Mission approved by officer {request.ApprovedByOfficerId}. Teams required: {teamsRequired}."
+            });
+
+            await db.SaveChangesAsync();
+
+            // TODO (later branch): fire outbound POST to Resource's /api/resource/dispatch-requests
+            // wrapped in try/catch so this endpoint still succeeds if Resource isn't built/running yet.
+
+            return Results.Ok(mission);
+        });
+
+        // POST /api/incidents/{id}/damage-report — closes the incident, records damage
+        group.MapPost("/{id:guid}/damage-report", async (Guid id, CreateDamageReportRequest request, IncidentDbContext db) =>
+        {
+            var incident = await db.Incidents
+                .Include(i => i.DamageReport)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (incident is null) return Results.NotFound();
+            if (incident.DamageReport is not null)
+                return Results.Conflict("This incident already has a damage report.");
+
+            var damageReport = new DamageReport
+            {
+                IncidentId = id,
+                HousesDamaged = request.HousesDamaged,
+                DisplacedFamilies = request.DisplacedFamilies,
+                InfrastructureDamageNotes = request.InfrastructureDamageNotes
+            };
+
+            db.DamageReports.Add(damageReport);
+            incident.Status = "Closed";
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+
+            return Results.Created($"/api/incident/{id}/damage-report", damageReport);
+        });
+
+        // ── Cross-module contract endpoint — Recovery calls this exact path ────────
+        // NOTE: singular "/api/incident/", NOT "/api/incidents/" — matches
+        // Aegis.Recovery.Services.IncidentIntegrationService's GetDamageReportAsync call.
+        var incidentSingular = app.MapGroup("/api/incident").WithTags("Incidents");
+
+        incidentSingular.MapGet("/{id:guid}/damage-report", async (Guid id, IncidentDbContext db) =>
+        {
+            var incident = await db.Incidents
+                .Include(i => i.DamageReport)
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (incident is null || incident.DamageReport is null)
+                return Results.NotFound();
+
+            var response = new IncidentDamageReportResponse
+            {
+                IncidentId = incident.Id,
+                DisasterType = incident.DisasterType,
+                Location = $"{incident.Latitude}, {incident.Longitude}",
+                HousesDamaged = incident.DamageReport.HousesDamaged,
+                DisplacedFamilies = incident.DamageReport.DisplacedFamilies,
+                InfrastructureDamage = new List<InfrastructureDamageItemRequest>()
+            };
+
+            return Results.Ok(response);
         });
     }
 }
