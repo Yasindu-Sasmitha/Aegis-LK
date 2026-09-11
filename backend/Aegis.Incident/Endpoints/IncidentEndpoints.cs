@@ -168,8 +168,35 @@ public static class IncidentEndpoints
             return Results.Created($"/api/incident/{id}/damage-report", damageReport);
         });
 
-        // ── Cross-module contract endpoint — Recovery calls this exact path ────────
-        // NOTE: singular "/api/incident/", NOT "/api/incidents/" — matches
+        // POST /api/incidents/{id}/photo - citizen (or officer) attaches a photo after creation
+        group.MapPost("/{id:guid}/photo", async (Guid id, HttpRequest request, IncidentDbContext db, CloudinaryService cloudinaryService) =>
+        {
+            var incident = await db.Incidents.FindAsync(id);
+            if (incident is null) return Results.NotFound();
+
+            if (!request.HasFormContentType)
+                return Results.BadRequest("Expected multipart/form-data with a 'file' field.");
+
+            var form = await request.ReadFormAsync();
+            var file = form.Files.GetFile("file");
+            if (file is null || file.Length == 0)
+                return Results.BadRequest("No file uploaded.");
+
+            await using var stream = file.OpenReadStream();
+            var photoUrl = await cloudinaryService.UploadIncidentPhotoAsync(stream, file.FileName, id);
+
+            if (photoUrl is null)
+                return Results.Problem("Photo upload failed — please try again.", statusCode: 502);
+
+            incident.PhotoUrl = photoUrl;
+            incident.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new { incident.Id, incident.PhotoUrl });
+        });
+
+        // ── Cross-module contract endpoint - Recovery calls this exact path ────────
+        // NOTE: singular "/api/incident/", NOT "/api/incidents/" - matches
         // Aegis.Recovery.Services.IncidentIntegrationService's GetDamageReportAsync call.
         var incidentSingular = app.MapGroup("/api/incident").WithTags("Incidents");
 
