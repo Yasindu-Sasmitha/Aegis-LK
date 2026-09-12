@@ -34,9 +34,18 @@ public class IncidentDbContext : DbContext
             .WithOne(v => v.Incident)
             .HasForeignKey(v => v.IncidentId);
 
-        builder.Entity<IncidentReport>()
+                builder.Entity<IncidentReport>()
             .HasMany(i => i.Logs)
             .WithOne(l => l.Incident)
             .HasForeignKey(l => l.IncidentId);
+
+        // Self-referencing: a duplicate report points at its primary incident.
+        // Restrict delete behavior — deleting a primary must never cascade-delete
+        // (or silently orphan in a confusing way) the duplicate reports linked to it.
+        builder.Entity<IncidentReport>()
+            .HasOne(i => i.LinkedIncident)
+            .WithMany()
+            .HasForeignKey(i => i.LinkedIncidentId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
