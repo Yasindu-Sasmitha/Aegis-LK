@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from incident_agent import incident_agent, IncidentAgentState
+from incident_plausibility_agent import assess_plausibility
 
 app = FastAPI(title="Incident Agent Service (internal only — not for direct client use)")
 
@@ -19,6 +20,21 @@ class AssessResponse(BaseModel):
     teams_required: int
     recommendation: str
     steps: list[dict]
+    overall_status: str
+    error: Optional[str] = None
+
+class PlausibilityRequest(BaseModel):
+    disaster_type: str
+    description: str
+    latitude: float
+    longitude: float
+    photo_url: Optional[str] = None
+
+
+class PlausibilityResponse(BaseModel):
+    plausibility_score: int
+    plausibility_reasoning: str
+    district_checked: str
     overall_status: str
     error: Optional[str] = None
 
@@ -44,6 +60,17 @@ def assess(req: AssessRequest):
         overall_status=result["overall_status"],
         error=result.get("error"),
     )
+
+@app.post("/plausibility", response_model=PlausibilityResponse)
+def plausibility(req: PlausibilityRequest):
+    result = assess_plausibility(
+        disaster_type=req.disaster_type,
+        description=req.description,
+        latitude=req.latitude,
+        longitude=req.longitude,
+        photo_url=req.photo_url,
+    )
+    return PlausibilityResponse(**result)
 
 
 @app.get("/health")

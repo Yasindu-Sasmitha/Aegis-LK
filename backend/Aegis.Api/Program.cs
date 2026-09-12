@@ -76,6 +76,11 @@ builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentAgentClient>(clie
     client.BaseAddress = new Uri("http://127.0.0.1:8002");
 });
 
+builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentPlausibilityAgentClient>(client =>
+{
+    client.BaseAddress = new Uri("http://127.0.0.1:8002");
+});
+
 
 var cloudinarySettings = new Aegis.Incident.Services.CloudinarySettings
 {
