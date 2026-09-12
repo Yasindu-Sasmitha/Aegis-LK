@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Aegis.Incident.Data;
@@ -27,7 +28,7 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents — citizen creates a report
-        group.MapPost("/", async (CreateIncidentRequest request, IncidentDbContext db) =>
+        group.MapPost("/", async (CreateIncidentRequest request, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
         {
             if (string.IsNullOrWhiteSpace(request.DisasterType))
                 return Results.BadRequest("disasterType is required.");
@@ -48,6 +49,12 @@ public static class IncidentEndpoints
 
             db.Incidents.Add(incident);
             await db.SaveChangesAsync();
+
+            // Fire-and-forget: the citizen gets their 201 immediately, the plausibility
+            // check runs in the background. This needs its own DI scope (and therefore its
+            // own DbContext) because the original request's scope — and its `db` instance —
+            // gets disposed the moment this handler returns.
+            _ = RunPlausibilityCheckAsync(incident.Id, scopeFactory);
 
             return Results.Created($"/api/incidents/{incident.Id}", incident);
         });
@@ -221,5 +228,46 @@ public static class IncidentEndpoints
 
             return Results.Ok(response);
         });
+    }
+
+    private static async Task RunPlausibilityCheckAsync(Guid incidentId, IServiceScopeFactory scopeFactory)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IncidentDbContext>();
+        var agentClient = scope.ServiceProvider.GetRequiredService<IncidentPlausibilityAgentClient>();
+
+        var incident = await db.Incidents.FindAsync(incidentId);
+        if (incident is null) return;
+
+        var result = await agentClient.CheckPlausibilityAsync(new PlausibilityRequestDto
+        {
+            DisasterType = incident.DisasterType,
+            Description = incident.Description,
+            Latitude = incident.Latitude,
+            Longitude = incident.Longitude,
+            PhotoUrl = incident.PhotoUrl
+        });
+
+        if (result is null || result.OverallStatus != "Success")
+        {
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = incidentId,
+                Note = $"Plausibility check failed: {result?.Error ?? "Agent service unreachable"}"
+            });
+            await db.SaveChangesAsync();
+            return;
+        }
+
+        incident.PlausibilityScore = result.PlausibilityScore;
+        incident.PlausibilityReasoning = result.PlausibilityReasoning;
+
+        db.MissionLogs.Add(new MissionLog
+        {
+            IncidentId = incidentId,
+            Note = $"Plausibility check: score={result.PlausibilityScore}, district={result.DistrictChecked}. {result.PlausibilityReasoning}"
+        });
+
+        await db.SaveChangesAsync();
     }
 }
