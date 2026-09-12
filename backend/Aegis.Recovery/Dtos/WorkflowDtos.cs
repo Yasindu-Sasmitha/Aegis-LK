@@ -110,3 +110,12 @@ public record RecoveryPlanDetailDto(
     List<TaskDto> Tasks,
     WorkflowTraceDto? WorkflowTrace    // null if no agentic workflow was run
 );
+
+public record CreateRecoveryReportRequest(
+    string Title,
+    int TotalSheltered,
+    int TotalAidRequestsFulfilled,
+    decimal TotalCompensationDisbursed,
+    decimal TotalBudgetSpent,
+    string? ReportSummary
+);
