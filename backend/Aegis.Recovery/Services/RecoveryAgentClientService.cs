@@ -46,7 +46,9 @@ public class RecoveryAgentClientService
             ?? Environment.GetEnvironmentVariable("Gemini__ApiKey")
             ?? string.Empty;
 
-        var model = Environment.GetEnvironmentVariable("GEMINI_MODEL") ?? "gemini-2.5-flash";
+        var model = Environment.GetEnvironmentVariable("GEMINI_MODEL")
+            ?? Environment.GetEnvironmentVariable("CHAT_MODEL")
+            ?? "gemini-3.1-flash-lite-preview";
         var workflowStart = Stopwatch.GetTimestamp();
 
         var agentSteps = new List<object>();
@@ -941,6 +943,10 @@ public class RecoveryAgentClientService
 
     private async Task<string> CallGeminiAsync(string apiKey, string model, string prompt)
     {
+        var modelName = model.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
+            ? model["models/".Length..]
+            : model;
+
         var request = new
         {
             contents = new[] { new { parts = new[] { new { text = prompt } } } },
@@ -948,7 +954,7 @@ public class RecoveryAgentClientService
         };
 
         using var response = await HttpClient.PostAsJsonAsync(
-            $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={Uri.EscapeDataString(apiKey)}",
+            $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={Uri.EscapeDataString(apiKey)}",
             request, JsonOptions);
 
         var body = await response.Content.ReadAsStringAsync();
