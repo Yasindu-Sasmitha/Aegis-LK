@@ -24,6 +24,7 @@ __pycache__/
 .venv/
 venv/
 
+
 # === Editor / OS ===
 .vs/
 .vscode/*
@@ -34,3 +35,5 @@ Thumbs.db
 # === Secrets (defense in depth) ===
 appsettings.*.local.json
 *.pfx
+
+appsettings.Development.json

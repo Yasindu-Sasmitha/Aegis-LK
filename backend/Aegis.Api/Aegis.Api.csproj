@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Aegis.Shared\Aegis.Shared.csproj" />
     <ProjectReference Include="..\Aegis.Incident\Aegis.Incident.csproj" />
+    <ProjectReference Include="..\Aegis.Recovery\Aegis.Recovery.csproj" />
     <ProjectReference Include="..\Aegis.Data\Aegis.Data.csproj" />
   </ItemGroup>
 

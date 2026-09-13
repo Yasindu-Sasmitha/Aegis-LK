@@ -73,11 +73,20 @@ namespace Aegis.Incident.Migrations
                     b.Property<double>("Latitude")
                         .HasColumnType("double precision");
 
+                    b.Property<Guid?>("LinkedIncidentId")
+                        .HasColumnType("uuid");
+
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
 
                     b.Property<string>("PhotoUrl")
                         .HasColumnType("text");
+
+                    b.Property<string>("PlausibilityReasoning")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("PlausibilityScore")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("ReportedByUserId")
                         .HasColumnType("uuid");
@@ -97,6 +106,8 @@ namespace Aegis.Incident.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LinkedIncidentId");
 
                     b.ToTable("Incidents", "incident");
                 });
@@ -241,6 +252,16 @@ namespace Aegis.Incident.Migrations
                         .IsRequired();
 
                     b.Navigation("Incident");
+                });
+
+            modelBuilder.Entity("Aegis.Incident.Models.IncidentReport", b =>
+                {
+                    b.HasOne("Aegis.Incident.Models.IncidentReport", "LinkedIncident")
+                        .WithMany()
+                        .HasForeignKey("LinkedIncidentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("LinkedIncident");
                 });
 
             modelBuilder.Entity("Aegis.Incident.Models.MissionLog", b =>

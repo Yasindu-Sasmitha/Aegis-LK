@@ -40,28 +40,29 @@ public static class WeatherDataSeeder
             ("Kegalle", "Sabaragamuwa", 7.2513, 80.3464, 58, 92),
         };
 
-        var currentMonth = DateTime.UtcNow.Month;
-
         foreach (var d in districts)
         {
             var isProne = landslideProne.Contains(d.Name);
-            var district = new District
-            {
-                Name = d.Name, Province = d.Province, Latitude = d.Lat, Longitude = d.Lon,
-                IsLandslideProne = isProne
-            };
+            var district = new District { Name = d.Name, Province = d.Province, Latitude = d.Lat, Longitude = d.Lon, IsLandslideProne = isProne };
             context.Districts.Add(district);
 
-            context.HistoricalWeather.Add(new HistoricalWeather
+            // Seed EVERY month, not just whichever one happened to be current when this ran —
+            // otherwise the whole system silently breaks the moment the calendar rolls over.
+            // (We're not modeling real seasonal rainfall variation here — same baseline all
+            // year is a deliberate simplification, worth a one-line note in the ADR.)
+            for (int month = 1; month <= 12; month++)
             {
-                DistrictId = district.Id,
-                Month = currentMonth,
-                AvgRainfallMm = d.AvgRainfall,
-                FloodThresholdMm = d.FloodThreshold,
-                LandslideThresholdMm = isProne ? 100 : null,  // NBRO-style cumulative rainfall alert level
-                HighWindThresholdKmh = 60,
-                Source = "Dept. of Meteorology / NBRO (approximate seed baseline)"
-            });
+                context.HistoricalWeather.Add(new HistoricalWeather
+                {
+                    DistrictId = district.Id,
+                    Month = month,
+                    AvgRainfallMm = d.AvgRainfall,
+                    FloodThresholdMm = d.FloodThreshold,
+                    LandslideThresholdMm = isProne ? 100 : null,
+                    HighWindThresholdKmh = 60,
+                    Source = "Dept. of Meteorology / NBRO (approximate seed baseline, not seasonally varied)"
+                });
+            }
         }
 
         await context.SaveChangesAsync();
