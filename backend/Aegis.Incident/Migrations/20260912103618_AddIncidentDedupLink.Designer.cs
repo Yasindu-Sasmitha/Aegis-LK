@@ -3,6 +3,7 @@ using System;
 using Aegis.Incident.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aegis.Incident.Migrations
 {
     [DbContext(typeof(IncidentDbContext))]
-    partial class IncidentDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912103618_AddIncidentDedupLink")]
+    partial class AddIncidentDedupLink
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

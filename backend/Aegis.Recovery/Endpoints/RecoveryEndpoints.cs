@@ -724,6 +724,10 @@ public static class RecoveryEndpoints
     private static NGODto MapNGODto(NGO n) => new(
         n.Id, n.Name, n.ContactEmail, n.ContactPhone, n.Sectors, n.OperatingDistricts, n.AssignedBudget, n.Status);
 
+    private static RecoveryReportDto MapRecoveryReportDto(RecoveryReport r) => new(
+        r.Id, r.IncidentId, r.Title, r.TotalSheltered, r.TotalAidRequestsFulfilled,
+        r.TotalCompensationDisbursed, r.TotalBudgetSpent, r.ReportSummary, r.GeneratedAt);
+
     private static WorkflowTraceDto MapWorkflowTraceDto(RecoveryWorkflowLog log)
     {
         var opts = new JsonSerializerOptions(JsonSerializerDefaults.Web);

@@ -19,10 +19,10 @@ export interface AidRequest {
   victimName: string;
   contactPhone: string;
   district: string;
-  aidType: 'Food' | 'Medical' | 'Shelter' | 'Financial' | 'Clothing';
+  aidType: 'Food' | 'Medical' | 'Shelter' | 'Financial' | 'Clothing' | string;
   familySize: number;
-  urgency: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Pending' | 'Approved' | 'Fulfilled' | 'Rejected';
+  urgency: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+  status: 'Pending' | 'Approved' | 'Fulfilled' | 'Rejected' | string;
   shelterId?: string;
   shelterName?: string;
   notes: string;
@@ -32,21 +32,23 @@ export interface AidRequest {
 export interface Donation {
   id: string;
   donorName: string;
-  donationType: 'Monetary' | 'Supplies' | 'Equipment';
+  donorContact?: string;
+  donationType: 'Monetary' | 'Supplies' | 'Equipment' | string;
   amountOrQuantity: number;
   itemDescription: string;
   targetShelterId?: string;
-  allocationStatus: 'Unallocated' | 'Allocated' | 'Distributed';
+  allocationStatus: 'Unallocated' | 'Allocated' | 'Distributed' | string;
   createdAt: string;
 }
 
 export interface Compensation {
   id: string;
   applicantName: string;
-  damageCategory: 'Total House Loss' | 'Partial Loss' | 'Livelihood Loss';
+  nic?: string;
+  damageCategory: 'Total House Loss' | 'Partial Loss' | 'Livelihood Loss' | string;
   claimAmount: number;
   approvedAmount?: number;
-  status: 'Submitted' | 'UnderReview' | 'Approved' | 'Disbursed' | 'Rejected';
+  status: 'Submitted' | 'UnderReview' | 'Approved' | 'Disbursed' | 'Rejected' | string;
   verificationNotes: string;
   approvedBy?: string;
   createdAt: string;

@@ -15,6 +15,8 @@ public class IncidentReport
     public string? PhotoUrl { get; set; }
     public int? PlausibilityScore { get; set; }
     public string? PlausibilityReasoning { get; set; }
+    public Guid? LinkedIncidentId { get; set; }
+    public IncidentReport? LinkedIncident { get; set; }
     public string Status { get; set; } = "Reported";
     public Guid ReportedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

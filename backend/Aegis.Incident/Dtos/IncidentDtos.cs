@@ -62,3 +62,15 @@ public class IncidentDamageReportResponse
     public int DisplacedFamilies { get; set; }
     public List<InfrastructureDamageItemRequest> InfrastructureDamage { get; set; } = new();
 }
+
+// ── GET /api/incidents/nearby ──────────────────────────────────────────
+public class NearbyIncidentResponse
+{
+    public Guid Id { get; set; }
+    public string DisasterType { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string SeverityReported { get; set; } = string.Empty;
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public DateTime CreatedAt { get; set; }
+}

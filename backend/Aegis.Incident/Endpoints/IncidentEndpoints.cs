@@ -16,9 +16,39 @@ public static class IncidentEndpoints
     {
         var group = app.MapGroup("/api/incidents").WithTags("Incidents");
 
-        // GET /api/incidents — list all
+        // GET /api/incidents — list all (primaries only; duplicates are hidden here,
+        // available via GET /{id}/related-reports)
         group.MapGet("/", async (IncidentDbContext db) =>
-            await db.Incidents.OrderByDescending(i => i.CreatedAt).ToListAsync());
+            await db.Incidents
+                .Where(i => i.LinkedIncidentId == null)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync());
+
+        // GET /api/incidents/nearby — internal, called by the Dedup Agent's search_nearby_incidents tool
+        group.MapGet("/nearby", async (double lat, double lng, double radiusKm, double hours, IncidentDbContext db) =>
+        {
+            var cutoff = DateTime.UtcNow.AddHours(-hours);
+
+            var candidates = await db.Incidents
+                .Where(i => i.CreatedAt >= cutoff && i.LinkedIncidentId == null)
+                .ToListAsync();
+
+            var nearby = candidates
+                .Where(i => HaversineDistanceKm(lat, lng, i.Latitude, i.Longitude) <= radiusKm)
+                .Select(i => new NearbyIncidentResponse
+                {
+                    Id = i.Id,
+                    DisasterType = i.DisasterType,
+                    Description = i.Description,
+                    SeverityReported = i.SeverityReported,
+                    Latitude = i.Latitude,
+                    Longitude = i.Longitude,
+                    CreatedAt = i.CreatedAt
+                })
+                .ToList();
+
+            return Results.Ok(nearby);
+        });
 
         // GET /api/incidents/{id} — single incident
         group.MapGet("/{id:guid}", async (Guid id, IncidentDbContext db) =>
@@ -55,6 +85,8 @@ public static class IncidentEndpoints
             // own DbContext) because the original request's scope — and its `db` instance —
             // gets disposed the moment this handler returns.
             _ = RunPlausibilityCheckAsync(incident.Id, scopeFactory);
+            
+            _ = RunDedupCheckAsync(incident.Id, scopeFactory);
 
             return Results.Created($"/api/incidents/{incident.Id}", incident);
         });
@@ -202,6 +234,16 @@ public static class IncidentEndpoints
             return Results.Ok(new { incident.Id, incident.PhotoUrl });
         });
 
+        // GET /api/incidents/{id}/related-reports — duplicate reports linked to this primary
+        group.MapGet("/{id:guid}/related-reports", async (Guid id, IncidentDbContext db) =>
+        {
+            var related = await db.Incidents
+                .Where(i => i.LinkedIncidentId == id)
+                .OrderBy(i => i.CreatedAt)
+                .ToListAsync();
+            return Results.Ok(related);
+        });
+
         // ── Cross-module contract endpoint - Recovery calls this exact path ────────
         // NOTE: singular "/api/incident/", NOT "/api/incidents/" - matches
         // Aegis.Recovery.Services.IncidentIntegrationService's GetDamageReportAsync call.
@@ -269,5 +311,66 @@ public static class IncidentEndpoints
         });
 
         await db.SaveChangesAsync();
+    }
+
+    private static async Task RunDedupCheckAsync(Guid incidentId, IServiceScopeFactory scopeFactory)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IncidentDbContext>();
+        var agentClient = scope.ServiceProvider.GetRequiredService<IncidentDedupAgentClient>();
+
+        var incident = await db.Incidents.FindAsync(incidentId);
+        if (incident is null) return;
+
+        var result = await agentClient.CheckForDuplicateAsync(new DedupRequestDto
+        {
+            IncidentId = incidentId.ToString(),
+            DisasterType = incident.DisasterType,
+            Description = incident.Description,
+            Latitude = incident.Latitude,
+            Longitude = incident.Longitude
+        });
+
+        if (result is null || result.OverallStatus != "Success")
+        {
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = incidentId,
+                Note = $"Dedup check failed: {result?.Error ?? "Agent service unreachable"}"
+            });
+            await db.SaveChangesAsync();
+            return;
+        }
+
+        db.MissionLogs.Add(new MissionLog
+        {
+            IncidentId = incidentId,
+            Note = $"Dedup check: isDuplicate={result.IsDuplicate}, confidence={result.Confidence}. {result.Reasoning}"
+        });
+
+        if (result.IsDuplicate && Guid.TryParse(result.MatchedIncidentId, out var matchedId) && matchedId != incidentId)
+        {
+            // Confirm the matched incident actually exists and isn't itself a duplicate
+            // (never chain duplicates — always link to a true primary).
+            var matchedIncident = await db.Incidents.FindAsync(matchedId);
+            if (matchedIncident is not null && matchedIncident.LinkedIncidentId is null)
+            {
+                incident.LinkedIncidentId = matchedId;
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    private static double HaversineDistanceKm(double lat1, double lng1, double lat2, double lng2)
+    {
+        const double earthRadiusKm = 6371.0;
+        double dLat = (lat2 - lat1) * Math.PI / 180.0;
+        double dLng = (lng2 - lng1) * Math.PI / 180.0;
+        double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                   Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0) *
+                   Math.Sin(dLng / 2) * Math.Sin(dLng / 2);
+        double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return earthRadiusKm * c;
     }
 }

@@ -27,6 +27,7 @@ const ASSET_TYPES = ['Bridge', 'Road', 'Water', 'Hospital', 'School', 'Power', '
 
 export const RecoveryPlanningPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'intake' | 'history'>('intake');
+  const [isOfficer, setIsOfficer] = useState(true);
 
   // Intake Form State — clean dynamic inputs
   const [district, setDistrict] = useState('Kalutara');
@@ -449,42 +450,117 @@ export const RecoveryPlanningPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Add New Asset Row */}
-              <div style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '8px', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '0.75rem', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  placeholder="Asset Name (e.g. Bridge B12, Pipeline)"
-                  value={newAsset.assetName}
-                  onChange={(e) => setNewAsset({ ...newAsset, assetName: e.target.value })}
-                  style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
-                />
-                <select
-                  value={newAsset.assetType}
-                  onChange={(e) => setNewAsset({ ...newAsset, assetType: e.target.value })}
-                  style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', background: '#fff' }}
-                >
-                  {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <select
-                  value={newAsset.damageLevel}
-                  onChange={(e) => setNewAsset({ ...newAsset, damageLevel: e.target.value })}
-                  style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', background: '#fff' }}
-                >
-                  {DAMAGE_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-                <input
-                  type="number"
-                  placeholder="Est. Cost"
-                  value={newAsset.estimatedCost}
-                  onChange={(e) => setNewAsset({ ...newAsset, estimatedCost: Number(e.target.value) })}
-                  style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
-                />
+              {/* Quick Preset Asset Pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>💡 Quick Asset Templates:</span>
                 <button
-                  onClick={addInfraItem}
-                  style={{ padding: '0.6rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+                  type="button"
+                  onClick={() => setNewAsset({ assetName: 'Main River Bridge Access Road', assetType: 'Bridge', damageLevel: 'Destroyed', estimatedCost: 450000 })}
+                  style={{ padding: '0.25rem 0.6rem', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  + Add
+                  + 🌉 River Bridge (Rs. 450k)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setNewAsset({ assetName: 'Municipal Drinking Water Pipeline', assetType: 'Water', damageLevel: 'Severe', estimatedCost: 280000 })}
+                  style={{ padding: '0.25rem 0.6rem', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  + 🚰 Water Pipeline (Rs. 280k)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewAsset({ assetName: 'Rural Hospital Emergency Ward', assetType: 'Hospital', damageLevel: 'Moderate', estimatedCost: 150000 })}
+                  style={{ padding: '0.25rem 0.6rem', background: '#fdf2f8', border: '1px solid #fbcfe8', color: '#be185d', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  + 🏥 Hospital Ward (Rs. 150k)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewAsset({ assetName: 'Community Center Evacuation Roof', assetType: 'School', damageLevel: 'Severe', estimatedCost: 200000 })}
+                  style={{ padding: '0.25rem 0.6rem', background: '#fef3c7', border: '1px solid #fde68a', color: '#b45309', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  + 🏫 Shelter Roof (Rs. 200k)
+                </button>
+              </div>
+
+              {/* Add New Asset Form Card */}
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '1.25rem', borderRadius: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr)) auto', gap: '0.85rem', alignItems: 'flex-end' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                    1. Asset Name / Location
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Bridge B12, Water Main"
+                    value={newAsset.assetName}
+                    onChange={(e) => setNewAsset({ ...newAsset, assetName: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                    2. Asset Category
+                  </label>
+                  <select
+                    value={newAsset.assetType}
+                    onChange={(e) => setNewAsset({ ...newAsset, assetType: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', background: '#ffffff', boxSizing: 'border-box' }}
+                  >
+                    {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                    3. Damage Severity
+                  </label>
+                  <select
+                    value={newAsset.damageLevel}
+                    onChange={(e) => setNewAsset({ ...newAsset, damageLevel: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', background: '#ffffff', boxSizing: 'border-box' }}
+                  >
+                    {DAMAGE_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                    4. Est. Cost (LKR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={10000}
+                    placeholder="e.g. 250000"
+                    value={newAsset.estimatedCost || ''}
+                    onChange={(e) => setNewAsset({ ...newAsset, estimatedCost: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.875rem', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={addInfraItem}
+                    style={{
+                      padding: '0.65rem 1.25rem',
+                      background: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                    }}
+                  >
+                    <span>+ Add Asset</span>
+                  </button>
+                </div>
               </div>
             </div>
 
