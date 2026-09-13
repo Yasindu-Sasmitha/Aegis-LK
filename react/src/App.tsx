@@ -304,50 +304,33 @@ const MainPlatform: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Right Decorative Badge & Visual (Helicopter & Sri Lanka Crest Motif) */}
-                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingRight: '2rem' }}>
-                  {/* Stylized Helicopter / Rescue Graphic */}
-                  <svg width="280" height="150" viewBox="0 0 280 150" fill="none" opacity="0.9">
-                    {/* Rotor */}
-                    <ellipse cx="140" cy="35" rx="90" ry="4" stroke="#94a3b8" strokeWidth="2.5" strokeDasharray="6 4" />
-                    {/* Cabin */}
-                    <path d="M100 45 Q160 30 190 55 Q210 75 190 90 Q120 95 90 85 Q75 75 85 55 Z" fill="#1e3a5f" stroke="#38bdf8" strokeWidth="2" />
-                    {/* Cockpit Window */}
-                    <path d="M155 46 Q185 55 185 70 L145 70 Z" fill="#38bdf8" opacity="0.6" />
-                    {/* Tail Boom */}
-                    <path d="M90 65 L30 55 L30 40 L25 40 L25 70 L30 70 L30 62 L85 75 Z" fill="#0f2646" stroke="#38bdf8" strokeWidth="1.5" />
-                    <line x1="28" y1="35" x2="28" y2="75" stroke="#94a3b8" strokeWidth="2" />
-                    {/* Skids */}
-                    <line x1="100" y1="110" x2="180" y2="110" stroke="#cbd5e1" strokeWidth="3" strokeLinecap="round" />
-                    <line x1="115" y1="92" x2="110" y2="110" stroke="#cbd5e1" strokeWidth="2" />
-                    <line x1="165" y1="92" x2="170" y2="110" stroke="#cbd5e1" strokeWidth="2" />
-                  </svg>
-
-                  {/* Stronger Together Ribbon */}
+                {/* Right Decorative Badge (Stronger Together Ribbon matching Reference) */}
+                <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', alignSelf: 'flex-end' }}>
                   <div style={{
-                    marginTop: '1rem',
-                    textAlign: 'center',
+                    textAlign: 'right',
                     background: 'rgba(7, 23, 46, 0.75)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    padding: '0.65rem 1.5rem',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    padding: '0.75rem 1.65rem',
                     borderRadius: 30,
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                    boxShadow: '0 12px 30px rgba(0,0,0,0.45)'
                   }}>
                     <div style={{
                       fontFamily: "'Plus Jakarta Sans', sans-serif",
                       fontStyle: 'italic',
                       fontWeight: 800,
-                      fontSize: '1.25rem',
+                      fontSize: '1.35rem',
                       color: '#ffffff',
-                      textShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                      letterSpacing: '-0.01em',
+                      textShadow: '0 2px 10px rgba(0,0,0,0.6)'
                     }}>
                       Stronger Together
                     </div>
                     <div style={{
                       height: 4,
-                      width: 90,
-                      margin: '0.35rem auto 0',
+                      width: 100,
+                      marginLeft: 'auto',
+                      marginTop: '0.35rem',
                       borderRadius: 2,
                       background: 'linear-gradient(90deg, #f59e0b 0%, #ef4444 50%, #10b981 100%)'
                     }} />

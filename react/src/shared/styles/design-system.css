@@ -562,15 +562,27 @@
    ========================================================================== */
 
 .ae-landing-hero {
-    background: linear-gradient(135deg, #07172e 0%, #0b254a 50%, #06162d 100%);
+    background-color: #07172e;
+    background-image: url('/hero-bg.jpg');
+    background-size: cover;
+    background-position: center right;
     border-radius: 20px;
-    padding: 3.5rem 3.5rem;
+    padding: 3.75rem 3.5rem;
     color: #ffffff;
     position: relative;
     overflow: hidden;
     margin-bottom: 2.25rem;
-    box-shadow: 0 20px 40px -15px rgba(2, 6, 23, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 45px -12px rgba(2, 6, 23, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ae-landing-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #07172e 0%, rgba(7, 23, 46, 0.94) 45%, rgba(7, 23, 46, 0.65) 75%, rgba(7, 23, 46, 0.2) 100%);
+    pointer-events: none;
+    z-index: 1;
 }
 
 .ae-landing-hero::after {
@@ -579,9 +591,10 @@
     right: 0;
     top: 0;
     bottom: 0;
-    width: 50%;
-    background: radial-gradient(circle at center, rgba(37, 99, 235, 0.18) 0%, transparent 70%);
+    width: 40%;
+    background: radial-gradient(circle at 70% 30%, rgba(2, 132, 199, 0.15) 0%, transparent 60%);
     pointer-events: none;
+    z-index: 1;
 }
 
 .ae-hero-eyebrow {
