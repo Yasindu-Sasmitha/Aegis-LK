@@ -89,10 +89,7 @@ long-term trend data, not a 3-day forecast) and Tsunami (a seismic phenomenon, n
 **Database entities:** District, HistoricalWeather, WeatherStation, WeatherObservation,
 Prediction, WeatherAlert, ForecastHistory, AgentExecutionLog.
 
-**Agent — Weather Prediction Agent:** given a district's forecast and historical thresholds,
-returns a risk assessment per relevant hazard (probability, confidence, recommended action).
-Built with LangGraph + Gemini (`gemini-2.5-flash-lite`, free tier). Code — not the LLM — makes
-the final publish/review decision.
+**Agent — Weather Prediction Agent (Assessor / Critic split):** given a district's forecast and historical thresholds, runs a **3-node LangGraph pipeline**: (1) Assessor LLM proposes risk probability, confidence, and recommended action per hazard; (2) Critic LLM independently checks for internal inconsistencies in the Assessor's output; (3) deterministic code gate applies confidence, anomaly, and critic-override rules before any alert is published. Critic disagreements produce auditable `flag_for_review` overrides, not silent failures. Every run emits a full `steps` trace (per-node timing, status, plain-English summary) returned in the API response, persisted to `AgentExecutionLogs`, and rendered in the React UI via `AgentTraceTimeline`. Built with LangGraph + Gemini (`gemini-2.5-flash-lite`, free tier).
 
 **Third-party integration:** Open-Meteo API (free, no key required) for live weather forecasts.
 

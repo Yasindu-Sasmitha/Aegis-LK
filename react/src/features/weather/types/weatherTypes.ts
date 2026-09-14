@@ -42,6 +42,7 @@ export interface PredictResponse {
   name: string;
   agentRunId: string;
   results: HazardResult[];
+  trace: AgentStep[];
 }
 
 export interface WeatherAlert {
@@ -88,4 +89,13 @@ export interface AnalyticsResponse {
   correctPredictions: number;
   accuracyPct: number;
   byHazardType: HazardAccuracy[];
+}
+
+export interface AgentStep {
+  step: string;
+  tool: string;
+  duration_ms: number;
+  status: 'success' | 'failed';
+  summary: string;
+  error?: string;
 }

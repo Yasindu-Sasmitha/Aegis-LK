@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import type { District, ForecastResponse, PredictResponse, HazardResult } from '../types/weatherTypes';
 import { fetchDistricts, fetchForecast, runPrediction } from '../api/weatherApi';
+import { AgentTraceTimeline } from '../../../shared/components/AgentTraceTimeline';
 
 const HAZARD_CONFIG: Record<string, { color: string; bg: string; chip: string; icon: string; label: string }> = {
   Flood: { color: '#1d4ed8', bg: '#eff4ff', chip: 'ae-chip-moderate', icon: '🌊', label: 'Flood Risk' },
@@ -232,6 +233,9 @@ export const WeatherDashboardPage: React.FC = () => {
                       );
                     })}
                   </div>
+                  {prediction.trace && prediction.trace.length > 0 && (
+                    <AgentTraceTimeline steps={prediction.trace} />
+                  )}
                 </div>
               )}
             </div>
