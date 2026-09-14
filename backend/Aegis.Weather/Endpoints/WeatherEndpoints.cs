@@ -145,9 +145,19 @@ public static class WeatherEndpoints
             }
 
             await db.SaveChangesAsync();
-            return Results.Ok(new { district.Name, AgentRunId = agentRunId, Results = results });
+            return Results.Ok(new { district.Name, AgentRunId = agentRunId, Results = results, Trace = agentResult.Steps });
         }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
 
+        group.MapGet("/agent-runs/{agentRunId:guid}", async (Guid agentRunId, WeatherDbContext db) =>
+        {
+            var log = await db.AgentExecutionLogs.FindAsync(agentRunId);
+            if (log is null) return Results.NotFound();
+            return Results.Ok(new {
+                log.Id, log.DistrictId, log.OverallStatus, log.ErrorMessage,
+                log.StartedAt, log.CompletedAt,
+                Steps = System.Text.Json.JsonSerializer.Deserialize<object>(log.StepsJson)
+            });
+        });
         group.MapPost("/alerts/{id:guid}/review", async (
             Guid id,
             AlertReviewRequest body,
