@@ -132,7 +132,8 @@ Original data given to the assessor:
 The assessor's output:
 {json.dumps(state['llm_output'], indent=2)}
 
-Check specifically for:
+First, recompute the cumulative rainfall yourself from the raw daily values above and state
+the number explicitly. Then check specifically for:
 1. Is recommended_action logically consistent with risk_probability_pct and confidence_pct?
    (e.g. high risk + high confidence should not be "no_action")
 2. Does reasoning_summary actually support the numbers given?
