@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { fetchShelters, fetchAidRequests, fetchDonations, fetchCompensations, fetchWorkflows } from '../api/recoveryApi';
 import { Shelter, AidRequest, Donation, Compensation, WorkflowListItem } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
-// Navigate by clicking the shared nav buttons in App.tsx (no prop needed)
-const navigateTo = (tabLabel: string) => {
-  const buttons = document.querySelectorAll<HTMLButtonElement>('nav button');
-  for (const btn of buttons) {
-    if (btn.textContent?.includes(tabLabel)) {
-      btn.click();
-      return;
-    }
-  }
-};
+interface Props {
+  onNavigate?: (tab: string) => void;
+}
 
-export const RecoveryDashboardPage: React.FC = () => {
+export const RecoveryDashboardPage: React.FC<Props> = ({ onNavigate }) => {
+  const { user } = useAuth();
+  const isOfficerOrAdmin = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
+  const isCitizen = user?.role === 'Citizen';
+
   const [stats, setStats] = useState({
     sheltersCount: 0,
     totalCapacity: 0,
@@ -31,6 +29,14 @@ export const RecoveryDashboardPage: React.FC = () => {
   const [sheltersList, setSheltersList] = useState<Shelter[]>([]);
   const [recentAid, setRecentAid] = useState<AidRequest[]>([]);
   const [recentWorkflows, setRecentWorkflows] = useState<WorkflowListItem[]>([]);
+
+  const navigateToTab = (tabKey: string) => {
+    if (onNavigate) {
+      onNavigate(tabKey);
+    } else {
+      window.dispatchEvent(new CustomEvent('aegis:navigate-recovery', { detail: tabKey }));
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -113,7 +119,7 @@ export const RecoveryDashboardPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '1.75rem' }}>🏛️</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
-              Disaster Recovery & Community Support
+              Disaster Recovery &amp; Community Support
             </h1>
             <span style={{ background: '#22c55e', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '20px', textTransform: 'uppercase' }}>
               Active Operations
@@ -126,7 +132,7 @@ export const RecoveryDashboardPage: React.FC = () => {
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={() => navigateTo('AI Planning')}
+            onClick={() => navigateToTab('planning')}
             style={{
               padding: '0.75rem 1.25rem',
               background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
@@ -140,26 +146,84 @@ export const RecoveryDashboardPage: React.FC = () => {
               alignItems: 'center',
               gap: '0.5rem',
               boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+              transition: 'transform 0.15s ease',
             }}
           >
             <span>🤖</span>
             <span>Launch AI Recovery Planner</span>
           </button>
-          <button
-            onClick={() => navigateTo('Shelters')}
-            style={{
-              padding: '0.75rem 1.25rem',
-              background: 'rgba(255,255,255,0.1)',
-              color: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-            }}
-          >
-            ⛺ Manage Shelters
-          </button>
+          {isCitizen ? (
+            <>
+              <button
+                onClick={() => navigateToTab('aid')}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background: 'linear-gradient(135deg, #16a34a, #22c55e)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
+                }}
+              >
+                <span>🤝</span>
+                <span>Apply for Relief Aid</span>
+              </button>
+              <button
+                onClick={() => navigateToTab('shelters')}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ⛺ Find Safe Shelters
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => navigateToTab('shelters')}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ⛺ Manage Shelters
+              </button>
+              <button
+                onClick={() => navigateToTab('aid')}
+                style={{
+                  padding: '0.75rem 1.25rem',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                }}
+              >
+                🤝 Aid Applications
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -167,7 +231,10 @@ export const RecoveryDashboardPage: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
         {/* Metric 1: Shelters */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+        <div
+          onClick={() => navigateToTab('shelters')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'transform 0.15s ease' }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Emergency Shelters</span>
             <span style={{ fontSize: '1.25rem' }}>⛺</span>
@@ -185,7 +252,10 @@ export const RecoveryDashboardPage: React.FC = () => {
         </div>
 
         {/* Metric 2: Aid Requests */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+        <div
+          onClick={() => navigateToTab('aid')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Citizen Aid Demands</span>
             <span style={{ fontSize: '1.25rem' }}>🤝</span>
@@ -194,12 +264,15 @@ export const RecoveryDashboardPage: React.FC = () => {
             {stats.aidRequestsCount} Total
           </div>
           <div style={{ fontSize: '0.85rem', color: stats.pendingAid > 0 ? '#b45309' : '#16a34a', fontWeight: 600, marginTop: '0.5rem' }}>
-            {stats.pendingAid} pending review & dispatch
+            {stats.pendingAid} pending review &amp; dispatch
           </div>
         </div>
 
         {/* Metric 3: Donations */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+        <div
+          onClick={() => navigateToTab('donations')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Community Relief Funds</span>
             <span style={{ fontSize: '1.25rem' }}>📦</span>
@@ -213,7 +286,10 @@ export const RecoveryDashboardPage: React.FC = () => {
         </div>
 
         {/* Metric 4: Compensation */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+        <div
+          onClick={() => navigateToTab('compensation')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Damage Compensations</span>
             <span style={{ fontSize: '1.25rem' }}>💳</span>
@@ -236,10 +312,10 @@ export const RecoveryDashboardPage: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>⛺ Emergency Shelter Network</h2>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>Live occupancy & bed capacity tracking</p>
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>Live occupancy &amp; bed capacity tracking</p>
             </div>
             <button
-              onClick={() => navigateTo('Shelters')}
+              onClick={() => navigateToTab('shelters')}
               style={{ background: 'none', border: 'none', fontSize: '0.85rem', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}
             >
               View All Shelters →
@@ -282,20 +358,22 @@ export const RecoveryDashboardPage: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>🤖 AI Autonomous Recovery Plans</h2>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>4-Agent generated strategies & officer approval status</p>
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>4-Agent generated strategies &amp; officer approval status</p>
             </div>
-            <button
-              onClick={() => navigateTo('AI Planning')}
-              style={{ background: 'none', border: 'none', fontSize: '0.85rem', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Open AI Planner →
-            </button>
+            {isOfficerOrAdmin && (
+              <button
+                onClick={() => navigateToTab('planning')}
+                style={{ background: 'none', border: 'none', fontSize: '0.85rem', color: '#2563eb', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Open AI Planner →
+              </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {recentWorkflows.length === 0 ? (
               <div style={{ padding: '1.5rem', textAlign: 'center', background: '#f8fafc', borderRadius: '8px', color: '#64748b', fontSize: '0.85rem' }}>
-                No active recovery plans. Launch the AI planner to generate a master strategy.
+                No active recovery plans recorded yet.
               </div>
             ) : (
               recentWorkflows.map((wf) => (
@@ -332,22 +410,24 @@ export const RecoveryDashboardPage: React.FC = () => {
           Explore Recovery Module Workspaces:
         </span>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => navigateTo('AI Planning')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
-            🤖 AI Planner
-          </button>
-          <button onClick={() => navigateTo('Shelters')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
+          {isOfficerOrAdmin && (
+            <button onClick={() => navigateToTab('planning')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
+              🤖 AI Planner
+            </button>
+          )}
+          <button onClick={() => navigateToTab('shelters')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
             ⛺ Shelters
           </button>
-          <button onClick={() => navigateTo('Aid')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
+          <button onClick={() => navigateToTab('aid')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
             🤝 Aid Applications
           </button>
-          <button onClick={() => navigateTo('Donations')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
+          <button onClick={() => navigateToTab('donations')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
             📦 Donations
           </button>
-          <button onClick={() => navigateTo('Compensation')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
+          <button onClick={() => navigateToTab('compensation')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
             💳 Compensation
           </button>
-          <button onClick={() => navigateTo('Reports')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
+          <button onClick={() => navigateToTab('reports')} style={{ padding: '0.4rem 0.8rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
             📊 Audit Reports
           </button>
         </div>

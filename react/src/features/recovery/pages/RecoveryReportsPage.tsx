@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { fetchReports, generateReport, fetchShelters, fetchAidRequests, fetchCompensations } from '../api/recoveryApi';
+import { fetchReports, generateReport, deleteReport, fetchShelters, fetchAidRequests, fetchCompensations } from '../api/recoveryApi';
 import { RecoveryReport } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
 // ── PDF Export Helper ──────────────────────────────────────────────────────────
 const exportReportToPdf = (r: RecoveryReport, stats: { totalSheltered: number; fulfilledAid: number; compensationDisbursed: number; totalBudgetSpent: number }) => {
@@ -329,10 +330,13 @@ const exportReportToPdf = (r: RecoveryReport, stats: { totalSheltered: number; f
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export const RecoveryReportsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isOfficer = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
+  const isCitizen = user?.role === 'Citizen';
+
   const [reports, setReports] = useState<RecoveryReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [isOfficer, setIsOfficer] = useState(true);
 
   // Live Aggregates
   const [liveStats, setLiveStats] = useState({
@@ -395,10 +399,23 @@ export const RecoveryReportsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteReport = async (reportId: string, title: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the audit report "${title}"?`)) {
+      return;
+    }
+    try {
+      await deleteReport(reportId);
+      loadReportsAndStats();
+      alert('Audit report deleted successfully.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete report');
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
 
-      {/* ── HEADER & ROLE SWITCHER ── */}
+      {/* ── HEADER & AUTH ROLE BADGE ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
@@ -413,28 +430,22 @@ export const RecoveryReportsPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-          {/* Role Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.4rem 0.75rem', borderRadius: '10px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Active Mode:</span>
-            <button
-              onClick={() => setIsOfficer(!isOfficer)}
-              style={{
-                padding: '0.35rem 0.75rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: isOfficer ? '#1e3a8a' : '#16a34a',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-              }}
-            >
-              <span>{isOfficer ? '🛡️ DMC Officer View' : '👤 Citizen View'}</span>
-              <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>(Click to switch)</span>
-            </button>
+          {/* Authenticated Role Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
+              borderRadius: '6px',
+              background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
+              color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
+              border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+            </span>
           </div>
 
           {/* Generate Report — Officer only */}
@@ -586,26 +597,48 @@ export const RecoveryReportsPage: React.FC = () => {
                     Generated on {new Date(r.generatedAt).toLocaleString()} • Verified by DMC Internal Audit
                   </span>
                 </div>
-                {/* Export PDF — available to ALL roles */}
-                <button
-                  onClick={() => exportReportToPdf(r, liveStats)}
-                  style={{
-                    padding: '0.45rem 0.9rem',
-                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-                    border: 'none',
-                    borderRadius: '7px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
-                  }}
-                >
-                  📥 Export PDF
-                </button>
+                {/* Action Buttons: Export PDF & Delete (for Admin/Officer) */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    onClick={() => exportReportToPdf(r, liveStats)}
+                    style={{
+                      padding: '0.45rem 0.9rem',
+                      background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                      border: 'none',
+                      borderRadius: '7px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: '#ffffff',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
+                    }}
+                  >
+                    📥 Export PDF
+                  </button>
+                  {isOfficer && (
+                    <button
+                      onClick={() => handleDeleteReport(r.id, r.title)}
+                      style={{
+                        padding: '0.45rem 0.8rem',
+                        background: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '7px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: '#dc2626',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                      }}
+                    >
+                      🗑️ Delete
+                    </button>
+                  )}
+                </div>
               </div>
 
               <p style={{ margin: '0 0 1.25rem 0', color: '#334155', fontSize: '0.95rem', lineHeight: 1.5, background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #f1f5f9' }}>

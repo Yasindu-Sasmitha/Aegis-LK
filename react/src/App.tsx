@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './shared/auth/AuthContext';
 import { LoginPage } from './shared/auth/LoginPage';
 import { RegisterPage } from './shared/auth/RegisterPage';
@@ -44,14 +44,14 @@ const MainPlatform: React.FC = () => {
     ...(isOfficerOrAdmin ? [{ id: 'analytics', label: '📊 Accuracy Analytics' }] : []),
   ];
 
-  // Role-filtered tabs for Recovery module
+  // Navigation tabs for Recovery module (available across roles)
   const RECOVERY_TABS = [
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'shelters', label: '⛺ Emergency Shelters' },
     { id: 'aid', label: '🤝 Aid Applications' },
     { id: 'donations', label: '📦 Donations' },
     { id: 'compensation', label: '💳 Compensation' },
-    ...(isOfficerOrAdmin ? [{ id: 'planning', label: '🤖 Agentic AI Planning' }] : []),
+    { id: 'planning', label: '🤖 Agentic AI Planning' },
     { id: 'reports', label: '📜 Audit Reports' },
   ];
 
@@ -68,6 +68,19 @@ const MainPlatform: React.FC = () => {
     setRecoveryTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Allow deep navigation from sub-components
+  useEffect(() => {
+    const handleRecoveryNav = (e: CustomEvent<string>) => {
+      if (e.detail) {
+        setCurrentView('recovery');
+        setRecoveryTab(e.detail);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener('aegis:navigate-recovery' as any, handleRecoveryNav);
+    return () => window.removeEventListener('aegis:navigate-recovery' as any, handleRecoveryNav);
+  }, []);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -669,7 +682,7 @@ const MainPlatform: React.FC = () => {
            ========================================================================= */}
         {currentView === 'recovery' && (
           <main>
-            {recoveryTab === 'dashboard' && <RecoveryDashboardPage />}
+            {recoveryTab === 'dashboard' && <RecoveryDashboardPage onNavigate={(tab) => setRecoveryTab(tab)} />}
             {recoveryTab === 'shelters' && <ShelterManagementPage />}
             {recoveryTab === 'aid' && <AidRequestsPage />}
             {recoveryTab === 'donations' && <DonationsPage />}

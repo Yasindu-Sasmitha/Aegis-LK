@@ -70,6 +70,12 @@ public record CreateDonationRequest(
     string DonationType,
     decimal AmountOrQuantity,
     string ItemDescription,
+    Guid? TargetShelterId,
+    string? AllocationStatus = null
+);
+
+public record UpdateDonationAllocationRequest(
+    string? AllocationStatus,
     Guid? TargetShelterId
 );
 

@@ -1,11 +1,18 @@
-import React from 'react';
-import { Donation } from '../types/recoveryTypes';
+import React, { useState } from 'react';
+import { Donation, Shelter } from '../types/recoveryTypes';
 
 interface Props {
   donations: Donation[];
+  shelters?: Shelter[];
+  onUpdateAllocation?: (id: string, status: string, shelterId?: string) => Promise<void>;
 }
 
-export const DonationTracker: React.FC<Props> = ({ donations }) => {
+export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onUpdateAllocation }) => {
+  const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
+  const [targetStatus, setTargetStatus] = useState<string>('Allocated');
+  const [targetShelterId, setTargetShelterId] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+
   const totalMonetary = donations
     .filter((d) => d.donationType === 'Monetary')
     .reduce((sum, d) => sum + (d.amountOrQuantity || 0), 0);
@@ -13,6 +20,29 @@ export const DonationTracker: React.FC<Props> = ({ donations }) => {
   const totalSupplies = donations
     .filter((d) => d.donationType !== 'Monetary')
     .reduce((sum, d) => sum + (d.amountOrQuantity || 0), 0);
+
+  const openAllocateModal = (d: Donation) => {
+    setSelectedDonation(d);
+    setTargetStatus(d.allocationStatus === 'Unallocated' ? 'Allocated' : d.allocationStatus);
+    setTargetShelterId(d.targetShelterId || (shelters[0]?.id || ''));
+  };
+
+  const handleSaveAllocation = async () => {
+    if (!selectedDonation || !onUpdateAllocation) return;
+    setSaving(true);
+    try {
+      await onUpdateAllocation(
+        selectedDonation.id,
+        targetStatus,
+        targetStatus === 'Unallocated' ? undefined : targetShelterId || undefined
+      );
+      setSelectedDonation(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update allocation');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (donations.length === 0) {
     return (
@@ -82,6 +112,9 @@ export const DonationTracker: React.FC<Props> = ({ donations }) => {
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Item Description</th>
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Allocation Status</th>
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Date Received</th>
+                {onUpdateAllocation && (
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 700, textAlign: 'right' }}>Actions</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -119,12 +152,17 @@ export const DonationTracker: React.FC<Props> = ({ donations }) => {
                       : `${d.amountOrQuantity} Units`}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#334155' }}>
-                    {d.itemDescription || 'General Disaster Relief'}
+                    <div>{d.itemDescription || 'General Disaster Relief'}</div>
+                    {d.targetShelterId && (
+                      <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>
+                        ⛺ {shelters.find((s) => s.id === d.targetShelterId)?.name || 'Designated Shelter'}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '0.85rem 1rem' }}>
                     <span
                       style={{
-                        padding: '0.25rem 0.6rem',
+                        padding: '0.25rem 0.65rem',
                         borderRadius: '6px',
                         fontSize: '0.75rem',
                         fontWeight: 700,
@@ -140,20 +178,111 @@ export const DonationTracker: React.FC<Props> = ({ donations }) => {
                             : d.allocationStatus === 'Allocated'
                             ? '#1e40af'
                             : '#92400e',
+                        border: `1px solid ${
+                          d.allocationStatus === 'Distributed'
+                            ? '#86efac'
+                            : d.allocationStatus === 'Allocated'
+                            ? '#bfdbfe'
+                            : '#fde68a'
+                        }`,
                       }}
                     >
-                      {d.allocationStatus}
+                      ● {d.allocationStatus}
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
                     {new Date(d.createdAt).toLocaleDateString()}
                   </td>
+                  {onUpdateAllocation && (
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                      <button
+                        onClick={() => openAllocateModal(d)}
+                        style={{
+                          padding: '0.35rem 0.75rem',
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: '#334155',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ⚙️ Allocate
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* ── ALLOCATION UPDATE MODAL ── */}
+      {selectedDonation && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ background: '#ffffff', borderRadius: '14px', padding: '1.75rem', width: '450px', maxWidth: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+              Update Donation Allocation
+            </h3>
+            <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.85rem', color: '#64748b' }}>
+              Assign <strong>{selectedDonation.donorName}</strong>'s contribution to a relief shelter or mark as distributed.
+            </p>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                Allocation Status
+              </label>
+              <select
+                value={targetStatus}
+                onChange={(e) => setTargetStatus(e.target.value)}
+                style={{ width: '100%', padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem' }}
+              >
+                <option value="Unallocated">Unallocated (General Relief Fund)</option>
+                <option value="Allocated">Allocated to Specific Shelter</option>
+                <option value="Distributed">Distributed to Citizens</option>
+              </select>
+            </div>
+
+            {targetStatus !== 'Unallocated' && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                  Target Emergency Shelter
+                </label>
+                <select
+                  value={targetShelterId}
+                  onChange={(e) => setTargetShelterId(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem' }}
+                >
+                  <option value="">-- Select Relief Shelter --</option>
+                  {shelters.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.district})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setSelectedDonation(null)}
+                style={{ padding: '0.55rem 1rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', color: '#475569' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAllocation}
+                disabled={saving}
+                style={{ padding: '0.55rem 1.25rem', background: '#15803d', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}
+              >
+                {saving ? 'Updating...' : 'Save Allocation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
