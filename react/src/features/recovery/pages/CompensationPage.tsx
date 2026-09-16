@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchCompensations, createCompensation, approveCompensation } from '../api/recoveryApi';
 import { CompensationTable } from '../components/CompensationTable';
 import { Compensation } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
 const DAMAGE_CATEGORIES = [
   'Total House Loss',
@@ -13,9 +14,15 @@ const DAMAGE_CATEGORIES = [
 ];
 
 export const CompensationPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  const isDisasterOfficer = user?.role === 'DisasterOfficer';
+  const isOfficer = isAdmin || isDisasterOfficer;
+  const isCitizen = user?.role === 'Citizen';
+  const isResponder = user?.role === 'Responder';
+
   const [claims, setClaims] = useState<Compensation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOfficer, setIsOfficer] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -23,7 +30,7 @@ export const CompensationPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newClaim, setNewClaim] = useState({
-    applicantName: '',
+    applicantName: user?.fullName || '',
     nic: '',
     damageCategory: 'Total House Loss',
     claimAmount: 500000,
@@ -48,7 +55,7 @@ export const CompensationPage: React.FC = () => {
 
   const handleApprove = async (id: string, approvedAmount: number, status: string, notes: string) => {
     try {
-      await approveCompensation(id, approvedAmount, status, notes, 'DMC Recovery Officer');
+      await approveCompensation(id, approvedAmount, status, notes, user?.fullName || 'DMC Recovery Officer');
       loadClaims();
     } catch (err: any) {
       alert(err.message);
@@ -57,17 +64,33 @@ export const CompensationPage: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClaim.applicantName.trim() || !newClaim.nic.trim()) {
-      alert('Please enter your full name and National Identity Card (NIC) number.');
+    if (!newClaim.applicantName.trim()) {
+      alert('Please enter your full name as printed on your National Identity Card.');
+      return;
+    }
+
+    const cleanNic = newClaim.nic.trim().toUpperCase();
+    const oldNicRegex = /^[0-9]{9}[VX]$/;
+    const newNicRegex = /^[0-9]{12}$/;
+    if (!oldNicRegex.test(cleanNic) && !newNicRegex.test(cleanNic)) {
+      alert('Please enter a valid Sri Lankan NIC number (e.g. 9 digits + V/X like 123456789V, or modern 12 digits like 199012345678).');
+      return;
+    }
+
+    if (!newClaim.claimAmount || newClaim.claimAmount <= 0) {
+      alert('Please enter a valid compensation claim amount greater than LKR 0.');
       return;
     }
 
     setSubmitting(true);
     try {
-      await createCompensation(newClaim);
+      await createCompensation({
+        ...newClaim,
+        nic: cleanNic,
+      });
       setShowModal(false);
       setNewClaim({
-        applicantName: '',
+        applicantName: user?.fullName || '',
         nic: '',
         damageCategory: 'Total House Loss',
         claimAmount: 500000,
@@ -99,13 +122,13 @@ export const CompensationPage: React.FC = () => {
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* ── HEADER & ROLE SWITCHER ── */}
+      {/* ── HEADER & AUTH ROLE BADGE ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <span style={{ fontSize: '1.85rem' }}>💳</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
-              Disaster Damage Compensation & Loss Grants
+              Disaster Damage Compensation &amp; Loss Grants
             </h1>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
@@ -113,33 +136,27 @@ export const CompensationPage: React.FC = () => {
           </p>
         </div>
 
-        {/* User Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.4rem 0.75rem', borderRadius: '10px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Active Mode:</span>
-          <button
-            onClick={() => setIsOfficer(!isOfficer)}
-            style={{
-              padding: '0.35rem 0.75rem',
-              borderRadius: '6px',
-              border: 'none',
-              background: isOfficer ? '#1e3a8a' : '#16a34a',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-            }}
-          >
-            <span>{isOfficer ? '🛡️ DMC Officer View' : '👤 Citizen / Claimant View'}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>(Click to switch)</span>
-          </button>
+        {/* Authenticated Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            padding: '3px 10px',
+            borderRadius: '6px',
+            background: isAdmin ? '#faf5ff' : isDisasterOfficer ? '#eff6ff' : isResponder ? '#fffbeb' : '#f0fdf4',
+            color: isAdmin ? '#7e22ce' : isDisasterOfficer ? '#1e40af' : isResponder ? '#b45309' : '#15803d',
+            border: `1px solid ${isAdmin ? '#e9d5ff' : isDisasterOfficer ? '#bfdbfe' : isResponder ? '#fde68a' : '#bbf7d0'}`,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em'
+          }}>
+            {isAdmin ? '⚙️ System Admin' : isDisasterOfficer ? '🛡️ Disaster Officer' : isResponder ? '🚨 Field Responder' : '👥 Citizen Claimant'}
+          </span>
         </div>
       </div>
 
-      {/* ── CITIZEN INFO BANNER ── */}
-      {!isOfficer && (
+      {/* ── ROLE INFORMATIONAL BANNER ── */}
+      {isCitizen ? (
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -157,7 +174,29 @@ export const CompensationPage: React.FC = () => {
           <div>
             <strong>Citizen Claimant Portal</strong>
             <p style={{ margin: '0.25rem 0 0 0', color: '#6b21a8', fontWeight: 400 }}>
-              You can <strong>file a new compensation claim</strong> for property damage or livelihood loss. Once submitted, a Grama Niladhari officer will conduct a field verification. Claim approvals and payout decisions are made by the DMC Recovery Officer.
+              You can <strong>file a new compensation claim</strong> for property damage or livelihood loss. Once submitted, a Grama Niladhari officer will conduct a field verification. Official claim approvals and payouts are authorized by the DMC Recovery Officer.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          background: '#eff6ff',
+          border: '1px solid #dbeafe',
+          borderLeft: '4px solid #2563eb',
+          borderRadius: '10px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.25rem',
+          fontSize: '0.9rem',
+          color: '#1e40af',
+        }}>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
+          <div>
+            <strong>DMC Officer Verification &amp; Payout Audit</strong>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
+              Review submitted claims, adjust approved grant amounts according to statutory damage appraisal ceilings, and disburse relief funds to claimant accounts.
             </p>
           </div>
         </div>

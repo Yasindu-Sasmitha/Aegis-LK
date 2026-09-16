@@ -439,8 +439,32 @@ public static class RecoveryDataSeeder
                     DonationType = "Supplies",
                     AmountOrQuantity = 150,
                     ItemDescription = "Family Dry Ration Packs (Rice, Dhal, Sugar, Canned Fish)",
+                    TargetShelterId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                     AllocationStatus = "Allocated",
                     CreatedAt = DateTime.UtcNow.AddDays(-2)
+                },
+                new Donation
+                {
+                    Id = Guid.NewGuid(),
+                    DonorName = "Rotary Club of Ratnapura",
+                    DonorContact = "info@rotary.ratnapura.lk",
+                    DonationType = "Monetary",
+                    AmountOrQuantity = 75000.00m,
+                    ItemDescription = "Medical Post & Water Purification Filter Supplies",
+                    TargetShelterId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                    AllocationStatus = "Allocated",
+                    CreatedAt = DateTime.UtcNow.AddDays(-1)
+                },
+                new Donation
+                {
+                    Id = Guid.NewGuid(),
+                    DonorName = "Sarvodaya Movement",
+                    DonorContact = "relief@sarvodaya.org",
+                    DonationType = "Monetary",
+                    AmountOrQuantity = 25000.00m,
+                    ItemDescription = "Emergency Citizen Subsistence Fund",
+                    AllocationStatus = "Unallocated",
+                    CreatedAt = DateTime.UtcNow.AddHours(-12)
                 }
             };
             db.Donations.AddRange(donations);

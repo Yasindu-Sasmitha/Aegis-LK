@@ -202,6 +202,10 @@ public static class RecoveryEndpoints
             if (request.AmountOrQuantity <= 0)
                 return Results.BadRequest(new { error = "Donation amount or quantity must be greater than zero." });
 
+            var status = !string.IsNullOrWhiteSpace(request.AllocationStatus)
+                ? request.AllocationStatus.Trim()
+                : (request.TargetShelterId.HasValue ? "Allocated" : "Unallocated");
+
             var donation = new Donation
             {
                 DonorName = request.DonorName.Trim(),
@@ -210,13 +214,27 @@ public static class RecoveryEndpoints
                 AmountOrQuantity = request.AmountOrQuantity,
                 ItemDescription = request.ItemDescription?.Trim() ?? string.Empty,
                 TargetShelterId = request.TargetShelterId,
-                AllocationStatus = request.TargetShelterId.HasValue ? "Allocated" : "Unallocated",
+                AllocationStatus = status,
                 CreatedAt = DateTime.UtcNow
             };
 
             db.Donations.Add(donation);
             await db.SaveChangesAsync();
             return Results.Created($"/api/recovery/donations/{donation.Id}", MapDonationDto(donation));
+        });
+
+        group.MapPut("/donations/{id:guid}/allocation", async (Guid id, UpdateDonationAllocationRequest request, RecoveryDbContext db) =>
+        {
+            var donation = await db.Donations.FindAsync(id);
+            if (donation is null) return Results.NotFound();
+
+            if (!string.IsNullOrWhiteSpace(request.AllocationStatus))
+                donation.AllocationStatus = request.AllocationStatus.Trim();
+            if (request.TargetShelterId.HasValue)
+                donation.TargetShelterId = request.TargetShelterId.Value;
+
+            await db.SaveChangesAsync();
+            return Results.Ok(MapDonationDto(donation));
         });
 
         #endregion
@@ -607,6 +625,15 @@ public static class RecoveryEndpoints
             return Results.Created($"/api/recovery/reports/{report.Id}", report);
         });
 
+        group.MapDelete("/reports/{id:guid}", async (Guid id, RecoveryDbContext db) =>
+        {
+            var report = await db.RecoveryReports.FindAsync(id);
+            if (report is null) return Results.NotFound(new { error = "Report not found." });
+            db.RecoveryReports.Remove(report);
+            await db.SaveChangesAsync();
+            return Results.Ok(new { message = "Report deleted successfully." });
+        });
+
         #endregion
     }
 
@@ -730,50 +757,40 @@ public static class RecoveryEndpoints
 
     private static WorkflowTraceDto MapWorkflowTraceDto(RecoveryWorkflowLog log)
     {
-        var opts = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         List<AgentStepDto> steps = [];
         List<ToolCallDto> tools = [];
         List<ValidationResultDto> validations = [];
 
         try
         {
-            steps = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(log.AgentStepsJson, opts)?
-                .Select(s => new AgentStepDto(
-                    s.TryGetValue("agentName", out var n) ? n?.ToString() ?? "" : "",
-                    s.TryGetValue("role", out var r) ? r?.ToString() ?? "" : "",
-                    s.TryGetValue("inputSummary", out var i) ? i?.ToString() ?? "" : "",
-                    s.TryGetValue("outputSummary", out var o) ? o?.ToString() ?? "" : "",
-                    s.TryGetValue("durationMs", out var d) ? Convert.ToInt32(d) : 0,
-                    s.TryGetValue("status", out var st) ? st?.ToString() ?? "" : "",
-                    s.TryGetValue("errorMessage", out var e) ? e?.ToString() : null
-                )).ToList() ?? [];
+            if (!string.IsNullOrWhiteSpace(log.AgentStepsJson))
+                steps = JsonSerializer.Deserialize<List<AgentStepDto>>(log.AgentStepsJson, opts) ?? [];
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Trace Deserialization Error: AgentSteps] {ex.Message}");
+        }
 
         try
         {
-            tools = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(log.ToolCallsJson, opts)?
-                .Select(t => new ToolCallDto(
-                    t.TryGetValue("toolName", out var n) ? n?.ToString() ?? "" : "",
-                    t.TryGetValue("inputJson", out var i) ? i?.ToString() ?? "" : "",
-                    t.TryGetValue("outputJson", out var o) ? o?.ToString() ?? "" : "",
-                    t.TryGetValue("durationMs", out var d) ? Convert.ToInt32(d) : 0,
-                    t.TryGetValue("status", out var s) ? s?.ToString() ?? "" : "",
-                    t.TryGetValue("errorMessage", out var e) ? e?.ToString() : null
-                )).ToList() ?? [];
+            if (!string.IsNullOrWhiteSpace(log.ToolCallsJson))
+                tools = JsonSerializer.Deserialize<List<ToolCallDto>>(log.ToolCallsJson, opts) ?? [];
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Trace Deserialization Error: ToolCalls] {ex.Message}");
+        }
 
         try
         {
-            validations = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(log.ValidationResultsJson, opts)?
-                .Select(v => new ValidationResultDto(
-                    v.TryGetValue("ruleName", out var n) ? n?.ToString() ?? "" : "",
-                    v.TryGetValue("passed", out var p) && p?.ToString()?.ToLower() == "true",
-                    v.TryGetValue("detail", out var d) ? d?.ToString() ?? "" : ""
-                )).ToList() ?? [];
+            if (!string.IsNullOrWhiteSpace(log.ValidationResultsJson))
+                validations = JsonSerializer.Deserialize<List<ValidationResultDto>>(log.ValidationResultsJson, opts) ?? [];
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Trace Deserialization Error: ValidationResults] {ex.Message}");
+        }
 
         return new WorkflowTraceDto(
             log.Id, log.RecoveryPlanId, log.ExecutionStatus, log.TotalDurationMs, log.RetryCount,

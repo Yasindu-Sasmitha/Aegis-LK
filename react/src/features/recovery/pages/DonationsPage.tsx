@@ -1,28 +1,42 @@
 import React, { useEffect, useState } from 'react';
-import { fetchDonations, createDonation } from '../api/recoveryApi';
+import { fetchDonations, createDonation, fetchShelters, updateDonationAllocation } from '../api/recoveryApi';
 import { DonationTracker } from '../components/DonationTracker';
-import { Donation } from '../types/recoveryTypes';
+import { Donation, Shelter } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
 export const DonationsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  const isDisasterOfficer = user?.role === 'DisasterOfficer';
+  const isOfficer = isAdmin || isDisasterOfficer;
+  const isResponder = user?.role === 'Responder';
+
   const [donations, setDonations] = useState<Donation[]>([]);
+  const [shelters, setShelters] = useState<Shelter[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newDonation, setNewDonation] = useState({
-    donorName: '',
-    donorContact: '',
+    donorName: user?.fullName || '',
+    donorContact: user?.phoneNumber || '',
     donationType: 'Monetary',
     amountOrQuantity: 25000,
     itemDescription: 'Emergency Citizen Subsistence Fund',
+    allocationStatus: 'Unallocated',
+    targetShelterId: '',
   });
 
-  const loadDonations = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const data = await fetchDonations();
-      setDonations(Array.isArray(data) ? data : (data as any).items || []);
+      const [donationsRes, sheltersRes] = await Promise.all([
+        fetchDonations(),
+        fetchShelters(),
+      ]);
+      setDonations(Array.isArray(donationsRes) ? donationsRes : (donationsRes as any).items || []);
+      setShelters(Array.isArray(sheltersRes) ? sheltersRes : (sheltersRes as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -31,7 +45,7 @@ export const DonationsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadDonations();
+    loadData();
   }, []);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -41,11 +55,27 @@ export const DonationsPage: React.FC = () => {
       return;
     }
 
+    if (!newDonation.amountOrQuantity || newDonation.amountOrQuantity <= 0) {
+      alert('Please provide a positive donation amount or quantity.');
+      return;
+    }
+
+    const cleanContact = newDonation.donorContact.trim();
+    if (cleanContact && cleanContact.length < 5) {
+      alert('Please provide a valid contact phone number or email address.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await createDonation({
-        ...newDonation,
-        allocationStatus: 'Unallocated',
+        donorName: newDonation.donorName.trim(),
+        donorContact: cleanContact,
+        donationType: newDonation.donationType,
+        amountOrQuantity: newDonation.amountOrQuantity,
+        itemDescription: newDonation.itemDescription.trim() || 'General Emergency Disaster Relief',
+        allocationStatus: newDonation.allocationStatus,
+        targetShelterId: newDonation.targetShelterId || undefined,
       });
       setShowModal(false);
       setNewDonation({
@@ -54,8 +84,10 @@ export const DonationsPage: React.FC = () => {
         donationType: 'Monetary',
         amountOrQuantity: 25000,
         itemDescription: 'Emergency Citizen Subsistence Fund',
+        allocationStatus: 'Unallocated',
+        targetShelterId: '',
       });
-      loadDonations();
+      loadData();
       alert('Donation contribution recorded successfully in the transparency ledger.');
     } catch (err: any) {
       alert(err.message || 'Failed to record donation');
@@ -64,16 +96,29 @@ export const DonationsPage: React.FC = () => {
     }
   };
 
+  const handleUpdateAllocation = async (donationId: string, status: string, shelterId?: string) => {
+    if (!isOfficer) {
+      alert('Unauthorized: Only Disaster Officers and System Administrators can allocate relief donations to shelters.');
+      return;
+    }
+    try {
+      await updateDonationAllocation(donationId, status, shelterId);
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update allocation');
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
       {/* ── HEADER & ACTION BUTTON ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <span style={{ fontSize: '1.85rem' }}>📦</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
-              Public Community Donations & Supplies Registry
+              Public Community Donations &amp; Supplies Registry
             </h1>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
@@ -81,26 +126,46 @@ export const DonationsPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          style={{
-            padding: '0.75rem 1.25rem',
-            background: 'linear-gradient(135deg, #15803d, #16a34a)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '10px',
-            fontWeight: 700,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
-          }}
-        >
-          <span>➕</span>
-          <span>Record Community Donation</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* Authenticated Role Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
+              borderRadius: '6px',
+              background: isAdmin ? '#faf5ff' : isDisasterOfficer ? '#eff6ff' : isResponder ? '#fffbeb' : '#f0fdf4',
+              color: isAdmin ? '#7e22ce' : isDisasterOfficer ? '#1e40af' : isResponder ? '#b45309' : '#15803d',
+              border: `1px solid ${isAdmin ? '#e9d5ff' : isDisasterOfficer ? '#bfdbfe' : isResponder ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {isAdmin ? '⚙️ System Admin' : isDisasterOfficer ? '🛡️ Disaster Officer' : isResponder ? '🚨 Field Responder' : '👥 Citizen Donor'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              padding: '0.65rem 1.25rem',
+              background: 'linear-gradient(135deg, #15803d, #16a34a)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+            }}
+          >
+            <span>➕</span>
+            <span>Record Community Donation</span>
+          </button>
+        </div>
       </div>
 
       {/* ── TRACKER & TABLE ── */}
@@ -110,7 +175,11 @@ export const DonationsPage: React.FC = () => {
           <p>Loading donations registry...</p>
         </div>
       ) : (
-        <DonationTracker donations={donations} />
+        <DonationTracker
+          donations={donations}
+          shelters={shelters}
+          onUpdateAllocation={isOfficer ? handleUpdateAllocation : undefined}
+        />
       )}
 
       {/* ── LOG DONATION MODAL ── */}
@@ -170,6 +239,39 @@ export const DonationsPage: React.FC = () => {
                     onChange={(e) => setNewDonation({ ...newDonation, amountOrQuantity: Number(e.target.value) })}
                     style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Initial Allocation Status
+                  </label>
+                  <select
+                    value={newDonation.allocationStatus}
+                    onChange={(e) => setNewDonation({ ...newDonation, allocationStatus: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
+                  >
+                    <option value="Unallocated">Unallocated (General Pool)</option>
+                    <option value="Allocated">Allocated to Shelter</option>
+                    <option value="Distributed">Distributed (Completed)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                    Target Shelter (Optional)
+                  </label>
+                  <select
+                    value={newDonation.targetShelterId}
+                    onChange={(e) => setNewDonation({ ...newDonation, targetShelterId: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
+                  >
+                    <option value="">-- General / No Shelter --</option>
+                    {shelters.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.district})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
