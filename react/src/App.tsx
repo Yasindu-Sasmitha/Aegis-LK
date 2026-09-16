@@ -17,6 +17,8 @@ import {
   AlertReviewQueuePage,
   PredictionHistoryPage,
   AnalyticsPage,
+  fetchAlerts,
+  WeatherAlert,
 } from './features/weather';
 
 type NavView = 'home' | 'weather' | 'recovery';
@@ -33,6 +35,27 @@ const MainPlatform: React.FC = () => {
   const [currentView, setCurrentView] = useState<NavView>('home');
   const [weatherTab, setWeatherTab] = useState<string>('dashboard');
   const [recoveryTab, setRecoveryTab] = useState<string>('dashboard');
+  const [latestAlerts, setLatestAlerts] = useState<WeatherAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    if (currentView === 'home') {
+      setAlertsLoading(true);
+      fetchAlerts({ status: 'Published', pageSize: 4 })
+        .then(res => {
+          if (active) {
+            setLatestAlerts(res.items || []);
+            setAlertsLoading(false);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load published alerts:', err);
+          if (active) setAlertsLoading(false);
+        });
+    }
+    return () => { active = false; };
+  }, [currentView]);
 
   const isOfficerOrAdmin = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
 
@@ -451,83 +474,90 @@ const MainPlatform: React.FC = () => {
                   </div>
                   <span
                     className="ae-panel-action"
-                    onClick={() => navigateToWeather('dashboard')}
+                    onClick={() => navigateToWeather('history')}
                   >
                     View All →
                   </span>
                 </div>
 
-                <div className="ae-alert-item" onClick={() => navigateToWeather('dashboard')}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span style={{
-                        background: '#fee2e2',
-                        color: '#dc2626',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: 6
-                      }}>
-                        High
-                      </span>
-                      <strong style={{ fontSize: '0.875rem', color: '#0f172a' }}>
-                        Heavy Rainfall Warning – Western Province
-                      </strong>
+                {alertsLoading ? (
+                  <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                    ⏳ Loading latest published alerts…
+                  </div>
+                ) : latestAlerts.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '2rem 1rem',
+                    background: '#f8fafc',
+                    borderRadius: 12,
+                    border: '1px dashed #cbd5e1',
+                    color: '#64748b'
+                  }}>
+                    <div style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>✅</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.2rem' }}>
+                      No Active Published Alerts
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      Issued on 12 Sep 2025, 10:30 AM
+                      All monitored districts are currently operating under normal baseline conditions.
                     </div>
                   </div>
-                  <span style={{ color: '#94a3b8' }}>›</span>
-                </div>
+                ) : (
+                  latestAlerts.map(alert => {
+                    const isHigh = alert.severity === 'High';
+                    const hIcon = alert.hazardType === 'Flood' ? '🌊' : alert.hazardType === 'Landslide' ? '⛰️' : '💨';
+                    const issuedDate = alert.publishedAt ?? alert.createdAt;
 
-                <div className="ae-alert-item" onClick={() => navigateToWeather('dashboard')}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span style={{
-                        background: '#fef3c7',
-                        color: '#d97706',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: 6
-                      }}>
-                        Medium
-                      </span>
-                      <strong style={{ fontSize: '0.875rem', color: '#0f172a' }}>
-                        Strong Winds Expected – Southern Coast
-                      </strong>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      Issued on 12 Sep 2025, 08:15 AM
-                    </div>
-                  </div>
-                  <span style={{ color: '#94a3b8' }}>›</span>
-                </div>
-
-                <div className="ae-alert-item" onClick={() => navigateToWeather('dashboard')}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span style={{
-                        background: '#fef9c3',
-                        color: '#ca8a04',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: 6
-                      }}>
-                        Low
-                      </span>
-                      <strong style={{ fontSize: '0.875rem', color: '#0f172a' }}>
-                        Flood Risk Alert – Kegalle District
-                      </strong>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      Issued on 11 Sep 2025, 05:40 PM
-                    </div>
-                  </div>
-                  <span style={{ color: '#94a3b8' }}>›</span>
-                </div>
+                    return (
+                      <div
+                        key={alert.id}
+                        className="ae-alert-item"
+                        onClick={() => navigateToWeather('history')}
+                        title={alert.message}
+                      >
+                        <div style={{ flex: 1, minWidth: 0, paddingRight: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
+                            <span style={{
+                              background: isHigh ? '#fee2e2' : '#fef3c7',
+                              color: isHigh ? '#991b1b' : '#92400e',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 6
+                            }}>
+                              {alert.severity}
+                            </span>
+                            <span style={{ fontSize: '0.85rem' }}>{hIcon}</span>
+                            <strong style={{
+                              fontSize: '0.875rem',
+                              color: '#0f172a',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '260px'
+                            }}>
+                              {alert.hazardType} Warning – {alert.districtName ?? 'Sri Lanka'}
+                            </strong>
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#475569',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '320px',
+                            lineHeight: 1.4
+                          }}>
+                            {alert.message}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.2rem' }}>
+                            Issued {new Date(issuedDate).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </div>
+                        </div>
+                        <span style={{ color: '#94a3b8', fontSize: '1.25rem', marginLeft: 'auto' }}>›</span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Center Column: Quick Access (Dark Blue Card with Sri Lanka Motif) */}
