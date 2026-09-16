@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchAidRequests, createAidRequest, updateAidRequestStatus } from '../api/recoveryApi';
 import { AidRequestTable } from '../components/AidRequestTable';
 import { AidRequest } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
 const SRI_LANKA_DISTRICTS = [
   'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 'Galle',
@@ -22,9 +23,12 @@ const AID_TYPES = [
 ];
 
 export const AidRequestsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isOfficer = user?.role === 'DisasterOfficer' || user?.role === 'Admin' || user?.role === 'Responder';
+  const isCitizen = user?.role === 'Citizen';
+
   const [requests, setRequests] = useState<AidRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOfficer, setIsOfficer] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -32,9 +36,9 @@ export const AidRequestsPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newRequest, setNewRequest] = useState({
-    victimName: '',
-    contactPhone: '',
-    district: 'Kalutara',
+    victimName: user?.fullName || '',
+    contactPhone: user?.phoneNumber || '',
+    district: user?.district || 'Kalutara',
     aidType: 'Food Rations',
     familySize: 4,
     urgency: 'High',
@@ -68,8 +72,19 @@ export const AidRequestsPage: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRequest.victimName.trim() || !newRequest.contactPhone.trim()) {
-      alert('Please provide your name and contact phone number.');
+    if (!newRequest.victimName.trim()) {
+      alert('Please provide the applicant/victim full name.');
+      return;
+    }
+
+    const cleanPhone = newRequest.contactPhone.trim();
+    if (!cleanPhone || cleanPhone.replace(/[^0-9+]/g, '').length < 9) {
+      alert('Please provide a valid contact phone number with at least 9-10 digits (e.g. 0771234567 or +94112345670).');
+      return;
+    }
+
+    if (!newRequest.familySize || newRequest.familySize < 1 || newRequest.familySize > 50) {
+      alert('Family size must be between 1 and 50 members.');
       return;
     }
 
@@ -77,13 +92,14 @@ export const AidRequestsPage: React.FC = () => {
     try {
       await createAidRequest({
         ...newRequest,
+        contactPhone: cleanPhone,
         status: 'Pending',
       });
       setShowModal(false);
       setNewRequest({
-        victimName: '',
-        contactPhone: '',
-        district: 'Kalutara',
+        victimName: user?.fullName || '',
+        contactPhone: user?.phoneNumber || '',
+        district: user?.district || 'Kalutara',
         aidType: 'Food Rations',
         familySize: 4,
         urgency: 'High',
@@ -115,13 +131,13 @@ export const AidRequestsPage: React.FC = () => {
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* ── HEADER & ROLE SWITCHER ── */}
+      {/* ── HEADER & AUTH ROLE BADGE ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <span style={{ fontSize: '1.85rem' }}>🤝</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
-              Citizen Emergency Aid & Relief Portal
+              Citizen Emergency Aid &amp; Relief Portal
             </h1>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
@@ -129,33 +145,27 @@ export const AidRequestsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* User Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.4rem 0.75rem', borderRadius: '10px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Active Mode:</span>
-          <button
-            onClick={() => setIsOfficer(!isOfficer)}
-            style={{
-              padding: '0.35rem 0.75rem',
-              borderRadius: '6px',
-              border: 'none',
-              background: isOfficer ? '#1e3a8a' : '#16a34a',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-            }}
-          >
-            <span>{isOfficer ? '🛡️ DMC Officer View' : '👤 Citizen View'}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>(Click to switch)</span>
-          </button>
+        {/* Authenticated Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            padding: '3px 10px',
+            borderRadius: '6px',
+            background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
+            color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
+            border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em'
+          }}>
+            {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+          </span>
         </div>
       </div>
 
       {/* ── CITIZEN INFO BANNER ── */}
-      {!isOfficer && (
+      {isCitizen ? (
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -167,13 +177,35 @@ export const AidRequestsPage: React.FC = () => {
           padding: '1rem 1.25rem',
           marginBottom: '1.25rem',
           fontSize: '0.9rem',
-          color: '#15803d',
+          color: '#166534',
         }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>✋</span>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>ℹ️</span>
           <div>
-            <strong>Citizen / Victim Portal</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#166534', fontWeight: 400 }}>
-              You can <strong>submit a new aid request</strong> and track the status of your existing applications below. Approvals, rejections, and dispatch confirmations are handled by your assigned DMC Relief Officer.
+            <strong>Citizen Relief Request Service</strong>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#15803d', fontWeight: 400 }}>
+              Need emergency rations, potable drinking water, medical kits, or temporary bedding? Click <strong>"+ Apply for Emergency Relief"</strong> below. Your request will be prioritized and assigned to field response teams.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          background: '#eff6ff',
+          border: '1px solid #dbeafe',
+          borderLeft: '4px solid #2563eb',
+          borderRadius: '10px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.25rem',
+          fontSize: '0.9rem',
+          color: '#1e40af',
+        }}>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
+          <div>
+            <strong>Officer Relief Dispatch &amp; Fulfillment Portal</strong>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
+              Manage intake volume, filter by critical urgency, assign victims to emergency shelters, and advance request fulfillment status.
             </p>
           </div>
         </div>
