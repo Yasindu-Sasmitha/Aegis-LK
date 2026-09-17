@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/recovery_service.dart';
 
 class DonateScreen extends StatefulWidget {
-  const DonateScreen({Key? key}) : super(key: key);
+  const DonateScreen({super.key});
 
   @override
   State<DonateScreen> createState() => _DonateScreenState();
@@ -78,7 +78,7 @@ class _DonateScreenState extends State<DonateScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _donationType,
+                initialValue: _donationType,
                 decoration: const InputDecoration(labelText: 'Contribution Type', border: OutlineInputBorder()),
                 items: ['Monetary', 'Supplies', 'Equipment']
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))

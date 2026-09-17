@@ -3,7 +3,7 @@ import '../models/weather_models.dart';
 import '../services/weather_service.dart';
 
 class WeatherAlertsScreen extends StatefulWidget {
-  const WeatherAlertsScreen({Key? key}) : super(key: key);
+  const WeatherAlertsScreen({super.key});
 
   @override
   State<WeatherAlertsScreen> createState() => _WeatherAlertsScreenState();
@@ -257,7 +257,7 @@ class _WeatherAlertsScreenState extends State<WeatherAlertsScreen> {
                             child: ListView.separated(
                               padding: const EdgeInsets.all(16),
                               itemCount: _alerts.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 12),
+                              separatorBuilder: (_, _) => const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final alert = _alerts[index];
                                 return _buildAlertCard(alert);
@@ -340,7 +340,7 @@ class _WeatherAlertsScreenState extends State<WeatherAlertsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: statusBadgeColor.withOpacity(0.12),
+                    color: statusBadgeColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -356,7 +356,7 @@ class _WeatherAlertsScreenState extends State<WeatherAlertsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: severityColor.withOpacity(0.1),
+                color: severityColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(

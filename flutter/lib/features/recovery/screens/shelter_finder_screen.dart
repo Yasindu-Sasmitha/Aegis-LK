@@ -3,7 +3,7 @@ import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
 
 class ShelterFinderScreen extends StatefulWidget {
-  const ShelterFinderScreen({Key? key}) : super(key: key);
+  const ShelterFinderScreen({super.key});
 
   @override
   State<ShelterFinderScreen> createState() => _ShelterFinderScreenState();

@@ -3,7 +3,7 @@ import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
 
 class CitizenDamageReportScreen extends StatefulWidget {
-  const CitizenDamageReportScreen({Key? key}) : super(key: key);
+  const CitizenDamageReportScreen({super.key});
 
   @override
   State<CitizenDamageReportScreen> createState() => _CitizenDamageReportScreenState();
@@ -65,7 +65,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
                   onChanged: (v) => name = v,
                 ),
                 DropdownButtonFormField<String>(
-                  value: type,
+                  initialValue: type,
                   decoration: const InputDecoration(labelText: 'Asset Type'),
                   items: ['Bridge', 'Road', 'Water', 'Hospital', 'School', 'Power']
                       .map((t) => DropdownMenuItem(value: t, child: Text(t)))
@@ -73,7 +73,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
                   onChanged: (v) => type = v ?? 'Bridge',
                 ),
                 DropdownButtonFormField<String>(
-                  value: severity,
+                  initialValue: severity,
                   decoration: const InputDecoration(labelText: 'Damage Level'),
                   items: ['Destroyed', 'Severe', 'Moderate', 'Minor']
                       .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -190,7 +190,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
               const SizedBox(height: 20),
 
               DropdownButtonFormField<String>(
-                value: _district,
+                initialValue: _district,
                 decoration: const InputDecoration(labelText: 'District', border: OutlineInputBorder()),
                 items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                 onChanged: (v) => setState(() => _district = v ?? 'Kalutara'),
@@ -198,7 +198,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
               const SizedBox(height: 12),
 
               DropdownButtonFormField<String>(
-                value: _disasterType,
+                initialValue: _disasterType,
                 decoration: const InputDecoration(labelText: 'Disaster Type', border: OutlineInputBorder()),
                 items: _disasterTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                 onChanged: (v) => setState(() => _disasterType = v ?? 'Flood'),

@@ -37,3 +37,7 @@ appsettings.*.local.json
 *.pfx
 
 appsettings.Development.json
+
+# === JVM Crash Logs (Android Studio) ===
+hs_err_pid*.log
+replay_pid*.log

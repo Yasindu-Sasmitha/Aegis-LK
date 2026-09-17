@@ -5,7 +5,7 @@ import '../models/recovery_models.dart';
 class RecoveryService {
   final String baseUrl;
 
-  RecoveryService({this.baseUrl = 'http://localhost:5000/api/recovery'});
+  RecoveryService({this.baseUrl = 'http://localhost:5012/api/recovery'});
 
   Future<List<ShelterModel>> fetchShelters({String? district}) async {
     final uri = Uri.parse('$baseUrl/shelters${district != null ? '?district=$district' : ''}');

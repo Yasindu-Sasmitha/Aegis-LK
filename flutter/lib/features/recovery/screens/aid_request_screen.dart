@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/recovery_service.dart';
 
 class AidRequestScreen extends StatefulWidget {
-  const AidRequestScreen({Key? key}) : super(key: key);
+  const AidRequestScreen({super.key});
 
   @override
   State<AidRequestScreen> createState() => _AidRequestScreenState();
@@ -84,7 +84,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _district,
+                initialValue: _district,
                 decoration: const InputDecoration(labelText: 'District', border: OutlineInputBorder()),
                 items: ['Kalutara', 'Ratnapura', 'Matara', 'Colombo', 'Galle']
                     .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -93,7 +93,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _aidType,
+                initialValue: _aidType,
                 decoration: const InputDecoration(labelText: 'Type of Aid Needed', border: OutlineInputBorder()),
                 items: ['Shelter', 'Food', 'Medical', 'Financial', 'Clothing']
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
@@ -110,7 +110,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _urgency,
+                initialValue: _urgency,
                 decoration: const InputDecoration(labelText: 'Urgency Level', border: OutlineInputBorder()),
                 items: ['Critical', 'High', 'Medium', 'Low']
                     .map((u) => DropdownMenuItem(value: u, child: Text(u)))
