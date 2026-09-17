@@ -7,7 +7,7 @@ import 'recovery_plan_status_screen.dart';
 import 'citizen_damage_report_screen.dart';
 
 class RecoveryHomeScreen extends StatelessWidget {
-  const RecoveryHomeScreen({Key? key}) : super(key: key);
+  const RecoveryHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +101,7 @@ class RecoveryHomeScreen extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.15),
+          backgroundColor: color.withValues(alpha: 0.15),
           radius: 26,
           child: Icon(icon, color: color, size: 28),
         ),

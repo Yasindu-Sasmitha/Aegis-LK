@@ -20,6 +20,24 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 
+// ── CORS ────────────────────────────────────────────────────────────────────
+// Allow Flutter web (and React frontend) running on any localhost port during development
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowLocalDev", policy =>
+    {
+        policy
+            .SetIsOriginAllowed(origin =>
+            {
+                var uri = new Uri(origin);
+                return uri.Host == "localhost" || uri.Host == "127.0.0.1";
+            })
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
+});
+
 // ── Database Contexts ────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -119,6 +137,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// ── CORS Middleware ─────────────────────────────────────────────────────────
+app.UseCors("AllowLocalDev");
 
 // ── Auth Pipeline ───────────────────────────────────────────────────────────
 app.UseAuthentication();

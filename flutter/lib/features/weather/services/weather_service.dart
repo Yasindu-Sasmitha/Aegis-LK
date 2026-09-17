@@ -1,11 +1,13 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../models/weather_models.dart';
 
 class WeatherService {
   final String baseUrl;
 
-  WeatherService({this.baseUrl = 'http://localhost:5000/api/weather'});
+  WeatherService({this.baseUrl = 'http://localhost:5012/api/weather'});
 
   /// Fetch all 25 Sri Lankan districts
   Future<List<District>> fetchDistricts() async {
@@ -13,7 +15,9 @@ class WeatherService {
     final response = await http.get(uri);
     if (response.statusCode == 200) {
       final List decoded = jsonDecode(response.body);
-      return decoded.map((e) => District.fromJson(e as Map<String, dynamic>)).toList();
+      return decoded
+          .map((e) => District.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     throw Exception('Failed to load districts (status ${response.statusCode})');
   }
@@ -25,7 +29,9 @@ class WeatherService {
     if (response.statusCode == 200) {
       return ForecastResponse.fromJson(jsonDecode(response.body));
     }
-    throw Exception('Failed to load forecast for district (status ${response.statusCode})');
+    throw Exception(
+      'Failed to load forecast for district (status ${response.statusCode})',
+    );
   }
 
   /// Trigger autonomous AI multi-hazard prediction for a district
@@ -39,7 +45,10 @@ class WeatherService {
       return PredictResponse.fromJson(jsonDecode(response.body));
     }
     final errorBody = jsonDecode(response.body);
-    throw Exception(errorBody['error'] ?? 'Prediction run failed (status ${response.statusCode})');
+    throw Exception(
+      errorBody['error'] ??
+          'Prediction run failed (status ${response.statusCode})',
+    );
   }
 
   /// Fetch weather alerts with optional status, district, and hazardType filters
@@ -55,17 +64,26 @@ class WeatherService {
       'pageSize': pageSize.toString(),
     };
     if (status != null && status.isNotEmpty) queryParams['status'] = status;
-    if (districtId != null && districtId.isNotEmpty) queryParams['districtId'] = districtId;
-    if (hazardType != null && hazardType.isNotEmpty) queryParams['hazardType'] = hazardType;
+    if (districtId != null && districtId.isNotEmpty) {
+      queryParams['districtId'] = districtId;
+    }
+    if (hazardType != null && hazardType.isNotEmpty) {
+      queryParams['hazardType'] = hazardType;
+    }
 
-    final uri = Uri.parse('$baseUrl/alerts').replace(queryParameters: queryParams);
+    final uri = Uri.parse('$baseUrl/alerts')
+        .replace(queryParameters: queryParams);
     final response = await http.get(uri);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List items = decoded['items'] ?? [];
-      return items.map((e) => WeatherAlert.fromJson(e as Map<String, dynamic>)).toList();
+      return items
+          .map((e) => WeatherAlert.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
-    throw Exception('Failed to load weather alerts (status ${response.statusCode})');
+    throw Exception(
+      'Failed to load weather alerts (status ${response.statusCode})',
+    );
   }
 
   /// Review an alert: Approve or Reject

@@ -3,7 +3,7 @@ import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
 
 class MyAidRequestsScreen extends StatefulWidget {
-  const MyAidRequestsScreen({Key? key}) : super(key: key);
+  const MyAidRequestsScreen({super.key});
 
   @override
   State<MyAidRequestsScreen> createState() => _MyAidRequestsScreenState();

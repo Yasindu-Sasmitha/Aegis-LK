@@ -5,7 +5,7 @@ import 'district_forecast_screen.dart';
 import 'alerts_screen.dart';
 
 class WeatherHomeScreen extends StatefulWidget {
-  const WeatherHomeScreen({Key? key}) : super(key: key);
+  const WeatherHomeScreen({super.key});
 
   @override
   State<WeatherHomeScreen> createState() => _WeatherHomeScreenState();
@@ -153,7 +153,7 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                     hintStyle: const TextStyle(color: Colors.white54),
                     prefixIcon: const Icon(Icons.search, color: Colors.white70),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.12),
+                    fillColor: Colors.white.withValues(alpha: 0.12),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -174,7 +174,7 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: provinces.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   final p = provinces[index];
                   final isSelected = p == _selectedProvince;
@@ -230,7 +230,7 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                         : ListView.separated(
                             padding: const EdgeInsets.all(16),
                             itemCount: _filteredDistricts.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            separatorBuilder: (_, _) => const SizedBox(height: 10),
                             itemBuilder: (context, index) {
                               final d = _filteredDistricts[index];
                               return Card(
