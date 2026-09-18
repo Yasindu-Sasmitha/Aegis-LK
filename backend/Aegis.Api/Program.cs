@@ -113,6 +113,11 @@ var cloudinarySettings = new Aegis.Incident.Services.CloudinarySettings
 builder.Services.AddSingleton(cloudinarySettings);
 builder.Services.AddSingleton<Aegis.Incident.Services.CloudinaryService>();
 
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+});
+
 var app = builder.Build();
 
 // ── Database Seeding ────────────────────────────────────────────────────────

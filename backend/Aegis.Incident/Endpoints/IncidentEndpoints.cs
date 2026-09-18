@@ -179,6 +179,52 @@ public static class IncidentEndpoints
             return Results.Ok(mission);
         });
 
+        group.MapPost("/{id:guid}/reject", async (Guid id, RejectIncidentRequest request, IncidentDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return Results.BadRequest("A reason is required to reject an incident.");
+
+            var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
+            if (incident is null) return Results.NotFound();
+            if (incident.Status is "Rejected" or "MissionApproved")
+                return Results.Conflict($"Incident is already {incident.Status}.");
+
+            incident.Status = "Rejected";
+            incident.RejectionReason = request.Reason;
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = $"Incident rejected. Reason: {request.Reason}"
+            });
+
+            await db.SaveChangesAsync();
+            return Results.Ok(incident);
+        });
+
+        group.MapPost("/{id:guid}/hold", async (Guid id, HoldIncidentRequest request, IncidentDbContext db) =>
+        {
+            var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
+            if (incident is null) return Results.NotFound();
+            if (incident.Status is "Rejected" or "MissionApproved")
+                return Results.Conflict($"Incident is already {incident.Status}.");
+
+            incident.Status = "OnHold";
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = request.Reason is null
+                    ? "Incident placed on hold."
+                    : $"Incident placed on hold. Reason: {request.Reason}"
+            });
+
+            await db.SaveChangesAsync();
+            return Results.Ok(incident);
+        });
+
         // POST /api/incidents/{id}/damage-report — closes the incident, records damage
         group.MapPost("/{id:guid}/damage-report", async (Guid id, CreateDamageReportRequest request, IncidentDbContext db) =>
         {
