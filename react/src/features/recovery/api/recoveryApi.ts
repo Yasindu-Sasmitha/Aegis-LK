@@ -146,6 +146,16 @@ export async function fetchNGOs(status?: string): Promise<NGO[]> {
   return res.json();
 }
 
+export async function createNGO(data: Partial<NGO>): Promise<NGO> {
+  const res = await fetch(`${API_BASE}/ngos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to register NGO'); }
+  return res.json();
+}
+
 export async function fetchInfrastructureDamage(incidentId?: string): Promise<InfrastructureDamage[]> {
   const url = incidentId ? `${API_BASE}/infrastructure-damage?incidentId=${incidentId}` : `${API_BASE}/infrastructure-damage`;
   const res = await fetch(url);
@@ -209,6 +219,12 @@ export async function startWorkflowFromIncident(incidentId: string): Promise<Rec
 }
 
 /** Get the agent execution trace for a plan */
+export async function fetchWorkflowDetail(planId: string): Promise<RecoveryPlan> {
+  const res = await fetch(`${API_BASE}/workflows/${planId}`);
+  if (!res.ok) throw new Error('Failed to fetch plan detail');
+  return res.json();
+}
+
 export async function fetchWorkflowTrace(planId: string): Promise<WorkflowTrace> {
   const res = await fetch(`${API_BASE}/workflows/${planId}/trace`);
   if (!res.ok) throw new Error('No workflow trace found for this plan');
