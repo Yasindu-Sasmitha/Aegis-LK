@@ -22,12 +22,12 @@ public static class IncidentEndpoints
         group.MapGet("/", async (
             string? status,
             string? district,
-            int page,
-            int pageSize,
+            int? page,
+            int? pageSize,
             IncidentDbContext db) =>
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 20;
+            var pageNum = page is null or < 1 ? 1 : page.Value;
+            var size = pageSize is null or < 1 ? 20 : pageSize.Value;
 
             var query = db.Incidents.Where(i => i.LinkedIncidentId == null);
 
@@ -43,9 +43,9 @@ public static class IncidentEndpoints
                     .ToList();
 
             var total = candidates.Count;
-            var items = candidates.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            var items = candidates.Skip((pageNum - 1) * size).Take(size).ToList();
 
-            return Results.Ok(new { total, page, pageSize, items });
+            return Results.Ok(new { total, page = pageNum, pageSize = size, items });
         });
 
         // GET /api/incidents/nearby — internal, called by the Dedup Agent's search_nearby_incidents tool
