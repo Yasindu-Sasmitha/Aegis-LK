@@ -1,6 +1,7 @@
 import { getAuthHeaders } from '../../../shared/auth/authApi';
 import type {
   IncidentReport,
+  IncidentListResponse,
   CreateIncidentRequest,
   AssessIncidentResponse,
   ApproveIncidentRequest,
@@ -37,15 +38,18 @@ async function handle<T>(res: Response, fallbackMessage: string): Promise<T> {
 export async function fetchIncidents(params?: {
   status?: string;
   district?: string;
-}): Promise<IncidentReport[]> {
+  page?: number;
+  pageSize?: number;
+}): Promise<IncidentListResponse> {
   const query = new URLSearchParams();
   if (params?.status) query.append('status', params.status);
   if (params?.district) query.append('district', params.district);
-  const qs = query.toString();
-  const res = await fetch(`${API_BASE}${qs ? `?${qs}` : ''}`, {
+  query.append('page', String(params?.page ?? 1));
+  query.append('pageSize', String(params?.pageSize ?? 20));
+  const res = await fetch(`${API_BASE}?${query.toString()}`, {
     headers: getAuthHeaders(),
   });
-  return handle<IncidentReport[]>(res, 'Failed to fetch incidents');
+  return handle<IncidentListResponse>(res, 'Failed to fetch incidents');
 }
 
 // ── GET /api/incidents/{id} ──────────────────────────────────────────────────

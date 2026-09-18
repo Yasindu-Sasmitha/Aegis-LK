@@ -126,3 +126,11 @@ export interface NearbyIncidentResponse {
 
 // ── GET /api/incidents/{id}/related-reports ─────────────────────────────────
 export type RelatedReport = IncidentReport; // duplicates are just IncidentReports linked via linkedIncidentId
+
+// ── GET /api/incidents — paginated list response ────────────────────────────
+export interface IncidentListResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: IncidentReport[];
+}
