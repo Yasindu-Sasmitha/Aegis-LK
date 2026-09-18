@@ -18,6 +18,7 @@ public class IncidentReport
     public Guid? LinkedIncidentId { get; set; }
     public IncidentReport? LinkedIncident { get; set; }
     public string Status { get; set; } = "Reported";
+    public string? RejectionReason { get; set; }
     public Guid ReportedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

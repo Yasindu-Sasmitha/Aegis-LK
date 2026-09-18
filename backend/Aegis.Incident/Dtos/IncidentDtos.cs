@@ -74,3 +74,13 @@ public class NearbyIncidentResponse
     public double Longitude { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+public class RejectIncidentRequest
+{
+    public string Reason { get; set; } = string.Empty; // required
+}
+
+public class HoldIncidentRequest
+{
+    public string? Reason { get; set; } // optional
+}
