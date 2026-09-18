@@ -618,50 +618,23 @@ const MainPlatform: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Sri Lanka Heat Map Preview Graphic */}
+                {/* Live wind map — Windy.com free embed, centered on Sri Lanka */}
                 <div style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
                   borderRadius: 14,
-                  padding: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-around',
-                  marginBottom: '1rem'
+                  overflow: 'hidden',
+                  border: '1px solid #e2e8f0',
+                  marginBottom: '1rem',
+                  height: 220,
                 }}>
-                  {/* Island Graphic with Heat zones */}
-                  <svg width="100" height="130" viewBox="0 0 100 130" fill="none">
-                    <path
-                      d="M50 10 C56 12 60 18 60 23 C60 28 57 32 58 37 C60 43 67 47 69 53 C71 61 68 69 65 76 C62 84 56 93 50 93 C44 93 40 86 40 80 C40 73 43 68 43 62 C43 55 39 50 41 43 C43 37 47 31 48 23 C49 18 48 10 50 10 Z"
-                      fill="#86efac"
-                      stroke="#4ade80"
-                      strokeWidth="1.5"
-                    />
-                    {/* Moderate Risk Zone (Central highlands) */}
-                    <circle cx="53" cy="62" r="14" fill="#fde047" opacity="0.85" />
-                    {/* High Risk Spot (South-West) */}
-                    <circle cx="48" cy="70" r="8" fill="#f87171" opacity="0.9" />
-                  </svg>
-
-                  {/* Legend */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.75rem', color: '#475569' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
-                      <span>High Risk</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }} />
-                      <span>Moderate Risk</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#eab308' }} />
-                      <span>Low Risk</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
-                      <span>Normal</span>
-                    </div>
-                  </div>
+                  <iframe
+                    title="Sri Lanka live wind map"
+                    src="https://embed.windy.com/embed2.html?lat=7.87&lon=80.77&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1"
+                    width="100%"
+                    height="100%"
+                    frameBorder="0"
+                    loading="lazy"
+                    style={{ display: 'block' }}
+                  />
                 </div>
 
                 {/* Tip Bubble */}
@@ -693,16 +666,16 @@ const MainPlatform: React.FC = () => {
               isOfficerOrAdmin
                 ? <AlertReviewQueuePage />
                 : <div style={{ color: '#b91c1c', background: '#fee2e2', padding: '1rem', borderRadius: 8 }}>
-                    Access restricted to Disaster Officers.
-                  </div>
+                  Access restricted to Disaster Officers.
+                </div>
             )}
             {weatherTab === 'history' && <PredictionHistoryPage />}
             {weatherTab === 'analytics' && (
               isOfficerOrAdmin
                 ? <AnalyticsPage />
                 : <div style={{ color: '#b91c1c', background: '#fee2e2', padding: '1rem', borderRadius: 8 }}>
-                    Access restricted to Disaster Officers.
-                  </div>
+                  Access restricted to Disaster Officers.
+                </div>
             )}
           </main>
         )}
