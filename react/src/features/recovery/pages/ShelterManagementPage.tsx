@@ -392,13 +392,15 @@ export const ShelterManagementPage: React.FC = () => {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    padding: '0.65rem 1.5rem',
-                    background: '#2563eb',
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
                   {submitting ? 'Registering...' : '✓ Register Shelter'}

@@ -148,18 +148,18 @@ export const DonationsPage: React.FC = () => {
           <button
             onClick={() => setShowModal(true)}
             style={{
-              padding: '0.65rem 1.25rem',
-              background: 'linear-gradient(135deg, #15803d, #16a34a)',
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '10px',
               fontWeight: 700,
-              fontSize: '0.875rem',
+              fontSize: '0.9rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
             }}
           >
             <span>➕</span>
@@ -313,13 +313,15 @@ export const DonationsPage: React.FC = () => {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    padding: '0.65rem 1.5rem',
-                    background: '#15803d',
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
                   {submitting ? 'Recording...' : '✓ Record Donation'}

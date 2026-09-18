@@ -229,7 +229,7 @@ export const CompensationPage: React.FC = () => {
               width: '100%',
               height: '100%',
               padding: '0.85rem 1.25rem',
-              background: 'linear-gradient(135deg, #7e22ce, #6b21a8)',
+              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '10px',
@@ -240,7 +240,7 @@ export const CompensationPage: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(126, 34, 206, 0.25)',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
             }}
           >
             <span>➕</span>
@@ -391,13 +391,15 @@ export const CompensationPage: React.FC = () => {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    padding: '0.65rem 1.5rem',
-                    background: '#7e22ce',
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
                   {submitting ? 'Submitting...' : '✓ File Claim'}
