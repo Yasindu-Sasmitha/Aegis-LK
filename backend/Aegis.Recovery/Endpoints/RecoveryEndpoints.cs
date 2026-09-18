@@ -464,6 +464,21 @@ public static class RecoveryEndpoints
             return await RunWorkflowInternal(incidentId, damageReport, request.RevisionGuidance, db, agentClient);
         });
 
+        /// GET /api/recovery/workflows/{planId:guid}
+        /// Returns full RecoveryPlan detail (with Tasks, NGO names, and WorkflowLog Trace) by Plan ID.
+        group.MapGet("/workflows/{planId:guid}", async (Guid planId, RecoveryDbContext db) =>
+        {
+            var plan = await db.RecoveryPlans
+                .Include(p => p.Tasks).ThenInclude(t => t.AssignedNGO)
+                .Include(p => p.WorkflowLog)
+                .FirstOrDefaultAsync(p => p.Id == planId);
+
+            if (plan is null)
+                return Results.NotFound(new { error = "Recovery plan not found." });
+
+            return Results.Ok(MapRecoveryPlanDetailDto(plan));
+        });
+
         /// GET /api/recovery/workflows/{planId}/trace
         /// Returns the full agentic execution trace for observability.
         group.MapGet("/workflows/{planId:guid}/trace", async (Guid planId, RecoveryDbContext db) =>
@@ -598,6 +613,7 @@ public static class RecoveryEndpoints
 
         group.MapPost("/reports/generate", async (GenerateReportRequest request, RecoveryDbContext db) =>
         {
+            var incidentId = request.IncidentId != Guid.Empty ? request.IncidentId : Guid.NewGuid();
             var shelteredCount = await db.Shelters.SumAsync(s => s.CurrentOccupancy);
             var fulfilledAid = await db.AidRequests.CountAsync(a => a.Status == "Fulfilled");
             var compensationTotal = await db.Compensations
@@ -607,16 +623,20 @@ public static class RecoveryEndpoints
                 .Where(t => t.Status == "Completed" || t.Status == "InProgress")
                 .SumAsync(t => t.EstimatedCost);
 
+            var incidentRef = request.IncidentId != Guid.Empty
+                ? $"Incident #{request.IncidentId.ToString()[..8].ToUpper()}"
+                : "National Disaster Recovery Operations";
+
             var report = new RecoveryReport
             {
-                IncidentId = request.IncidentId,
+                IncidentId = incidentId,
                 Title = string.IsNullOrWhiteSpace(request.Title) ? "Post-Disaster Recovery Summary Report" : request.Title,
                 TotalSheltered = shelteredCount,
                 TotalAidRequestsFulfilled = fulfilledAid,
                 TotalCompensationDisbursed = compensationTotal,
                 TotalBudgetSpent = budgetSpent,
-                ReportSummary = $"Report for incident {request.IncidentId}: {shelteredCount} sheltered, " +
-                                $"{fulfilledAid} aid requests fulfilled, LKR {compensationTotal:N0} compensation disbursed.",
+                ReportSummary = $"Comprehensive audit summary for {incidentRef}: {shelteredCount} sheltered citizens, " +
+                                $"{fulfilledAid} aid requests fulfilled, and LKR {compensationTotal:N0} compensation disbursed.",
                 GeneratedAt = DateTime.UtcNow
             };
 

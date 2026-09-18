@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   startWorkflowFromIntake,
   fetchWorkflows,
+  fetchWorkflowDetail,
   fetchWorkflowTrace,
   submitWorkflowDecision,
 } from '../api/recoveryApi';
@@ -200,27 +201,26 @@ export const RecoveryPlanningPage: React.FC = () => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const trace = await fetchWorkflowTrace(planId);
-      setWorkflowTrace(trace);
+      // Fetch full plan detail (includes real incidentId + all recovery tasks)
+      const planDetail = await fetchWorkflowDetail(planId);
+      setCurrentPlan(planDetail);
 
-      const matched = workflowList.find((w) => w.id === planId);
-      if (matched) {
-        setCurrentPlan({
-          id: matched.id,
-          incidentId: '00000000-0000-0000-0000-000000000000',
-          planName: matched.planName,
-          status: matched.status as any,
-          estimatedTotalBudget: matched.estimatedTotalBudget,
-          planSummaryJson: '',
-          revisionCount: matched.revisionCount || 0,
-          tasks: [],
-          createdAt: matched.createdAt,
-        });
+      // Fetch the agent execution trace separately
+      if (planDetail.workflowTrace) {
+        setWorkflowTrace(planDetail.workflowTrace);
+      } else {
+        try {
+          const trace = await fetchWorkflowTrace(planId);
+          setWorkflowTrace(trace);
+        } catch {
+          setWorkflowTrace(null);
+        }
       }
+
       setInspectingHistoryPlan(true);
       setActiveTab('history');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to load workflow trace.');
+      setErrorMessage(err.message || 'Failed to load workflow detail.');
     } finally {
       setLoading(false);
     }
@@ -929,18 +929,18 @@ export const RecoveryPlanningPage: React.FC = () => {
                     style={{
                       width: '100%',
                       padding: '0.65rem 1rem',
-                      background: 'linear-gradient(135deg, #15803d, #16a34a)',
+                      background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                       color: '#ffffff',
                       border: 'none',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       fontWeight: 700,
-                      fontSize: '0.85rem',
+                      fontSize: '0.875rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '0.35rem',
-                      boxShadow: '0 2px 6px rgba(22,163,74,0.25)',
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                     }}
                   >
                     <span>➕</span>

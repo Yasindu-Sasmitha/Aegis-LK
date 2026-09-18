@@ -11,6 +11,7 @@ import {
   CompensationPage,
   RecoveryPlanningPage,
   RecoveryReportsPage,
+  NGOManagementPage,
 } from './features/recovery';
 import {
   WeatherDashboardPage,
@@ -74,6 +75,7 @@ const MainPlatform: React.FC = () => {
     { id: 'aid', label: '🤝 Aid Applications' },
     { id: 'donations', label: '📦 Donations' },
     { id: 'compensation', label: '💳 Compensation' },
+    { id: 'ngos', label: '🏢 Partner NGOs' },
     { id: 'planning', label: '🤖 Agentic AI Planning' },
     { id: 'reports', label: '📜 Audit Reports' },
   ];
@@ -690,6 +692,7 @@ const MainPlatform: React.FC = () => {
             {recoveryTab === 'aid' && <AidRequestsPage />}
             {recoveryTab === 'donations' && <DonationsPage />}
             {recoveryTab === 'compensation' && <CompensationPage />}
+            {recoveryTab === 'ngos' && <NGOManagementPage />}
             {recoveryTab === 'planning' && <RecoveryPlanningPage />}
             {recoveryTab === 'reports' && <RecoveryReportsPage />}
           </main>

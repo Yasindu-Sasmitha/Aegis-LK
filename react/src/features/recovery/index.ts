@@ -7,3 +7,4 @@ export * from './pages/DonationsPage';
 export * from './pages/CompensationPage';
 export * from './pages/RecoveryPlanningPage';
 export * from './pages/RecoveryReportsPage';
+export * from './pages/NGOManagementPage';
