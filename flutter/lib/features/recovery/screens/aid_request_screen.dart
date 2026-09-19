@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/recovery_service.dart';
 
 class AidRequestScreen extends StatefulWidget {
-  const AidRequestScreen({super.key});
+  final bool showAppBar;
+  const AidRequestScreen({super.key, this.showAppBar = true});
 
   @override
   State<AidRequestScreen> createState() => _AidRequestScreenState();
@@ -57,10 +58,12 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Apply for Emergency Aid'),
-        backgroundColor: Colors.blue[700],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Apply for Emergency Aid'),
+              backgroundColor: Colors.blue[700],
+            )
+          : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(

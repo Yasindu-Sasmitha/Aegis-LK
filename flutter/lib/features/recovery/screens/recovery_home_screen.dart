@@ -7,15 +7,24 @@ import 'recovery_plan_status_screen.dart';
 import 'citizen_damage_report_screen.dart';
 
 class RecoveryHomeScreen extends StatelessWidget {
-  const RecoveryHomeScreen({super.key});
+  final bool showAppBar;
+  final Function(int subIndex)? onSelectSubIndex;
+
+  const RecoveryHomeScreen({
+    super.key,
+    this.showAppBar = true,
+    this.onSelectSubIndex,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recovery & Relief'),
-        backgroundColor: Colors.teal[700],
-      ),
+      appBar: showAppBar
+          ? AppBar(
+              title: const Text('Recovery & Relief'),
+              backgroundColor: Colors.teal[700],
+            )
+          : null,
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -35,7 +44,9 @@ class RecoveryHomeScreen extends StatelessWidget {
             subtitle: 'Submit localized damage & trigger autonomous AI recovery planning.',
             icon: Icons.report_problem_outlined,
             color: Colors.red[700]!,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CitizenDamageReportScreen())),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(5)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const CitizenDamageReportScreen())),
           ),
           const SizedBox(height: 12),
           _buildCard(
@@ -44,7 +55,9 @@ class RecoveryHomeScreen extends StatelessWidget {
             subtitle: 'Locate nearby open shelters and view available capacity.',
             icon: Icons.night_shelter_outlined,
             color: Colors.teal[600]!,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShelterFinderScreen())),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(1)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const ShelterFinderScreen())),
           ),
           const SizedBox(height: 12),
           _buildCard(
@@ -53,7 +66,9 @@ class RecoveryHomeScreen extends StatelessWidget {
             subtitle: 'Apply for food, medical care, shelter allocation or financial help.',
             icon: Icons.handshake_outlined,
             color: Colors.blue[600]!,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AidRequestScreen())),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(2)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const AidRequestScreen())),
           ),
           const SizedBox(height: 12),
           _buildCard(
@@ -62,7 +77,9 @@ class RecoveryHomeScreen extends StatelessWidget {
             subtitle: 'Track status of your submitted emergency aid requests.',
             icon: Icons.assignment_outlined,
             color: Colors.amber[800]!,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyAidRequestsScreen())),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(3)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const MyAidRequestsScreen())),
           ),
           const SizedBox(height: 12),
           _buildCard(
@@ -71,7 +88,9 @@ class RecoveryHomeScreen extends StatelessWidget {
             subtitle: 'Contribute monetary aid or supplies to shelter centers.',
             icon: Icons.volunteer_activism_outlined,
             color: Colors.green[600]!,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DonateScreen())),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(4)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const DonateScreen())),
           ),
           const SizedBox(height: 12),
           _buildCard(
@@ -80,7 +99,9 @@ class RecoveryHomeScreen extends StatelessWidget {
             subtitle: 'View active rebuilding plans and NGO assignments.',
             icon: Icons.analytics_outlined,
             color: Colors.indigo[600]!,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryPlanStatusScreen())),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(6)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryPlanStatusScreen())),
           ),
         ],
       ),

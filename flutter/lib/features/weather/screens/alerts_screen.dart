@@ -3,7 +3,14 @@ import '../models/weather_models.dart';
 import '../services/weather_service.dart';
 
 class WeatherAlertsScreen extends StatefulWidget {
-  const WeatherAlertsScreen({super.key});
+  final bool showAppBar;
+  final String? initialStatus;
+
+  const WeatherAlertsScreen({
+    super.key,
+    this.showAppBar = true,
+    this.initialStatus,
+  });
 
   @override
   State<WeatherAlertsScreen> createState() => _WeatherAlertsScreenState();
@@ -23,7 +30,21 @@ class _WeatherAlertsScreenState extends State<WeatherAlertsScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialStatus != null) {
+      _statusFilter = widget.initialStatus!;
+    }
     _loadAlerts();
+  }
+
+  @override
+  void didUpdateWidget(covariant WeatherAlertsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialStatus != oldWidget.initialStatus && widget.initialStatus != null) {
+      setState(() {
+        _statusFilter = widget.initialStatus!;
+      });
+      _loadAlerts();
+    }
   }
 
   Future<void> _loadAlerts() async {
@@ -135,17 +156,19 @@ class _WeatherAlertsScreenState extends State<WeatherAlertsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Weather Alerts & Review'),
-        backgroundColor: Colors.blue[800],
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadAlerts,
-          ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Weather Alerts & Review'),
+              backgroundColor: Colors.blue[800],
+              foregroundColor: Colors.white,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _isLoading ? null : _loadAlerts,
+                ),
+              ],
+            )
+          : null,
       body: Column(
         children: [
           // Filter Chips Bar

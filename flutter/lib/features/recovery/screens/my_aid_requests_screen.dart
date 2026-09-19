@@ -3,7 +3,8 @@ import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
 
 class MyAidRequestsScreen extends StatefulWidget {
-  const MyAidRequestsScreen({super.key});
+  final bool showAppBar;
+  const MyAidRequestsScreen({super.key, this.showAppBar = true});
 
   @override
   State<MyAidRequestsScreen> createState() => _MyAidRequestsScreenState();
@@ -22,10 +23,12 @@ class _MyAidRequestsScreenState extends State<MyAidRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Aid Applications'),
-        backgroundColor: Colors.amber[800],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('My Aid Applications'),
+              backgroundColor: Colors.amber[800],
+            )
+          : null,
       body: FutureBuilder<List<AidRequestModel>>(
         future: _requestsFuture,
         builder: (context, snapshot) {

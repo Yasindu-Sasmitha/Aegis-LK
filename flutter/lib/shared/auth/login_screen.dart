@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'auth_service.dart';
+import 'package:provider/provider.dart';
+import 'auth_provider.dart';
 import 'register_screen.dart';
 import '../router/app_router.dart';
 
@@ -11,7 +12,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final AuthService _authService = AuthService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -52,15 +52,18 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authService.login(email: email, password: password);
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      await auth.login(email, password);
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRouter.weatherHome);
+        Navigator.pushNamedAndRemoveUntil(context, AppRouter.initialRoute, (r) => false);
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 

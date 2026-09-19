@@ -3,7 +3,8 @@ import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
 
 class CitizenDamageReportScreen extends StatefulWidget {
-  const CitizenDamageReportScreen({super.key});
+  final bool showAppBar;
+  const CitizenDamageReportScreen({super.key, this.showAppBar = true});
 
   @override
   State<CitizenDamageReportScreen> createState() => _CitizenDamageReportScreenState();
@@ -167,10 +168,12 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Report Disaster Damage'),
-        backgroundColor: Colors.red[800],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Report Disaster Damage'),
+              backgroundColor: Colors.red[800],
+            )
+          : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(

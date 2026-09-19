@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/recovery_service.dart';
 
 class DonateScreen extends StatefulWidget {
-  const DonateScreen({super.key});
+  final bool showAppBar;
+  const DonateScreen({super.key, this.showAppBar = true});
 
   @override
   State<DonateScreen> createState() => _DonateScreenState();
@@ -53,10 +54,12 @@ class _DonateScreenState extends State<DonateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Donate & Contribute'),
-        backgroundColor: Colors.green[700],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Donate & Contribute'),
+              backgroundColor: Colors.green[700],
+            )
+          : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
