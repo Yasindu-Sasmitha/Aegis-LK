@@ -545,7 +545,16 @@ public static class RecoveryEndpoints
             // If revision requested: re-run the workflow with guidance
             if (string.Equals(action, "Revise", StringComparison.OrdinalIgnoreCase))
             {
-                var damageReport = await incidentService.GetDamageReportAsync(plan.IncidentId);
+                var existingInfra = await db.InfrastructureDamages
+                    .Where(i => i.IncidentId == plan.IncidentId)
+                    .ToListAsync();
+
+                // 1. Reconstruct original report case-insensitively from PlanSummaryJson or WorkflowLog
+                var damageReport = ReconstructDamageReport(plan, existingInfra);
+
+                // 2. Fallback to external incident service if not found in summary/log
+                damageReport ??= await incidentService.GetDamageReportAsync(plan.IncidentId);
+
                 if (damageReport != null)
                 {
                     // Remove old tasks before re-generating
@@ -746,6 +755,99 @@ public static class RecoveryEndpoints
                 title: "Recovery workflow failed",
                 statusCode: 500);
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Damage Report Reconstruction for Revisions (case-insensitive)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private static IncidentDamageReportDto? ReconstructDamageReport(RecoveryPlan plan, List<InfrastructureDamage> existingInfra)
+    {
+        string? loc = null;
+        string? dt = null;
+        int hd = 0;
+        int df = 0;
+
+        // Try reading from PlanSummaryJson first (case-insensitively)
+        if (!string.IsNullOrWhiteSpace(plan.PlanSummaryJson))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(plan.PlanSummaryJson);
+                var root = doc.RootElement;
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name.Equals("Location", StringComparison.OrdinalIgnoreCase))
+                        loc = prop.Value.GetString();
+                    else if (prop.Name.Equals("DisasterType", StringComparison.OrdinalIgnoreCase))
+                        dt = prop.Value.GetString();
+                    else if (prop.Name.Equals("HousesDamaged", StringComparison.OrdinalIgnoreCase))
+                        hd = prop.Value.ValueKind == System.Text.Json.JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v1) ? v1 : 0;
+                    else if (prop.Name.Equals("DisplacedFamilies", StringComparison.OrdinalIgnoreCase))
+                        df = prop.Value.ValueKind == System.Text.Json.JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v2) ? v2 : 0;
+                }
+            }
+            catch { }
+        }
+
+        // Try reading from WorkflowLog ObjectiveJson if missing
+        if (string.IsNullOrWhiteSpace(loc) && plan.WorkflowLog != null && !string.IsNullOrWhiteSpace(plan.WorkflowLog.ObjectiveJson))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(plan.WorkflowLog.ObjectiveJson);
+                var root = doc.RootElement;
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name.Equals("Location", StringComparison.OrdinalIgnoreCase))
+                        loc = prop.Value.GetString();
+                    else if (prop.Name.Equals("DisasterType", StringComparison.OrdinalIgnoreCase))
+                        dt = prop.Value.GetString();
+                    else if (prop.Name.Equals("HousesDamaged", StringComparison.OrdinalIgnoreCase))
+                        hd = prop.Value.ValueKind == System.Text.Json.JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v1) ? v1 : 0;
+                    else if (prop.Name.Equals("DisplacedFamilies", StringComparison.OrdinalIgnoreCase))
+                        df = prop.Value.ValueKind == System.Text.Json.JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v2) ? v2 : 0;
+                }
+            }
+            catch { }
+        }
+
+        if (string.IsNullOrWhiteSpace(loc)) return null;
+
+        var items = new List<InfrastructureDamageItemDto>();
+        if (existingInfra.Count > 0)
+        {
+            items.AddRange(existingInfra.Select(i => new InfrastructureDamageItemDto
+            {
+                AssetName = i.AssetName,
+                AssetType = i.AssetType,
+                DamageLevel = i.DamageLevel,
+                EstimatedCost = i.EstimatedRepairCost
+            }));
+        }
+        else if (plan.Tasks != null)
+        {
+            foreach (var t in plan.Tasks.Where(t => !string.IsNullOrWhiteSpace(t.Title)))
+            {
+                items.Add(new InfrastructureDamageItemDto
+                {
+                    AssetName = t.Title,
+                    AssetType = "Road",
+                    DamageLevel = t.Priority == "Critical" ? "Destroyed" : "Severe",
+                    EstimatedCost = t.EstimatedCost
+                });
+            }
+        }
+
+        return new IncidentDamageReportDto
+        {
+            IncidentId = plan.IncidentId,
+            DisasterType = dt ?? "Disaster",
+            Location = loc,
+            HousesDamaged = hd,
+            DisplacedFamilies = df,
+            InfrastructureDamage = items
+        };
     }
 
     // ──────────────────────────────────────────────────────────────────────────

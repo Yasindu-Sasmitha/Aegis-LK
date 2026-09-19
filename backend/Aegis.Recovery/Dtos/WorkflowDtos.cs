@@ -52,8 +52,9 @@ public record AgentStepDto(
     string Role,
     string InputSummary,
     string OutputSummary,
-    int DurationMs,
+    long DurationMs,
     string Status,              // success | failed | skipped
+    string? ExecutionType,      // llm | deterministic | fallback
     string? ErrorMessage
 );
 
@@ -69,7 +70,8 @@ public record ToolCallDto(
 public record ValidationResultDto(
     string RuleName,
     bool Passed,
-    string Detail
+    string Detail,
+    string? Source           // "Code" | "AI" — origin of the check
 );
 
 public record WorkflowTraceDto(
