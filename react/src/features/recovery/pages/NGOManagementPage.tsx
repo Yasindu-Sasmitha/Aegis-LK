@@ -161,7 +161,7 @@ export const NGOManagementPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>🤝</span>
+            <span style={{ fontSize: '1.85rem' }}>🏢</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Partner Organizations (NGO Registry)
             </h1>
@@ -194,22 +194,23 @@ export const NGOManagementPage: React.FC = () => {
             <button
               onClick={() => setShowModal(true)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
+                padding: '0.75rem 1.25rem',
                 background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                 color: '#ffffff',
                 border: 'none',
-                padding: '0.75rem 1.25rem',
                 borderRadius: '10px',
-                fontSize: '0.9rem',
                 fontWeight: 700,
+                fontSize: '0.9rem',
                 cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
                 boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                 transition: 'all 0.15s ease',
               }}
             >
-              <span>➕</span> Register Partner NGO
+              <span>➕</span>
+              <span>Register Partner NGO</span>
             </button>
           )}
         </div>
@@ -237,63 +238,75 @@ export const NGOManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── METRICS SUMMARY CARDS ── */}
+      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         gap: '1rem',
         marginBottom: '1.5rem',
       }}>
         <div style={{
+          padding: '1.25rem',
           backgroundColor: '#ffffff',
           border: '1px solid #e2e8f0',
           borderRadius: '12px',
-          padding: '1.25rem',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>🏛️ ACCREDITED PARTNERS</div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0f172a', marginTop: '0.25rem' }}>{ngos.length}</div>
-          <div style={{ fontSize: '0.75rem', color: '#0284c7', marginTop: '0.25rem', fontWeight: 500 }}>Verified Relief Agencies</div>
-        </div>
-
-        <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-        }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>✅ ACTIVE IN OPERATIONS</div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#16a34a', marginTop: '0.25rem' }}>
-            {ngos.filter(n => n.status === 'Active').length}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Accredited Partners</span>
+            <span style={{ fontSize: '1.25rem' }}>🏢</span>
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Available for AI matching</div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>{ngos.length} NGOs</div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>Verified Relief Agencies</div>
         </div>
 
         <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
           padding: '1.25rem',
+          backgroundColor: '#ffffff',
+          border: '1px solid #bbf7d0',
+          borderRadius: '12px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>💰 TOTAL CAPACITY BUDGETS</div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#d97706', marginTop: '0.25rem' }}>
-            LKR {(totalBudget / 1000000).toFixed(1)}M
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Active in Operations</span>
+            <span style={{ fontSize: '1.25rem' }}>✅</span>
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Allocated partner grants</div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
+            {ngos.filter(n => n.status === 'Active').length} Active
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.25rem' }}>Available for AI matching</div>
         </div>
 
         <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
           padding: '1.25rem',
+          backgroundColor: '#ffffff',
+          border: '1px solid #bfdbfe',
+          borderRadius: '12px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>📍 DISTRICT COVERAGE</div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#7c3aed', marginTop: '0.25rem' }}>25 / 25</div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Islandwide deployment</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#1e40af', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Capacity Budgets</span>
+            <span style={{ fontSize: '1.25rem' }}>💰</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8' }}>
+            Rs. {totalBudget.toLocaleString()}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>Allocated partner relief grants</div>
+        </div>
+
+        <div style={{
+          padding: '1.25rem',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e9d5ff',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#7e22ce', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>District Coverage</span>
+            <span style={{ fontSize: '1.25rem' }}>📍</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7e22ce' }}>25 / 25</div>
+          <div style={{ fontSize: '0.8rem', color: '#7e22ce', marginTop: '0.25rem' }}>Islandwide deployment</div>
         </div>
       </div>
 

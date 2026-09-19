@@ -619,11 +619,11 @@ export const RecoveryPlanningPage: React.FC = () => {
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
       {/* ── HEADER & NAVIGATION TABS ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '2rem' }}>🤖</span>
-            <h1 style={{ fontSize: '1.85rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#1d4ed8' }}>
+            <span style={{ fontSize: '1.85rem' }}>🤖</span>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Autonomous Disaster Recovery Planning Agent
             </h1>
           </div>
@@ -632,46 +632,66 @@ export const RecoveryPlanningPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', padding: '0.35rem', borderRadius: '10px' }}>
-          <button
-            onClick={() => {
-              setActiveTab('intake');
-              setInspectingHistoryPlan(false);
-              resetForm();
-            }}
-            style={{
-              padding: '0.55rem 1.1rem',
-              borderRadius: '8px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'intake' ? '#2563eb' : 'transparent',
-              color: activeTab === 'intake' ? '#ffffff' : '#64748b',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            ✨ New AI Intake &amp; Planner
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('history');
-            }}
-            style={{
-              padding: '0.55rem 1.1rem',
-              borderRadius: '8px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'history' ? '#2563eb' : 'transparent',
-              color: activeTab === 'history' ? '#ffffff' : '#64748b',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            📋 Past Plans &amp; Audit ({workflowList.length})
-          </button>
+        {/* Action Controls & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
+              borderRadius: '6px',
+              background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
+              color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
+              border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+            </span>
+          </div>
+
+          {/* Tab Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f1f5f9', padding: '0.3rem', borderRadius: '10px' }}>
+            <button
+              onClick={() => {
+                setActiveTab('intake');
+                setInspectingHistoryPlan(false);
+                resetForm();
+              }}
+              style={{
+                padding: '0.55rem 1.1rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'intake' ? '#2563eb' : 'transparent',
+                color: activeTab === 'intake' ? '#ffffff' : '#64748b',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              ✨ New AI Intake &amp; Planner
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('history');
+              }}
+              style={{
+                padding: '0.55rem 1.1rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'history' ? '#2563eb' : 'transparent',
+                color: activeTab === 'history' ? '#ffffff' : '#64748b',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              📋 Past Plans &amp; Audit ({workflowList.length})
+            </button>
+          </div>
         </div>
       </div>
 

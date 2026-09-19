@@ -145,22 +145,46 @@ export const AidRequestsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Authenticated Role Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
-          <span style={{
-            fontSize: '0.75rem',
-            fontWeight: 800,
-            padding: '3px 10px',
-            borderRadius: '6px',
-            background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
-            color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
-            border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em'
-          }}>
-            {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
-          </span>
+        {/* Action Button & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
+              borderRadius: '6px',
+              background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
+              color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
+              border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>➕</span>
+            <span>Apply for Emergency Relief</span>
+          </button>
         </div>
       </div>
 
@@ -183,7 +207,7 @@ export const AidRequestsPage: React.FC = () => {
           <div>
             <strong>Citizen Relief Request Service</strong>
             <p style={{ margin: '0.25rem 0 0 0', color: '#15803d', fontWeight: 400 }}>
-              Need emergency rations, potable drinking water, medical kits, or temporary bedding? Click <strong>"+ Apply for Emergency Relief"</strong> below. Your request will be prioritized and assigned to field response teams.
+              Need emergency rations, potable drinking water, medical kits, or temporary bedding? Click <strong>"+ Apply for Emergency Relief"</strong>. Your request will be prioritized and assigned to field response teams.
             </p>
           </div>
         </div>
@@ -211,47 +235,45 @@ export const AidRequestsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── ACTION BAR & METRICS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Applications</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0' }}>{requests.length}</div>
+      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Applications</span>
+            <span style={{ fontSize: '1.25rem' }}>📋</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
+            {requests.length} Requests
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+            Submitted across all affected districts
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>Pending Review</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', margin: '0.2rem 0' }}>{pendingCount}</div>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Pending Review</span>
+            <span style={{ fontSize: '1.25rem' }}>⏳</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
+            {pendingCount} Pending
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#b45309', marginTop: '0.25rem' }}>
+            Awaiting officer verification &amp; triage
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>Fulfilled / Dispatched</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', margin: '0.2rem 0' }}>{fulfilledCount}</div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              width: '100%',
-              height: '100%',
-              padding: '0.85rem 1.25rem',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-            }}
-          >
-            <span>➕</span>
-            <span>Apply for Emergency Relief</span>
-          </button>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Fulfilled / Dispatched</span>
+            <span style={{ fontSize: '1.25rem' }}>✅</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
+            {fulfilledCount} Completed
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.25rem' }}>
+            Relief supplies successfully delivered
+          </div>
         </div>
       </div>
 
