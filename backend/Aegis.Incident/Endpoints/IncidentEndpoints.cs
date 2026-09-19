@@ -17,12 +17,36 @@ public static class IncidentEndpoints
         var group = app.MapGroup("/api/incidents").WithTags("Incidents");
 
         // GET /api/incidents — list all (primaries only; duplicates are hidden here,
-        // available via GET /{id}/related-reports)
-        group.MapGet("/", async (IncidentDbContext db) =>
-            await db.Incidents
-                .Where(i => i.LinkedIncidentId == null)
-                .OrderByDescending(i => i.CreatedAt)
-                .ToListAsync());
+        // available via GET /{id}/related-reports). Matches Recovery/Weather's
+        // server-side filter + pagination convention: {status, district, page, pageSize} -> {total, page, pageSize, items}
+        group.MapGet("/", async (
+            string? status,
+            string? district,
+            int? page,
+            int? pageSize,
+            IncidentDbContext db) =>
+        {
+            var pageNum = page is null or < 1 ? 1 : page.Value;
+            var size = pageSize is null or < 1 ? 20 : pageSize.Value;
+
+            var query = db.Incidents.Where(i => i.LinkedIncidentId == null);
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(i => i.Status.ToLower() == status.ToLower());
+
+            var candidates = await query.OrderByDescending(i => i.CreatedAt).ToListAsync();
+
+            if (!string.IsNullOrWhiteSpace(district))
+                candidates = candidates
+                    .Where(i => DistrictHelper.NearestDistrict(i.Latitude, i.Longitude)
+                                 .Equals(district, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+            var total = candidates.Count;
+            var items = candidates.Skip((pageNum - 1) * size).Take(size).ToList();
+
+            return Results.Ok(new { total, page = pageNum, pageSize = size, items });
+        });
 
         // GET /api/incidents/nearby — internal, called by the Dedup Agent's search_nearby_incidents tool
         group.MapGet("/nearby", async (double lat, double lng, double radiusKm, double hours, IncidentDbContext db) =>
@@ -418,5 +442,35 @@ public static class IncidentEndpoints
                    Math.Sin(dLng / 2) * Math.Sin(dLng / 2);
         double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
         return earthRadiusKm * c;
+    }
+}
+
+// Mirrors agentic-ai/agents/incident_plausibility_agent.py's DISTRICT_COORDS + _nearest_district
+// exactly — same 9 centroids, same squared-distance nearest match. Keep both in sync if either changes.
+internal static class DistrictHelper
+{
+    private static readonly (string Name, double Lat, double Lng)[] DistrictCoords =
+    {
+        ("Colombo", 6.9271, 79.8612),
+        ("Gampaha", 7.0917, 79.9997),
+        ("Kalutara", 6.5854, 79.9607),
+        ("Kandy", 7.2906, 80.6337),
+        ("NuwaraEliya", 6.9497, 80.7891),
+        ("Ratnapura", 6.6828, 80.3992),
+        ("Galle", 6.0535, 80.2210),
+        ("Matara", 5.9549, 80.5550),
+        ("Kegalle", 7.2513, 80.3464),
+    };
+
+    public static string NearestDistrict(double lat, double lng)
+    {
+        string best = "Colombo";
+        double bestDist = double.MaxValue;
+        foreach (var (name, dLat, dLng) in DistrictCoords)
+        {
+            var dist = Math.Pow(lat - dLat, 2) + Math.Pow(lng - dLng, 2);
+            if (dist < bestDist) { bestDist = dist; best = name; }
+        }
+        return best;
     }
 }
