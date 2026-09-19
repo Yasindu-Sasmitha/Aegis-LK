@@ -291,7 +291,7 @@ const MainPlatform: React.FC = () => {
       </header>
 
       {/* Sub-header Module Nav (Visible when in module views) */}
-      {currentView !== 'home' && (
+      {currentView !== 'home' && currentView !== 'incident' && (
         <div style={{
           backgroundColor: '#0c2242',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -723,6 +723,10 @@ const MainPlatform: React.FC = () => {
             {recoveryTab === 'planning' && <RecoveryPlanningPage />}
             {recoveryTab === 'reports' && <RecoveryReportsPage />}
           </main>
+        )}
+
+        {currentView === 'incident' && (
+          <IncidentQueuePage onNavigate={(tab) => setIncidentTab(tab)} />
         )}
       </div>
 
