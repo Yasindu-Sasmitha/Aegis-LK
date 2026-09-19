@@ -22,7 +22,11 @@ import {
   WeatherAlert,
 } from './features/weather';
 
-type NavView = 'home' | 'weather' | 'recovery';
+import {
+  IncidentQueuePage,
+} from './features/incident';
+
+type NavView = 'home' | 'weather' | 'recovery' | 'incident';
 
 const ROLE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
   Admin: { label: '⚙️ Admin', color: '#c084fc', bg: 'rgba(192,132,252,0.15)' },
@@ -36,6 +40,7 @@ const MainPlatform: React.FC = () => {
   const [currentView, setCurrentView] = useState<NavView>('home');
   const [weatherTab, setWeatherTab] = useState<string>('dashboard');
   const [recoveryTab, setRecoveryTab] = useState<string>('dashboard');
+  const [incidentTab, setIncidentTab] = useState<string>('queue');
   const [latestAlerts, setLatestAlerts] = useState<WeatherAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
 
@@ -193,6 +198,28 @@ const MainPlatform: React.FC = () => {
           >
             <span>🏥</span>
             <span>Recovery & Relief</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentView('incident')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 8,
+              border: 'none',
+              background: currentView === 'incident' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              color: currentView === 'incident' ? '#38bdf8' : '#cbd5e1',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>🚨</span>
+            <span>Incidents</span>
           </button>
 
           <button
