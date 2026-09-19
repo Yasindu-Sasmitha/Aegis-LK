@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'auth_service.dart';
+import 'package:provider/provider.dart';
+import 'auth_provider.dart';
 import '../router/app_router.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -10,7 +11,6 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final AuthService _authService = AuthService();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -34,7 +34,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      await _authService.register(
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      await auth.register(
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -42,13 +43,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
       );
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRouter.weatherHome);
+        Navigator.pushNamedAndRemoveUntil(context, AppRouter.initialRoute, (r) => false);
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 

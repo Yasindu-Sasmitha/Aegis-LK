@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
 class RecoveryPlanStatusScreen extends StatelessWidget {
-  const RecoveryPlanStatusScreen({super.key});
+  final bool showAppBar;
+  const RecoveryPlanStatusScreen({super.key, this.showAppBar = true});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Community Recovery Status'),
-        backgroundColor: Colors.indigo[700],
-      ),
+      appBar: showAppBar
+          ? AppBar(
+              title: const Text('Community Recovery Status'),
+              backgroundColor: Colors.indigo[700],
+            )
+          : null,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

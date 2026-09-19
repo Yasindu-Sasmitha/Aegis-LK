@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../features/weather/screens/weather_home_screen.dart';
-import '../../features/weather/screens/alerts_screen.dart';
-import '../../features/recovery/screens/recovery_home_screen.dart';
+import '../shell/aegis_shell.dart';
+import '../shell/main_shell.dart';
 import '../auth/login_screen.dart';
 import '../auth/register_screen.dart';
 
@@ -9,23 +8,40 @@ class AppRouter {
   static const String initialRoute = '/';
   static const String login = '/login';
   static const String register = '/register';
+  static const String home = '/home';
   static const String weatherHome = '/weather';
   static const String weatherAlerts = '/weather/alerts';
+  static const String alertReviewQueue = '/weather/review-queue';
   static const String recoveryHome = '/recovery';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case initialRoute:
+        return MaterialPageRoute(builder: (_) => const AegisShell());
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
-      case initialRoute:
+      case home:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 0),
+        );
       case weatherHome:
-        return MaterialPageRoute(builder: (_) => const WeatherHomeScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 1, initialSubIndex: 0),
+        );
       case weatherAlerts:
-        return MaterialPageRoute(builder: (_) => const WeatherAlertsScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 1, initialSubIndex: 1),
+        );
+      case alertReviewQueue:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 1, initialSubIndex: 2),
+        );
       case recoveryHome:
-        return MaterialPageRoute(builder: (_) => const RecoveryHomeScreen());
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 2, initialSubIndex: 0),
+        );
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(

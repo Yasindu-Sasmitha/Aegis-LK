@@ -3,7 +3,8 @@ import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
 
 class ShelterFinderScreen extends StatefulWidget {
-  const ShelterFinderScreen({super.key});
+  final bool showAppBar;
+  const ShelterFinderScreen({super.key, this.showAppBar = true});
 
   @override
   State<ShelterFinderScreen> createState() => _ShelterFinderScreenState();
@@ -29,10 +30,12 @@ class _ShelterFinderScreenState extends State<ShelterFinderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Emergency Shelters'),
-        backgroundColor: Colors.teal[700],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Emergency Shelters'),
+              backgroundColor: Colors.teal[700],
+            )
+          : null,
       body: Column(
         children: [
           Padding(
