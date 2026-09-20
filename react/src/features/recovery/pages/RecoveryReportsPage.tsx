@@ -419,7 +419,7 @@ export const RecoveryReportsPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>📊</span>
+            <span style={{ fontSize: '1.85rem' }}>📜</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Recovery Audit &amp; Performance Reports
             </h1>
@@ -429,8 +429,8 @@ export const RecoveryReportsPage: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-          {/* Authenticated Role Indicator */}
+        {/* Action Button & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
             <span style={{
@@ -466,6 +466,7 @@ export const RecoveryReportsPage: React.FC = () => {
                 alignItems: 'center',
                 gap: '0.5rem',
                 boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                transition: 'all 0.15s ease',
               }}
             >
               <span>{generating ? '⏳' : '⚡'}</span>
@@ -500,52 +501,56 @@ export const RecoveryReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── 4 KPI METRIC SUMMARY CARDS ── */}
+      {/* ── 4 KPI METRIC SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-            Evacuees Sheltered
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#1e40af', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Evacuees Sheltered</span>
+            <span style={{ fontSize: '1.25rem' }}>👥</span>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#1e3a8a' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e40af' }}>
             {liveStats.totalSheltered} People
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.35rem' }}>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
             Across all active emergency centers
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-            Relief Demands Fulfilled
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Relief Demands Fulfilled</span>
+            <span style={{ fontSize: '1.25rem' }}>📦</span>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#15803d' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
             {liveStats.fulfilledAid} Dispatched
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.35rem' }}>
+          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.25rem' }}>
             Food, medical, and cash packages
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-            Compensation Disbursed
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e9d5ff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#7e22ce', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Compensation Disbursed</span>
+            <span style={{ fontSize: '1.25rem' }}>💳</span>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#7e22ce' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7e22ce' }}>
             Rs. {liveStats.compensationDisbursed.toLocaleString()}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.35rem' }}>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
             Audited citizen damage payouts
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-            Total Recovery Budget Spent
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Recovery Budget Spent</span>
+            <span style={{ fontSize: '1.25rem' }}>💰</span>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0f172a' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
             Rs. {liveStats.totalBudgetSpent.toLocaleString()}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.35rem' }}>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
             Infrastructure + emergency relief
           </div>
         </div>

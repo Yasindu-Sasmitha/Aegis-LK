@@ -281,6 +281,13 @@ export const RecoveryPlanningPage: React.FC = () => {
         color: '#1d4ed8',
         desc: 'Scanned official shelter registry for active centers with open bed capacity in the affected district.',
       },
+      tool_estimate_repair_costs: {
+        title: 'Civil Infrastructure Repair Cost Benchmark Estimator',
+        icon: '🏗️',
+        bg: '#f0f9ff',
+        color: '#0369a1',
+        desc: 'Calculated official public infrastructure repair cost benchmarks based on damage severity ratings.',
+      },
       tool_match_ngo_by_sector: {
         title: 'Registered NGO Partner Capability Matcher',
         icon: '🤝',
@@ -337,19 +344,50 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.5rem' }}>
                   {parsedOutput.availableShelters.map((s: any, sIdx: number) => (
                     <div key={sIdx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem' }}>
-                      <strong style={{ color: '#0f172a', display: 'block' }}>⛺ {s.name}</strong>
-                      <span style={{ color: '#64748b' }}>{s.location} • Available Beds: </span>
-                      <strong style={{ color: '#16a34a' }}>{s.remainingCapacity}</strong>
+                      <strong style={{ color: '#0f172a', display: 'block' }}>⛺ {s.name || s.Name || s.shelterName || 'Shelter Center'}</strong>
+                      <span style={{ color: '#64748b' }}>{s.district || s.District || s.location || s.Location || ''} • Available Beds: </span>
+                      <strong style={{ color: '#16a34a' }}>{s.remainingBeds ?? s.RemainingBeds ?? s.remainingCapacity ?? s.RemainingCapacity ?? 0}</strong>
                     </div>
                   ))}
                 </div>
               ) : (
-                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Active shelters matched with open bed capacity.</span>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#991b1b', fontSize: '0.825rem' }}>
+                  <strong>⚠️ No Registered Shelters Found in {parsedInput.district || district || 'District'}:</strong>{' '}
+                  <span>
+                    0 open beds registered in this district. Full capacity deficit of {parsedInput.requiredBeds || parsedOutput.deficit || parsedOutput.Deficit || 0} beds requires immediate temporary relief shelter or tent allocation.
+                  </span>
+                </div>
               )}
             </div>
           )}
 
-          {/* Specific Tool 2: NGO Matching */}
+          {/* Specific Tool 2: Cost Benchmarks */}
+          {tool.toolName === 'tool_estimate_repair_costs' && (
+            <div>
+              <div style={{ marginBottom: '0.6rem', fontSize: '0.85rem' }}>
+                Assessed Infrastructure Assets: <strong style={{ color: '#0369a1' }}>{Array.isArray(parsedOutput) ? parsedOutput.length : (parsedInput?.assets?.length || (Array.isArray(parsedOutput?.list) ? parsedOutput.list.length : 0))} Assets</strong>
+              </div>
+              {Array.isArray(parsedOutput) && parsedOutput.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.6rem' }}>
+                  {parsedOutput.map((item: any, bIdx: number) => (
+                    <div key={bIdx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.7rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem' }}>
+                      <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.85rem' }}>🏗️ {item.assetName || item.AssetName || 'Infrastructure Asset'}</strong>
+                      <div style={{ color: '#64748b', margin: '0.2rem 0' }}>
+                        Type: <span style={{ fontWeight: 600, color: '#334155' }}>{item.assetType || item.AssetType || 'General'}</span>
+                      </div>
+                      <div style={{ marginTop: '0.35rem', color: '#0369a1', fontWeight: 700 }}>
+                        Benchmark: Rs. {Number(item.standardCostLkrMin || item.StandardCostLkrMin || 0).toLocaleString()} – Rs. {Number(item.standardCostLkrMax || item.StandardCostLkrMax || 0).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Standardized repair benchmark rates applied.</span>
+              )}
+            </div>
+          )}
+
+          {/* Specific Tool 3: NGO Matching */}
           {tool.toolName === 'tool_match_ngo_by_sector' && (
             <div>
               <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>
@@ -359,10 +397,10 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.5rem' }}>
                   {parsedOutput.qualifiedNGOs.map((ngo: any, nIdx: number) => (
                     <div key={nIdx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem' }}>
-                      <strong style={{ color: '#0f172a', display: 'block' }}>🏢 {ngo.name}</strong>
-                      <span style={{ color: '#64748b' }}>Sectors: {ngo.sectors}</span>
+                      <strong style={{ color: '#0f172a', display: 'block' }}>🏢 {ngo.name || ngo.Name || ngo.ngoName || 'Humanitarian Partner'}</strong>
+                      <span style={{ color: '#64748b' }}>Matched Sectors: {Array.isArray(ngo.matchedSectors || ngo.MatchedSectors) ? (ngo.matchedSectors || ngo.MatchedSectors).join(', ') : (ngo.sectors || ngo.Sectors || 'General')}</span>
                       <div style={{ marginTop: '0.2rem', color: '#15803d', fontWeight: 700 }}>
-                        Capacity Grant: LKR {Number(ngo.availableBudget || 0).toLocaleString()}
+                        Operating Districts: {Array.isArray(ngo.operatingDistricts || ngo.OperatingDistricts) ? (ngo.operatingDistricts || ngo.OperatingDistricts).join(', ') : 'All Districts'}
                       </div>
                     </div>
                   ))}
@@ -373,7 +411,7 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           )}
 
-          {/* Specific Tool 3: Cash Stipend Calculator */}
+          {/* Specific Tool 4: Cash Stipend Calculator */}
           {tool.toolName === 'tool_calculate_cash_stipend_budget' && (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
@@ -387,6 +425,7 @@ export const RecoveryPlanningPage: React.FC = () => {
 
           {/* Generic Tool fallback */}
           {tool.toolName !== 'tool_query_shelter_capacity' &&
+           tool.toolName !== 'tool_estimate_repair_costs' &&
            tool.toolName !== 'tool_match_ngo_by_sector' &&
            tool.toolName !== 'tool_calculate_cash_stipend_budget' && (
             <div style={{ fontSize: '0.85rem', color: '#334155' }}>
@@ -619,11 +658,11 @@ export const RecoveryPlanningPage: React.FC = () => {
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
       {/* ── HEADER & NAVIGATION TABS ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '2rem' }}>🤖</span>
-            <h1 style={{ fontSize: '1.85rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#1d4ed8' }}>
+            <span style={{ fontSize: '1.85rem' }}>🤖</span>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Autonomous Disaster Recovery Planning Agent
             </h1>
           </div>
@@ -632,46 +671,66 @@ export const RecoveryPlanningPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', padding: '0.35rem', borderRadius: '10px' }}>
-          <button
-            onClick={() => {
-              setActiveTab('intake');
-              setInspectingHistoryPlan(false);
-              resetForm();
-            }}
-            style={{
-              padding: '0.55rem 1.1rem',
-              borderRadius: '8px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'intake' ? '#2563eb' : 'transparent',
-              color: activeTab === 'intake' ? '#ffffff' : '#64748b',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            ✨ New AI Intake &amp; Planner
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('history');
-            }}
-            style={{
-              padding: '0.55rem 1.1rem',
-              borderRadius: '8px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'history' ? '#2563eb' : 'transparent',
-              color: activeTab === 'history' ? '#ffffff' : '#64748b',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            📋 Past Plans &amp; Audit ({workflowList.length})
-          </button>
+        {/* Action Controls & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
+              borderRadius: '6px',
+              background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
+              color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
+              border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+            </span>
+          </div>
+
+          {/* Tab Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f1f5f9', padding: '0.3rem', borderRadius: '10px' }}>
+            <button
+              onClick={() => {
+                setActiveTab('intake');
+                setInspectingHistoryPlan(false);
+                resetForm();
+              }}
+              style={{
+                padding: '0.55rem 1.1rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'intake' ? '#2563eb' : 'transparent',
+                color: activeTab === 'intake' ? '#ffffff' : '#64748b',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              ✨ New AI Intake &amp; Planner
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('history');
+              }}
+              style={{
+                padding: '0.55rem 1.1rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'history' ? '#2563eb' : 'transparent',
+                color: activeTab === 'history' ? '#ffffff' : '#64748b',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              📋 Past Plans &amp; Audit ({workflowList.length})
+            </button>
+          </div>
         </div>
       </div>
 

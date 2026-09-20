@@ -136,22 +136,46 @@ export const CompensationPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Authenticated Role Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
-          <span style={{
-            fontSize: '0.75rem',
-            fontWeight: 800,
-            padding: '3px 10px',
-            borderRadius: '6px',
-            background: isAdmin ? '#faf5ff' : isDisasterOfficer ? '#eff6ff' : isResponder ? '#fffbeb' : '#f0fdf4',
-            color: isAdmin ? '#7e22ce' : isDisasterOfficer ? '#1e40af' : isResponder ? '#b45309' : '#15803d',
-            border: `1px solid ${isAdmin ? '#e9d5ff' : isDisasterOfficer ? '#bfdbfe' : isResponder ? '#fde68a' : '#bbf7d0'}`,
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em'
-          }}>
-            {isAdmin ? '⚙️ System Admin' : isDisasterOfficer ? '🛡️ Disaster Officer' : isResponder ? '🚨 Field Responder' : '👥 Citizen Claimant'}
-          </span>
+        {/* Action Button & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
+              borderRadius: '6px',
+              background: isAdmin ? '#faf5ff' : isDisasterOfficer ? '#eff6ff' : isResponder ? '#fffbeb' : '#f0fdf4',
+              color: isAdmin ? '#7e22ce' : isDisasterOfficer ? '#1e40af' : isResponder ? '#b45309' : '#15803d',
+              border: `1px solid ${isAdmin ? '#e9d5ff' : isDisasterOfficer ? '#bfdbfe' : isResponder ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {isAdmin ? '⚙️ System Admin' : isDisasterOfficer ? '🛡️ Disaster Officer' : isResponder ? '🚨 Field Responder' : '👥 Citizen Claimant'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>➕</span>
+            <span>File Damage Compensation Claim</span>
+          </button>
         </div>
       </div>
 
@@ -202,50 +226,45 @@ export const CompensationPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── METRICS & ACTION BUTTON ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Claims Filed</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0' }}>{claims.length} Claims</div>
-          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Claimed: Rs. {totalClaimed.toLocaleString()}</div>
+      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Claims Filed</span>
+            <span style={{ fontSize: '1.25rem' }}>📄</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
+            {claims.length} Claims
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+            Claimed: Rs. {totalClaimed.toLocaleString()}
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>Approved Payout Funds</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', margin: '0.2rem 0' }}>Rs. {totalApproved.toLocaleString()}</div>
-          <div style={{ fontSize: '0.8rem', color: '#15803d' }}>Verified by DMC audit</div>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Approved Payout Funds</span>
+            <span style={{ fontSize: '1.25rem' }}>💵</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
+            Rs. {totalApproved.toLocaleString()}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.25rem' }}>
+            Verified by DMC audit
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>Under Field Verification</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', margin: '0.2rem 0' }}>{pendingCount}</div>
-          <div style={{ fontSize: '0.8rem', color: '#b45309' }}>Awaiting Grama Niladhari check</div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              width: '100%',
-              height: '100%',
-              padding: '0.85rem 1.25rem',
-              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-            }}
-          >
-            <span>➕</span>
-            <span>File Damage Compensation Claim</span>
-          </button>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Under Field Verification</span>
+            <span style={{ fontSize: '1.25rem' }}>⏳</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
+            {pendingCount} Pending
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#b45309', marginTop: '0.25rem' }}>
+            Awaiting Grama Niladhari check
+          </div>
         </div>
       </div>
 

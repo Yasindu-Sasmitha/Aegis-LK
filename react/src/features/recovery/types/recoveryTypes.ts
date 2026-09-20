@@ -99,7 +99,8 @@ export interface AgentStepDto {
   inputSummary: string;
   outputSummary: string;
   durationMs: number;
-  status: 'success' | 'failed' | 'skipped';
+  status: 'success' | 'failed' | 'skipped' | 'fallback';
+  executionType?: string;     // 'llm' | 'deterministic' | 'fallback'
   errorMessage?: string;
 }
 
@@ -116,6 +117,7 @@ export interface ValidationResultDto {
   ruleName: string;
   passed: boolean;
   detail: string;
+  source?: string;            // 'Code' | 'AI'
 }
 
 export interface WorkflowTrace {
