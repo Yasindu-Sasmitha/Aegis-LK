@@ -17,6 +17,8 @@ public class IncidentReport
     public string? PlausibilityReasoning { get; set; }
     public Guid? LinkedIncidentId { get; set; }
     public IncidentReport? LinkedIncident { get; set; }
+    public int? DedupConfidence { get; set; }
+    public string? DedupReasoning { get; set; }
     public string Status { get; set; } = "Reported";
     public string? RejectionReason { get; set; }
     public Guid ReportedByUserId { get; set; }
