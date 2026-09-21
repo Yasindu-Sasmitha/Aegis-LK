@@ -12,6 +12,8 @@ import '../../features/recovery/screens/my_aid_requests_screen.dart';
 import '../../features/recovery/screens/donate_screen.dart';
 import '../../features/recovery/screens/citizen_damage_report_screen.dart';
 import '../../features/recovery/screens/recovery_plan_status_screen.dart';
+import '../../features/recovery/screens/compensation_claim_screen.dart';
+import '../../features/recovery/screens/recovery_reports_screen.dart';
 
 class MainShell extends StatefulWidget {
   final int initialPrimaryIndex;
@@ -397,6 +399,20 @@ class _MainShellState extends State<MainShell> {
             isActive: _recoverySubIndex == 6,
             onTap: () => setState(() => _recoverySubIndex = 6),
           ),
+          const SizedBox(width: 6),
+          _buildSubNavItem(
+            label: 'Compensation',
+            icon: Icons.roofing_outlined,
+            isActive: _recoverySubIndex == 7,
+            onTap: () => setState(() => _recoverySubIndex = 7),
+          ),
+          const SizedBox(width: 6),
+          _buildSubNavItem(
+            label: 'Audit Reports',
+            icon: Icons.assessment_outlined,
+            isActive: _recoverySubIndex == 8,
+            onTap: () => setState(() => _recoverySubIndex = 8),
+          ),
         ],
       ),
     );
@@ -497,6 +513,10 @@ class _MainShellState extends State<MainShell> {
           return const CitizenDamageReportScreen(showAppBar: false);
         case 6:
           return const RecoveryPlanStatusScreen(showAppBar: false);
+        case 7:
+          return const CompensationClaimScreen(showAppBar: false);
+        case 8:
+          return const RecoveryReportsScreen(showAppBar: false);
         default:
           return RecoveryHomeScreen(
             showAppBar: false,
