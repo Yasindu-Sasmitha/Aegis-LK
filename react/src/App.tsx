@@ -24,6 +24,7 @@ import {
 
 import {
   IncidentQueuePage,
+  IncidentDashboardPage,
 } from './features/incident';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'incident';
@@ -40,7 +41,7 @@ const MainPlatform: React.FC = () => {
   const [currentView, setCurrentView] = useState<NavView>('home');
   const [weatherTab, setWeatherTab] = useState<string>('dashboard');
   const [recoveryTab, setRecoveryTab] = useState<string>('dashboard');
-  const [incidentTab, setIncidentTab] = useState<string>('queue');
+  const [incidentTab, setIncidentTab] = useState<string>('dashboard');
   const [latestAlerts, setLatestAlerts] = useState<WeatherAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
 
@@ -71,6 +72,18 @@ const MainPlatform: React.FC = () => {
     ...(isOfficerOrAdmin ? [{ id: 'review', label: '🔔 Alert Review Queue' }] : []),
     { id: 'history', label: '📜 Alert History' },
     ...(isOfficerOrAdmin ? [{ id: 'analytics', label: '📊 Accuracy Analytics' }] : []),
+  ];
+
+  // Navigation tabs for Incident module
+  const INCIDENT_TABS = [
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'all', label: '📋 All Incidents' },
+    { id: 'Reported', label: '📥 Reported' },
+    { id: 'Assessed', label: '🔍 Assessed' },
+    { id: 'OnHold', label: '⏸️ On Hold' },
+    { id: 'Rejected', label: '🚫 Rejected' },
+    { id: 'MissionApproved', label: '✅ Approved' },
+    { id: 'Closed', label: '📁 Closed' },
   ];
 
   // Navigation tabs for Recovery module (available across roles)
