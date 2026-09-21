@@ -426,6 +426,8 @@ public static class IncidentEndpoints
             if (matchedIncident is not null && matchedIncident.LinkedIncidentId is null)
             {
                 incident.LinkedIncidentId = matchedId;
+                incident.DedupConfidence = result.Confidence;
+                incident.DedupReasoning = result.Reasoning;
             }
         }
 
