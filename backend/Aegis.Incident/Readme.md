@@ -107,6 +107,8 @@ the same prompt renamed.
 | `PlausibilityScore` | int, nullable | Plausibility Agent (background) |
 | `PlausibilityReasoning` | string, nullable | Plausibility Agent (background) |
 | `LinkedIncidentId` | Guid, nullable, self-referencing FK | Dedup Agent (background) |
+| `DedupConfidence` | int, nullable (0-100) | Dedup Agent (background) — only set on the incident that gets linked as a duplicate, not on the primary |
+| `DedupReasoning` | string, nullable | Dedup Agent (background) — the agent's reasoning for the match, shown to the officer alongside the confidence score |
 
 `LinkedIncidentId` uses `ON DELETE RESTRICT` — deleting a primary incident is blocked rather
 than cascading or silently orphaning its linked duplicates.
@@ -116,7 +118,14 @@ than cascading or silently orphaning its linked duplicates.
 `GET /api/incidents` returns **primaries only** (`LinkedIncidentId == null`). Nothing is ever
 deleted or hidden permanently — duplicate reports remain fully queryable via
 `GET /api/incidents/{primaryId}/related-reports`, so an officer investigating one incident can
-still see every citizen report that contributed to it.
+still see every citizen report that contributed to it, along with the Dedup Agent's confidence
+score and reasoning for that specific match.
+
+The Dedup Agent can be wrong. `POST /api/incidents/{id}/unlink` lets an officer manually reverse
+a mistaken match: it clears `LinkedIncidentId`, `DedupConfidence`, and `DedupReasoning` on the
+incident, which makes it visible again in the main queue as its own primary. No reason is
+required — unlike reject/hold, this isn't a judgment call about the incident itself, just a
+correction of the agent's guess, and it's logged to `MissionLog` for auditability regardless.
 
 ## 6. Deliberately NOT agentic — and why
 
