@@ -304,7 +304,7 @@ const MainPlatform: React.FC = () => {
       </header>
 
       {/* Sub-header Module Nav (Visible when in module views) */}
-      {currentView !== 'home' && currentView !== 'incident' && (
+      {currentView !== 'home' && (
         <div style={{
           backgroundColor: '#0c2242',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -314,12 +314,12 @@ const MainPlatform: React.FC = () => {
           overflowX: 'auto',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
-          {(currentView === 'weather' ? WEATHER_TABS : RECOVERY_TABS).map((tab) => {
-            const active = (currentView === 'weather' ? weatherTab : recoveryTab) === tab.id;
+          {(currentView === 'weather' ? WEATHER_TABS : currentView === 'incident' ? INCIDENT_TABS : RECOVERY_TABS).map((tab) => {
+            const active = (currentView === 'weather' ? weatherTab : currentView === 'incident' ? incidentTab : recoveryTab) === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => currentView === 'weather' ? setWeatherTab(tab.id) : setRecoveryTab(tab.id)}
+                onClick={() => currentView === 'weather' ? setWeatherTab(tab.id) : currentView === 'incident' ? setIncidentTab(tab.id) : setRecoveryTab(tab.id)}
                 style={{
                   padding: '0.85rem 1.15rem',
                   background: 'transparent',
@@ -739,7 +739,22 @@ const MainPlatform: React.FC = () => {
         )}
 
         {currentView === 'incident' && (
-          <IncidentQueuePage onNavigate={(tab) => setIncidentTab(tab)} />
+          <main>
+            {incidentTab === 'dashboard' && (
+              <IncidentDashboardPage onNavigate={(tab) => setIncidentTab(tab)} />
+            )}
+            {incidentTab === 'all' && (
+              <IncidentQueuePage title="All Incidents" onNavigate={(tab) => setIncidentTab(tab)} />
+            )}
+            {['Reported', 'Assessed', 'OnHold', 'Rejected', 'MissionApproved', 'Closed'].includes(incidentTab) && (
+              <IncidentQueuePage
+                key={incidentTab}
+                fixedStatus={incidentTab as any}
+                title={`${incidentTab} Incidents`}
+                onNavigate={(tab) => setIncidentTab(tab)}
+              />
+            )}
+          </main>
         )}
       </div>
 
