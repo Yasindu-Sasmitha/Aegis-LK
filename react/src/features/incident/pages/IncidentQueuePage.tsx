@@ -6,6 +6,8 @@ import { IncidentDetailPanel } from '../components/IncidentDetailPanel';
 
 interface Props {
   onNavigate?: (tab: string, incidentId?: string) => void;
+  fixedStatus?: IncidentStatus; // when set, this tab is locked to one status and the dropdown is hidden
+  title?: string; // e.g. "Reported Incidents" — defaults to "Incident Queue"
 }
 
 const STATUS_OPTIONS: { value: IncidentStatus | 'All'; label: string }[] = [
@@ -39,7 +41,7 @@ function plausibilityLabel(score: number | null): string {
   return `${score}/100`;
 }
 
-export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
+export const IncidentQueuePage: React.FC<Props> = ({ onNavigate, fixedStatus, title }) => {
   const { user } = useAuth();
   const isOfficerOrAdmin = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
 
@@ -47,16 +49,18 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<IncidentStatus | 'All'>('All');
+  const [statusFilter, setStatusFilter] = useState<IncidentStatus | 'All'>(fixedStatus ?? 'All');
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const pageSize = 10;
+
+  const effectiveStatus = fixedStatus ?? statusFilter;
 
   const loadIncidents = useCallback(() => {
     setLoading(true);
     setError(null);
     fetchIncidents({
-      status: statusFilter === 'All' ? undefined : statusFilter,
+      status: effectiveStatus === 'All' ? undefined : effectiveStatus,
       page,
       pageSize,
     })
@@ -73,7 +77,7 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
         setError(err instanceof Error ? err.message : 'Failed to load incidents');
         setLoading(false);
       });
-  }, [statusFilter, page]);
+  }, [effectiveStatus, page]);
 
   useEffect(() => {
     loadIncidents();
@@ -94,39 +98,41 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div>
+                <div>
           <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#0f172a' }}>
-            🚨 Incident Queue
+            🚨 {title ?? 'Incident Queue'}
           </h2>
           <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.875rem' }}>
-            {total} {total === 1 ? 'incident' : 'incidents'} reported
+            {total} {total === 1 ? 'incident' : 'incidents'}
             {!isOfficerOrAdmin && ' (read-only view)'}
           </p>
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as IncidentStatus | 'All');
-            setPage(1);
-          }}
-          style={{
-            padding: '0.55rem 0.85rem',
-            borderRadius: 8,
-            border: '1px solid #cbd5e1',
-            fontSize: '0.875rem',
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            color: '#334155',
-            backgroundColor: '#ffffff',
-            cursor: 'pointer',
-          }}
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        {!fixedStatus && (
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as IncidentStatus | 'All');
+              setPage(1);
+            }}
+            style={{
+              padding: '0.55rem 0.85rem',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
+              fontSize: '0.875rem',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              color: '#334155',
+              backgroundColor: '#ffffff',
+              cursor: 'pointer',
+            }}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {error && (
