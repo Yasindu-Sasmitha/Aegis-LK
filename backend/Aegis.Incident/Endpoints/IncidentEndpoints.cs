@@ -314,6 +314,35 @@ public static class IncidentEndpoints
             return Results.Ok(related);
         });
 
+                // POST /api/incidents/{id}/unlink — officer manually reverses a wrong Dedup Agent match.
+        // Called on the DUPLICATE (not the primary): clears its link, restoring it as its own
+        // primary incident, visible again in the main queue. No reason required — this corrects
+        // an agent guess, not a judgment call about the incident itself — but always logged.
+        group.MapPost("/{id:guid}/unlink", async (Guid id, IncidentDbContext db) =>
+        {
+            var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
+            if (incident is null) return Results.NotFound();
+
+            if (incident.LinkedIncidentId is null)
+                return Results.BadRequest("This incident is not currently linked as a duplicate.");
+
+            var previousPrimaryId = incident.LinkedIncidentId;
+
+            incident.LinkedIncidentId = null;
+            incident.DedupConfidence = null;
+            incident.DedupReasoning = null;
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = $"Manually unlinked by officer — was linked to incident {previousPrimaryId} as a duplicate. Restored as its own primary incident."
+            });
+
+            await db.SaveChangesAsync();
+            return Results.Ok(incident);
+        });
+
         // ── Cross-module contract endpoint - Recovery calls this exact path ────────
         // NOTE: singular "/api/incident/", NOT "/api/incidents/" - matches
         // Aegis.Recovery.Services.IncidentIntegrationService's GetDamageReportAsync call.
