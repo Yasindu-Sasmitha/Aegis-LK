@@ -27,6 +27,15 @@ function statusChipClass(status: string): string {
   return map[status] ?? 'ae-chip-neutral';
 }
 
+function scoreChipClass(score: number | null, invert = false): string {
+  if (score === null) return 'ae-chip-neutral';
+  const high = invert ? score < 40 : score >= 70;
+  const mid = invert ? score >= 40 && score < 70 : score >= 40 && score < 70;
+  if (high) return invert ? 'ae-chip-high' : 'ae-chip-safe';
+  if (mid) return 'ae-chip-moderate';
+  return invert ? 'ae-chip-safe' : 'ae-chip-high';
+}
+
 export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) => {
   const { user } = useAuth();
   const isOfficerOrAdmin = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
@@ -36,8 +45,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Action state
-  const [actionBusy, setActionBusy] = useState<string | null>(null); // 'assess' | 'approve' | 'hold' | 'reject' | null
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
@@ -51,7 +59,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
       .then((data) => {
         setIncident(data);
         setLoading(false);
-        return fetchReporterProfile(data.reportedByUserId).catch(() => null); // contact lookup is best-effort
+        return fetchReporterProfile(data.reportedByUserId).catch(() => null);
       })
       .then((profile) => {
         if (profile) setReporter(profile);
@@ -105,21 +113,17 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
   const canApproveOrTriage = isOfficerOrAdmin && ['Assessed', 'OnHold', 'Reported'].includes(incident.status);
   const isFinal = ['Rejected', 'MissionApproved', 'Closed'].includes(incident.status);
 
+  // Small bounding box around the point so OpenStreetMap's free embed shows useful context
+  const d = 0.01;
+  const bbox = `${incident.longitude - d},${incident.latitude - d},${incident.longitude + d},${incident.latitude + d}`;
+  const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${incident.latitude},${incident.longitude}`;
+
   return (
     <div>
       {onBack && (
         <button
           onClick={onBack}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#64748b',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            marginBottom: '1rem',
-            padding: 0,
-          }}
+          style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', marginBottom: '1rem', padding: 0 }}
         >
           ← Back to list
         </button>
@@ -148,12 +152,21 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
               {incident.description}
             </p>
 
-            {incident.photoUrl && (
+            {incident.photoUrl ? (
               <img
                 src={incident.photoUrl}
                 alt="Incident photo"
                 style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 10, marginBottom: '1rem' }}
               />
+            ) : (
+              <div style={{
+                width: '100%', height: 140, borderRadius: 10, marginBottom: '1rem',
+                backgroundColor: '#f1f5f9', border: '1px dashed #cbd5e1',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#94a3b8', fontSize: '0.85rem',
+              }}>
+                📷 No photo attached
+              </div>
             )}
 
             <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
@@ -174,40 +187,73 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
                 </div>
               )}
             </div>
-
-            <a
-              href={`https://www.google.com/maps?q=${incident.latitude},${incident.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                marginTop: '1rem',
-                fontSize: '0.85rem',
-                color: '#38bdf8',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              📍 View on map ({incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}) →
-            </a>
           </div>
 
-          {/* Plausibility reasoning */}
-          {incident.plausibilityScore !== null && (
-            <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
-                  🤖 Plausibility Screening
-                </h3>
-                <span className="ae-chip ae-chip-neutral">{incident.plausibilityScore}/100</span>
-              </div>
+          {/* ── Agent 1: Assessment ── */}
+          <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+                🔍 Assessment Agent
+              </h3>
+              {incident.severityAssessed && (
+                <span className="ae-chip ae-chip-neutral">{incident.severityAssessed}</span>
+              )}
+            </div>
+            {incident.severityAssessed ? (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569' }}>
+                Assessed severity: <strong>{incident.severityAssessed}</strong>
+                {incident.rescueMission && <> · Teams required: <strong>{incident.rescueMission.teamsRequired}</strong></>}
+              </p>
+            ) : (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                Not yet assessed — click "Assess" below to run this agent.
+              </p>
+            )}
+          </div>
+
+          {/* ── Agent 2: Plausibility ── */}
+          <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+                🌦️ Plausibility Agent
+              </h3>
+              <span className={`ae-chip ${scoreChipClass(incident.plausibilityScore)}`}>
+                {incident.plausibilityScore !== null ? `${incident.plausibilityScore}/100` : 'Not screened'}
+              </span>
+            </div>
+            {incident.plausibilityReasoning ? (
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.6 }}>
                 {incident.plausibilityReasoning}
               </p>
+            ) : (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                Runs automatically in the background shortly after a report is created.
+              </p>
+            )}
+          </div>
+
+          {/* ── Agent 3: Dedup ── */}
+          <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+                🧬 Dedup Agent
+              </h3>
+              {incident.linkedIncidentId && (
+                <span className={`ae-chip ${scoreChipClass(incident.dedupConfidence, true)}`}>
+                  {incident.dedupConfidence}% match
+                </span>
+              )}
             </div>
-          )}
+            {incident.linkedIncidentId ? (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.6 }}>
+                {incident.dedupReasoning ?? 'Linked as a duplicate.'}
+              </p>
+            ) : (
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                Not linked as a duplicate of any other report — treated as its own primary incident.
+              </p>
+            )}
+          </div>
 
           {/* Officer actions */}
           {isOfficerOrAdmin && !isFinal && (
@@ -233,9 +279,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
 
                 {canApproveOrTriage && user && (
                   <button
-                    onClick={() =>
-                      runAction(() => approveIncident(incidentId, { approvedByOfficerId: user.id }), 'approve')
-                    }
+                    onClick={() => runAction(() => approveIncident(incidentId, { approvedByOfficerId: user.id }), 'approve')}
                     disabled={actionBusy !== null}
                     style={actionButtonStyle('#059669', '#ffffff', actionBusy === 'approve')}
                   >
@@ -266,13 +310,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
 
               {showHoldForm && (
                 <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
-                  <input
-                    type="text"
-                    placeholder="Reason (optional)"
-                    value={holdReason}
-                    onChange={(e) => setHoldReason(e.target.value)}
-                    style={inputStyle}
-                  />
+                  <input type="text" placeholder="Reason (optional)" value={holdReason} onChange={(e) => setHoldReason(e.target.value)} style={inputStyle} />
                   <button
                     onClick={() => runAction(() => holdIncident(incidentId, { reason: holdReason || null }), 'hold')}
                     disabled={actionBusy !== null}
@@ -285,20 +323,11 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
 
               {showRejectForm && (
                 <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
-                  <input
-                    type="text"
-                    placeholder="Reason (required)"
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                    style={inputStyle}
-                  />
+                  <input type="text" placeholder="Reason (required)" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} style={inputStyle} />
                   <button
                     onClick={() => rejectReason.trim() && runAction(() => rejectIncident(incidentId, { reason: rejectReason }), 'reject')}
                     disabled={actionBusy !== null || !rejectReason.trim()}
-                    style={{
-                      ...actionButtonStyle('#ef4444', '#ffffff', actionBusy === 'reject' || !rejectReason.trim()),
-                      marginTop: '0.5rem',
-                    }}
+                    style={{ ...actionButtonStyle('#ef4444', '#ffffff', actionBusy === 'reject' || !rejectReason.trim()), marginTop: '0.5rem' }}
                   >
                     {actionBusy === 'reject' ? 'Rejecting…' : 'Confirm Reject'}
                   </button>
@@ -308,7 +337,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
           )}
         </div>
 
-        {/* Right: reporter contact + mission info */}
+        {/* Right: reporter contact, mission info, map at the bottom */}
         <div>
           <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
             <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
@@ -334,7 +363,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
           </div>
 
           {incident.rescueMission && (
-            <div className="ae-card">
+            <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
               <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
                 🚁 Rescue Mission
               </h3>
@@ -343,6 +372,35 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
               </p>
             </div>
           )}
+
+          {/* Map — always last in the right column */}
+          <div className="ae-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '0.85rem 1rem 0.6rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>📍 Location</h3>
+              <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
+                {incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}
+              </p>
+            </div>
+            <iframe
+              title="Incident location map"
+              src={osmEmbedUrl}
+              width="100%"
+              height="260"
+              frameBorder="0"
+              loading="lazy"
+              style={{ display: 'block', border: 0 }}
+            />
+            <div style={{ padding: '0.5rem 1rem' }}>
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${incident.latitude}&mlon=${incident.longitude}#map=15/${incident.latitude}/${incident.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 600, textDecoration: 'none' }}
+              >
+                View larger map →
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
