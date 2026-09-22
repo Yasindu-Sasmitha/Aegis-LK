@@ -25,6 +25,7 @@ import {
 import {
   IncidentQueuePage,
   IncidentDashboardPage,
+  IncidentFullDetailPage,
 } from './features/incident';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'incident';
@@ -42,6 +43,7 @@ const MainPlatform: React.FC = () => {
   const [weatherTab, setWeatherTab] = useState<string>('dashboard');
   const [recoveryTab, setRecoveryTab] = useState<string>('dashboard');
   const [incidentTab, setIncidentTab] = useState<string>('dashboard');
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [latestAlerts, setLatestAlerts] = useState<WeatherAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
 
@@ -740,19 +742,43 @@ const MainPlatform: React.FC = () => {
 
         {currentView === 'incident' && (
           <main>
-            {incidentTab === 'dashboard' && (
-              <IncidentDashboardPage onNavigate={(tab) => setIncidentTab(tab)} />
-            )}
-            {incidentTab === 'all' && (
-              <IncidentQueuePage title="All Incidents" onNavigate={(tab) => setIncidentTab(tab)} />
-            )}
-            {['Reported', 'Assessed', 'OnHold', 'Rejected', 'MissionApproved', 'Closed'].includes(incidentTab) && (
-              <IncidentQueuePage
-                key={incidentTab}
-                fixedStatus={incidentTab as any}
-                title={`${incidentTab} Incidents`}
-                onNavigate={(tab) => setIncidentTab(tab)}
+            {incidentTab === 'detail' && selectedIncidentId ? (
+              <IncidentFullDetailPage
+                incidentId={selectedIncidentId}
+                onBack={() => setIncidentTab('all')}
               />
+            ) : (
+              <>
+                {incidentTab === 'dashboard' && (
+                  <IncidentDashboardPage
+                    onNavigate={(tab) => setIncidentTab(tab)}
+                  />
+                )}
+                {incidentTab === 'all' && (
+                  <IncidentQueuePage
+                    title="All Incidents"
+                    onNavigate={(tab, incidentId) => {
+                      if (tab === 'detail' && incidentId) {
+                        setSelectedIncidentId(incidentId);
+                      }
+                      setIncidentTab(tab);
+                    }}
+                  />
+                )}
+                {['Reported', 'Assessed', 'OnHold', 'Rejected', 'MissionApproved', 'Closed'].includes(incidentTab) && (
+                  <IncidentQueuePage
+                    key={incidentTab}
+                    fixedStatus={incidentTab as any}
+                    title={`${incidentTab} Incidents`}
+                    onNavigate={(tab, incidentId) => {
+                      if (tab === 'detail' && incidentId) {
+                        setSelectedIncidentId(incidentId);
+                      }
+                      setIncidentTab(tab);
+                    }}
+                  />
+                )}
+              </>
             )}
           </main>
         )}
