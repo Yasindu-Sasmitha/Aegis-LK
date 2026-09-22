@@ -10,6 +10,7 @@ import type {
   CreateDamageReportRequest,
   NearbyIncidentResponse,
   RelatedReport,
+  ReporterProfile,
 } from '../types/incidentTypes';
 
 const API_BASE = '/api/incidents';
@@ -165,6 +166,15 @@ export async function holdIncident(
   return handle<IncidentReport>(res, 'Failed to hold incident');
 }
 
+// ── POST /api/incidents/{id}/unlink — officer reverses a wrong Dedup match ──
+export async function unlinkIncident(id: string): Promise<IncidentReport> {
+  const res = await fetch(`${API_BASE}/${id}/unlink`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  return handle<IncidentReport>(res, 'Failed to unlink incident');
+}
+
 // ── POST /api/incidents/{id}/damage-report — deliberately not agentic ──────
 export async function submitDamageReport(
   id: string,
@@ -176,4 +186,12 @@ export async function submitDamageReport(
     body: JSON.stringify(data),
   });
   return handle<IncidentReport>(res, 'Failed to submit damage report');
+}
+
+// ── GET /api/auth/users/{id} — reporter contact info (cross-module) ────────
+export async function fetchReporterProfile(userId: string): Promise<ReporterProfile> {
+  const res = await fetch(`/api/auth/users/${userId}`, {
+    headers: getAuthHeaders(),
+  });
+  return handle<ReporterProfile>(res, 'Failed to fetch reporter profile');
 }

@@ -30,6 +30,8 @@ export interface IncidentReport {
 
   linkedIncidentId: string | null;
   linkedIncident: IncidentReport | null; // present only when the API chooses to include it
+  dedupConfidence: number | null; // 0-100, set on the DUPLICATE incident, not the primary
+  dedupReasoning: string | null; // Dedup Agent's reasoning for this specific match
 
   status: IncidentStatus;
   rejectionReason: string | null;
@@ -133,4 +135,15 @@ export interface IncidentListResponse {
   page: number;
   pageSize: number;
   items: IncidentReport[];
+}
+
+// ── GET /api/auth/users/{id} — minimal reporter profile ─────────────────────
+export interface ReporterProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  district: string | null;
+  phoneNumber: string | null;
+  createdAt: string;
 }

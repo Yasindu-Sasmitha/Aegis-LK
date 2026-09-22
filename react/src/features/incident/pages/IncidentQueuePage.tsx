@@ -2,9 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { fetchIncidents } from '../api/incidentApi';
 import { IncidentReport, IncidentStatus } from '../types/incidentTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
+import { IncidentDetailPanel } from '../components/IncidentDetailPanel';
 
 interface Props {
   onNavigate?: (tab: string, incidentId?: string) => void;
+  fixedStatus?: IncidentStatus; // when set, this tab is locked to one status and the dropdown is hidden
+  title?: string; // e.g. "Reported Incidents" — defaults to "Incident Queue"
 }
 
 const STATUS_OPTIONS: { value: IncidentStatus | 'All'; label: string }[] = [
@@ -38,7 +41,7 @@ function plausibilityLabel(score: number | null): string {
   return `${score}/100`;
 }
 
-export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
+export const IncidentQueuePage: React.FC<Props> = ({ onNavigate, fixedStatus, title }) => {
   const { user } = useAuth();
   const isOfficerOrAdmin = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
 
@@ -46,15 +49,18 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<IncidentStatus | 'All'>('All');
+  const [statusFilter, setStatusFilter] = useState<IncidentStatus | 'All'>(fixedStatus ?? 'All');
   const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const pageSize = 10;
+
+  const effectiveStatus = fixedStatus ?? statusFilter;
 
   const loadIncidents = useCallback(() => {
     setLoading(true);
     setError(null);
     fetchIncidents({
-      status: statusFilter === 'All' ? undefined : statusFilter,
+      status: effectiveStatus === 'All' ? undefined : effectiveStatus,
       page,
       pageSize,
     })
@@ -62,19 +68,24 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
         setIncidents(res.items);
         setTotal(res.total);
         setLoading(false);
+        // Keep the selection if it's still present in the refreshed list; otherwise clear it
+        // (e.g. after a status filter change makes the previously-selected incident disappear).
+        setSelectedId((prev) => (prev && res.items.some((i) => i.id === prev) ? prev : null));
       })
       .catch((err) => {
         console.error('Failed to load incidents:', err);
         setError(err instanceof Error ? err.message : 'Failed to load incidents');
         setLoading(false);
       });
-  }, [statusFilter, page]);
+  }, [effectiveStatus, page]);
 
   useEffect(() => {
     loadIncidents();
   }, [loadIncidents]);
 
-  const openIncident = (id: string) => {
+  const selectedIncident = incidents.find((i) => i.id === selectedId) ?? null;
+
+  const openFullDetails = (id: string) => {
     if (onNavigate) {
       onNavigate('detail', id);
     } else {
@@ -89,37 +100,39 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#0f172a' }}>
-            🚨 Incident Queue
+            🚨 {title ?? 'Incident Queue'}
           </h2>
           <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.875rem' }}>
-            {total} {total === 1 ? 'incident' : 'incidents'} reported
+            {total} {total === 1 ? 'incident' : 'incidents'}
             {!isOfficerOrAdmin && ' (read-only view)'}
           </p>
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as IncidentStatus | 'All');
-            setPage(1);
-          }}
-          style={{
-            padding: '0.55rem 0.85rem',
-            borderRadius: 8,
-            border: '1px solid #cbd5e1',
-            fontSize: '0.875rem',
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            color: '#334155',
-            backgroundColor: '#ffffff',
-            cursor: 'pointer',
-          }}
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        {!fixedStatus && (
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as IncidentStatus | 'All');
+              setPage(1);
+            }}
+            style={{
+              padding: '0.55rem 0.85rem',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
+              fontSize: '0.875rem',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              color: '#334155',
+              backgroundColor: '#ffffff',
+              cursor: 'pointer',
+            }}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {error && (
@@ -128,115 +141,123 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate }) => {
         </div>
       )}
 
-      {loading ? (
-        <div className="ae-card">
-          <p style={{ margin: 0, color: '#64748b' }}>Loading incidents…</p>
-        </div>
-      ) : incidents.length === 0 ? (
-        <div className="ae-card">
-          <p style={{ margin: 0, color: '#64748b' }}>No incidents match this filter.</p>
-        </div>
-      ) : (
-        <div className="ae-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <th style={thStyle}>Type</th>
-                  <th style={thStyle}>Description</th>
-                  <th style={thStyle}>Severity</th>
-                  <th style={thStyle}>Plausibility</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Reported</th>
-                  <th style={thStyle}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {incidents.map((incident) => (
-                  <tr
-                    key={incident.id}
-                    style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
-                    onClick={() => openIncident(incident.id)}
-                  >
-                    <td style={tdStyle}>{incident.disasterType}</td>
-                    <td style={{ ...tdStyle, maxWidth: 320 }}>
-                      <span style={{
-                        display: 'block',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {incident.description}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '3fr 2fr',
+          gap: '1.5rem',
+          alignItems: 'start',
+        }}
+      >
+        {/* Left column — stacked incident cards, own scroll area so selecting a
+            lower card doesn't lose the top of the list */}
+        <div
+          style={{
+            maxHeight: 'calc(100vh - 260px)',
+            overflowY: 'auto',
+            paddingRight: '0.25rem',
+          }}
+        >
+          {loading ? (
+            <div className="ae-card">
+              <p style={{ margin: 0, color: '#64748b' }}>Loading incidents…</p>
+            </div>
+          ) : incidents.length === 0 ? (
+            <div className="ae-card">
+              <p style={{ margin: 0, color: '#64748b' }}>No incidents match this filter.</p>
+            </div>
+          ) : (
+            incidents.map((incident) => {
+              const isSelected = incident.id === selectedId;
+              return (
+                <div
+                  key={incident.id}
+                  className="ae-card"
+                  onClick={() => setSelectedId(incident.id)}
+                  style={{
+                    marginBottom: '0.85rem',
+                    cursor: 'pointer',
+                    border: isSelected ? '2px solid #38bdf8' : '1px solid #e2e8f0',
+                    boxShadow: isSelected ? '0 0 0 3px rgba(56,189,248,0.15)' : undefined,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                        {incident.disasterType}
                       </span>
-                    </td>
-                    <td style={tdStyle}>
-                      {incident.severityAssessed ?? incident.severityReported}
-                      {!incident.severityAssessed && (
-                        <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}> (reported)</span>
+                      {incident.photoUrl && (
+                        <span title="Photo attached" style={{ fontSize: '0.85rem' }}>📷</span>
                       )}
-                    </td>
-                    <td style={tdStyle}>
-                      <span className={`ae-chip ${plausibilityChipClass(incident.plausibilityScore)}`}>
-                        {plausibilityLabel(incident.plausibilityScore)}
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                        {new Date(incident.createdAt).toLocaleDateString()}
                       </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span className={`ae-chip ${STATUS_CHIP_CLASS[incident.status] ?? 'ae-chip-neutral'}`}>
-                        {incident.status}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      {new Date(incident.createdAt).toLocaleDateString()}
-                    </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: '#38bdf8', fontWeight: 600 }}>
-                      View →
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                    </div>
+                    <span className={`ae-chip ${STATUS_CHIP_CLASS[incident.status] ?? 'ae-chip-neutral'}`} style={{ flexShrink: 0 }}>
+                      {incident.status}
+                    </span>
+                  </div>
 
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1.25rem' }}>
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            style={pagerButtonStyle(page <= 1)}
-          >
-            ← Previous
-          </button>
-          <span style={{ padding: '0.5rem 0.75rem', color: '#64748b', fontSize: '0.875rem' }}>
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            style={pagerButtonStyle(page >= totalPages)}
-          >
-            Next →
-          </button>
+                  <p
+                    style={{
+                      margin: '0 0 0.6rem',
+                      fontSize: '0.85rem',
+                      color: '#475569',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {incident.description}
+                  </p>
+
+                  {/* Plausibility on its own line, severity on its own line below —
+                      keeps the two pieces of info visually distinct rather than
+                      crammed together */}
+                  <div style={{ marginBottom: '0.35rem' }}>
+                    <span className={`ae-chip ${plausibilityChipClass(incident.plausibilityScore)}`}>
+                      {plausibilityLabel(incident.plausibilityScore)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Severity: {incident.severityAssessed ?? incident.severityReported}
+                    {!incident.severityAssessed && ' (reported)'}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                style={pagerButtonStyle(page <= 1)}
+              >
+                ← Previous
+              </button>
+              <span style={{ padding: '0.5rem 0.75rem', color: '#64748b', fontSize: '0.875rem' }}>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                style={pagerButtonStyle(page >= totalPages)}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Right column — selected incident's full-detail button + duplicates */}
+        <div style={{ position: 'sticky', top: '1rem' }}>
+          <IncidentDetailPanel incident={selectedIncident} onViewFullDetails={openFullDetails} />
+        </div>
+      </div>
     </div>
   );
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '0.75rem 1rem',
-  fontWeight: 600,
-  color: '#64748b',
-  fontSize: '0.75rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.03em',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: '0.75rem 1rem',
-  color: '#334155',
 };
 
 function pagerButtonStyle(disabled: boolean): React.CSSProperties {
