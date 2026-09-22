@@ -501,6 +501,9 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen> wit
           ),
         ),
 
+        // Originating Disaster Intake Context Card (if available)
+        if (plan.originatingIntake != null) _buildOriginatingIntakeCard(plan.originatingIntake!),
+
         // Tab Views
         Expanded(
           child: _isLoadingDetail
@@ -516,6 +519,75 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen> wit
                 ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOriginatingIntakeCard(OriginatingIntakeModel intake) {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.assignment_outlined, size: 18, color: Color(0xFF0284C7)),
+                  SizedBox(width: 6),
+                  Text('Originating Citizen Disaster Intake', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(4)),
+                child: const Text('Field Assessment Context', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0369A1))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '📍 ${intake.district} (${intake.location}) • Type: ${intake.disasterType} • Houses: ${intake.housesDamaged} • Displaced: ${intake.displacedFamilies}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+          ),
+          if (intake.reporterName != null && intake.reporterName!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Reported By: ${intake.reporterName} (${intake.reporterContact ?? "No phone"})',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            ),
+          ],
+          if (intake.additionalNotes != null && intake.additionalNotes!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Notes: "${intake.additionalNotes}"',
+              style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF475569)),
+            ),
+          ],
+          if (intake.infrastructureDamage.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: intake.infrastructureDamage.map((infra) {
+                return Chip(
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  padding: EdgeInsets.zero,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                  label: Text('🏗️ ${infra.assetName} (${infra.damageLevel})', style: const TextStyle(fontSize: 10, color: Color(0xFF1E293B))),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -740,23 +812,32 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen> wit
       itemCount: validations.length,
       itemBuilder: (ctx, i) {
         final v = validations[i];
+        final cleanTitle = v.ruleName.replaceAll(RegExp(r'^(Code|AI):\s*', caseSensitive: false), '').trim();
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           child: ListTile(
             leading: Icon(
-              v.passed ? Icons.check_circle : Icons.error_outline,
-              color: v.passed ? Colors.green : Colors.red,
+              v.passed ? Icons.check_circle : Icons.warning_amber_rounded,
+              color: v.passed ? Colors.green : Colors.orange,
             ),
-            title: Text(v.ruleName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            subtitle: Text(v.detail, style: const TextStyle(fontSize: 12)),
+            title: Text(cleanTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+            subtitle: Text(v.detail, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
             trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(4),
+                color: v.passed ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: v.passed ? const Color(0xFFBBF7D0) : const Color(0xFFFED7AA)),
               ),
-              child: Text(v.source ?? 'Code', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+              child: Text(
+                v.passed ? 'POLICY PASSED' : 'FLAGGED FOR REVIEW',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: v.passed ? const Color(0xFF15803D) : const Color(0xFFC2410C),
+                ),
+              ),
             ),
           ),
         );
