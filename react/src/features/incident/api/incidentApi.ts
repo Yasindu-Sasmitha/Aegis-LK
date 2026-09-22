@@ -10,6 +10,7 @@ import type {
   CreateDamageReportRequest,
   NearbyIncidentResponse,
   RelatedReport,
+  ReporterProfile,
 } from '../types/incidentTypes';
 
 const API_BASE = '/api/incidents';
@@ -185,4 +186,12 @@ export async function submitDamageReport(
     body: JSON.stringify(data),
   });
   return handle<IncidentReport>(res, 'Failed to submit damage report');
+}
+
+// ── GET /api/auth/users/{id} — reporter contact info (cross-module) ────────
+export async function fetchReporterProfile(userId: string): Promise<ReporterProfile> {
+  const res = await fetch(`/api/auth/users/${userId}`, {
+    headers: getAuthHeaders(),
+  });
+  return handle<ReporterProfile>(res, 'Failed to fetch reporter profile');
 }

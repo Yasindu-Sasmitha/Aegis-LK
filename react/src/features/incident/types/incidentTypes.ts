@@ -136,3 +136,14 @@ export interface IncidentListResponse {
   pageSize: number;
   items: IncidentReport[];
 }
+
+// ── GET /api/auth/users/{id} — minimal reporter profile ─────────────────────
+export interface ReporterProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  district: string | null;
+  phoneNumber: string | null;
+  createdAt: string;
+}
