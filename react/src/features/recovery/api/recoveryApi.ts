@@ -280,3 +280,38 @@ export async function deleteReport(reportId: string): Promise<void> {
   });
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed to delete report'); }
 }
+
+// ── Citizen Disaster Damage Intake ──────────────────────────────────────────
+
+export async function fetchDamageReports(status?: string, district?: string): Promise<{ total: number; items: import('../types/recoveryTypes').DamageReportItem[] }> {
+  const params = new URLSearchParams();
+  if (status) params.append('status', status);
+  if (district) params.append('district', district);
+  const res = await fetch(`${API_BASE}/damage-reports?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to fetch citizen damage reports');
+  return res.json();
+}
+
+export async function submitCitizenDamageReport(data: {
+  district: string;
+  location: string;
+  disasterType: string;
+  housesDamaged: number;
+  displacedFamilies: number;
+  reporterName: string;
+  reporterContact: string;
+  additionalNotes: string;
+  infrastructureDamage?: import('../types/recoveryTypes').DamageIntakeInfrastructureItem[];
+}): Promise<import('../types/recoveryTypes').DamageReportItem> {
+  const res = await fetch(`${API_BASE}/damage-reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to submit damage report');
+  }
+  return res.json();
+}
+

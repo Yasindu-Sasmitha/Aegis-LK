@@ -103,6 +103,18 @@ public static class AuthEndpoints
             return Results.Ok(MapToProfile(user));
         }).RequireAuthorization();
 
+        // ── Look up a single user by ID (any authenticated user) ────────────
+        // Used by other modules (e.g. Incident) to show a reporter's contact
+        // info to an officer — read-only, minimal profile only.
+        group.MapGet("/users/{id:guid}", async (Guid id, AuthDbContext db) =>
+        {
+            var user = await db.Users.FindAsync(id);
+            if (user is null)
+                return Results.NotFound();
+
+            return Results.Ok(MapToProfile(user));
+        }).RequireAuthorization();
+
         // ── 4. Staff Account Provisioning (Admin Only) ──────────────────────
         group.MapPost("/admin/users", async (
             CreateStaffUserRequest req,

@@ -409,6 +409,104 @@ public static class RecoveryEndpoints
 
         #endregion
 
+        #region Citizen Damage Reports
+
+        /// GET /api/recovery/damage-reports — List citizen/field submitted disaster damage reports
+        group.MapGet("/damage-reports", async (string? district, string? status, string? search,
+            int page = 1, int pageSize = 50, RecoveryDbContext db = default!) =>
+        {
+            var query = db.DamageReports.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(district) && district != "All")
+                query = query.Where(d => d.District.ToLower() == district.ToLower());
+            if (!string.IsNullOrWhiteSpace(status) && status != "All")
+                query = query.Where(d => d.Status.ToLower() == status.ToLower());
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(d => d.ReporterName.Contains(search) || d.Location.Contains(search) || d.District.Contains(search));
+
+            var total = await query.CountAsync();
+            var reports = await query.OrderByDescending(d => d.CreatedAt)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var dtos = reports.Select(r =>
+            {
+                List<DamageIntakeInfrastructureItem> items = [];
+                try { items = JsonSerializer.Deserialize<List<DamageIntakeInfrastructureItem>>(r.InfrastructureJson, opts) ?? []; } catch { }
+                return new DamageReportDto(
+                    r.Id, r.IncidentId, r.District, r.Location, r.DisasterType,
+                    r.HousesDamaged, r.DisplacedFamilies, r.ReporterName, r.ReporterContact,
+                    r.AdditionalNotes, items, r.Status, r.RecoveryPlanId, r.CreatedAt, r.ProcessedAt);
+            });
+
+            return Results.Ok(new { total, page, pageSize, items = dtos });
+        });
+
+        /// GET /api/recovery/damage-reports/{id:guid}
+        group.MapGet("/damage-reports/{id:guid}", async (Guid id, RecoveryDbContext db) =>
+        {
+            var r = await db.DamageReports.FindAsync(id);
+            if (r is null) return Results.NotFound(new { error = "Damage report not found." });
+
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            List<DamageIntakeInfrastructureItem> items = [];
+            try { items = JsonSerializer.Deserialize<List<DamageIntakeInfrastructureItem>>(r.InfrastructureJson, opts) ?? []; } catch { }
+
+            return Results.Ok(new DamageReportDto(
+                r.Id, r.IncidentId, r.District, r.Location, r.DisasterType,
+                r.HousesDamaged, r.DisplacedFamilies, r.ReporterName, r.ReporterContact,
+                r.AdditionalNotes, items, r.Status, r.RecoveryPlanId, r.CreatedAt, r.ProcessedAt));
+        });
+
+        /// POST /api/recovery/damage-reports — Direct citizen disaster damage report submission
+        group.MapPost("/damage-reports", async (CreateDamageReportRequest request, RecoveryDbContext db) =>
+        {
+            // Safety net: ensure schema exists before first write
+            await RecoveryDataSeeder.EnsureSchemaAsync(db);
+
+            if (string.IsNullOrWhiteSpace(request.District))
+                return Results.BadRequest(new { error = "District is required." });
+            if (request.DisplacedFamilies < 0 || request.HousesDamaged < 0)
+                return Results.BadRequest(new { error = "Counts cannot be negative." });
+
+            try
+            {
+                var infraJson = JsonSerializer.Serialize(request.InfrastructureDamage ?? [], new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+                var report = new DamageReport
+                {
+                    District = request.District.Trim(),
+                    Location = string.IsNullOrWhiteSpace(request.Location) ? request.District.Trim() : request.Location.Trim(),
+                    DisasterType = string.IsNullOrWhiteSpace(request.DisasterType) ? "Flood" : request.DisasterType.Trim(),
+                    HousesDamaged = request.HousesDamaged,
+                    DisplacedFamilies = request.DisplacedFamilies,
+                    ReporterName = string.IsNullOrWhiteSpace(request.ReporterName) ? "Citizen Reporter" : request.ReporterName.Trim(),
+                    ReporterContact = request.ReporterContact?.Trim() ?? string.Empty,
+                    AdditionalNotes = request.AdditionalNotes?.Trim() ?? string.Empty,
+                    InfrastructureJson = infraJson,
+                    Status = "Submitted",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                db.DamageReports.Add(report);
+                await db.SaveChangesAsync();
+
+                var items = request.InfrastructureDamage ?? [];
+                var dto = new DamageReportDto(
+                    report.Id, report.IncidentId, report.District, report.Location, report.DisasterType,
+                    report.HousesDamaged, report.DisplacedFamilies, report.ReporterName, report.ReporterContact,
+                    report.AdditionalNotes, items, report.Status, report.RecoveryPlanId, report.CreatedAt, report.ProcessedAt);
+
+                return Results.Created($"/api/recovery/damage-reports/{report.Id}", dto);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DamageReport] Submission error: {ex.Message}");
+                return Results.Problem(detail: ex.Message, title: "Failed to save damage report", statusCode: 500);
+            }
+        });
+
+        #endregion
+
         #region Agentic AI Workflow — Independent Entry Points
 
         /// POST /api/recovery/workflows/start
@@ -419,6 +517,7 @@ public static class RecoveryEndpoints
         {
             IncidentDamageReportDto? damageReport = null;
             Guid incidentId;
+            DamageReport? dbDamageReport = null;
 
             if (request.IncidentId.HasValue && request.IncidentId != Guid.Empty)
             {
@@ -454,14 +553,34 @@ public static class RecoveryEndpoints
                     }).ToList()
                 };
 
-                // Build damage report (infrastructure records will be saved inside RunWorkflowInternal)
+                // Store or link citizen damage report in database
+                var infraJson = JsonSerializer.Serialize(intake.InfrastructureDamage, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                dbDamageReport = new DamageReport
+                {
+                    IncidentId = incidentId,
+                    District = intake.District.Trim(),
+                    Location = intake.District.Trim(),
+                    DisasterType = intake.DisasterType,
+                    HousesDamaged = intake.HousesDamaged,
+                    DisplacedFamilies = intake.DisplacedFamilies,
+                    ReporterName = string.IsNullOrWhiteSpace(intake.ReporterName) ? "Citizen Reporter" : intake.ReporterName.Trim(),
+                    ReporterContact = intake.ReporterContact?.Trim() ?? string.Empty,
+                    AdditionalNotes = intake.AdditionalNotes?.Trim() ?? string.Empty,
+                    InfrastructureJson = infraJson,
+                    Status = "PlanGenerated",
+                    ProcessedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.DamageReports.Add(dbDamageReport);
+                await db.SaveChangesAsync();
             }
             else
             {
                 return Results.BadRequest(new { error = "Provide either an IncidentId or a DirectDamageIntake." });
             }
 
-            return await RunWorkflowInternal(incidentId, damageReport, request.RevisionGuidance, db, agentClient);
+            var workflowResult = await RunWorkflowInternal(incidentId, damageReport, request.RevisionGuidance, db, agentClient);
+            return workflowResult;
         });
 
         /// GET /api/recovery/workflows/{planId:guid}
@@ -920,10 +1039,95 @@ public static class RecoveryEndpoints
             log.ApprovedBy, log.ApprovalDecision, log.ApprovalTimestamp, log.ApprovalNotes, log.CreatedAt);
     }
 
+    private static OriginatingIntakeDto? ExtractOriginatingIntake(RecoveryPlan p)
+    {
+        string? loc = null;
+        string? dt = null;
+        int hd = 0;
+        int df = 0;
+        string repName = "Citizen / Field Reporter";
+        string repContact = "";
+        string notes = "";
+
+        if (!string.IsNullOrWhiteSpace(p.PlanSummaryJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(p.PlanSummaryJson);
+                var root = doc.RootElement;
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name.Equals("Location", StringComparison.OrdinalIgnoreCase))
+                        loc = prop.Value.GetString();
+                    else if (prop.Name.Equals("DisasterType", StringComparison.OrdinalIgnoreCase))
+                        dt = prop.Value.GetString();
+                    else if (prop.Name.Equals("HousesDamaged", StringComparison.OrdinalIgnoreCase))
+                        hd = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v1) ? v1 : 0;
+                    else if (prop.Name.Equals("DisplacedFamilies", StringComparison.OrdinalIgnoreCase))
+                        df = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v2) ? v2 : 0;
+                }
+            }
+            catch { }
+        }
+
+        if (string.IsNullOrWhiteSpace(loc) && p.WorkflowLog != null && !string.IsNullOrWhiteSpace(p.WorkflowLog.ObjectiveJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(p.WorkflowLog.ObjectiveJson);
+                var root = doc.RootElement;
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name.Equals("Location", StringComparison.OrdinalIgnoreCase))
+                        loc = prop.Value.GetString();
+                    else if (prop.Name.Equals("DisasterType", StringComparison.OrdinalIgnoreCase))
+                        dt = prop.Value.GetString();
+                    else if (prop.Name.Equals("HousesDamaged", StringComparison.OrdinalIgnoreCase))
+                        hd = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v1) ? v1 : 0;
+                    else if (prop.Name.Equals("DisplacedFamilies", StringComparison.OrdinalIgnoreCase))
+                        df = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v2) ? v2 : 0;
+                    else if (prop.Name.Equals("RevisionGuidance", StringComparison.OrdinalIgnoreCase))
+                        notes = prop.Value.GetString() ?? "";
+                }
+            }
+            catch { }
+        }
+
+        if (string.IsNullOrWhiteSpace(loc)) return null;
+
+        var items = new List<DamageIntakeInfrastructureItem>();
+        if (p.Tasks != null)
+        {
+            foreach (var t in p.Tasks.Where(t => !string.IsNullOrWhiteSpace(t.Title)))
+            {
+                items.Add(new DamageIntakeInfrastructureItem
+                {
+                    AssetName = t.Title,
+                    AssetType = "Infrastructure",
+                    DamageLevel = t.Priority == "Critical" ? "Destroyed" : "Severe",
+                    EstimatedCost = t.EstimatedCost,
+                    Details = t.Description
+                });
+            }
+        }
+
+        return new OriginatingIntakeDto(
+            loc,
+            loc,
+            dt ?? "Disaster",
+            hd,
+            df,
+            repName,
+            repContact,
+            notes,
+            items);
+    }
+
     private static RecoveryPlanDetailDto MapRecoveryPlanDetailDto(RecoveryPlan p) => new(
         p.Id, p.IncidentId, p.PlanName, p.Status, p.EstimatedTotalBudget, p.PlanSummaryJson,
         p.ReviewNotes, p.ReviewedBy, p.CreatedAt, p.ReviewedAt, p.RevisionCount,
         p.Tasks.Select(t => new TaskDto(t.Id, t.Title, t.Description, t.AssignedNGOId, t.AssignedNGO?.Name,
             t.Priority, t.EstimatedCost, t.Status, t.TargetCompletionDate)).ToList(),
-        p.WorkflowLog != null ? MapWorkflowTraceDto(p.WorkflowLog) : null);
+        p.WorkflowLog != null ? MapWorkflowTraceDto(p.WorkflowLog) : null,
+        ExtractOriginatingIntake(p));
 }

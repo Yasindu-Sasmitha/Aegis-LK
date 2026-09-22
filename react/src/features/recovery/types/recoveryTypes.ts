@@ -152,15 +152,55 @@ export interface RecoveryPlan {
   revisionCount: number;
   tasks: TaskDto[];
   workflowTrace?: WorkflowTrace;
+  originatingIntake?: OriginatingIntake;
 }
 
-// ── Damage Intake Form ───────────────────────────────────────────────────────
+// ── Damage Intake Form & Citizen Reports ─────────────────────────────────────
+
+export interface DamageIntakeInfrastructureItem {
+  assetName: string;
+  assetType: string;
+  damageLevel: string;
+  estimatedCost?: number;
+  details?: string;
+}
+
+export interface OriginatingIntake {
+  district: string;
+  location: string;
+  disasterType: string;
+  housesDamaged: number;
+  displacedFamilies: number;
+  reporterName?: string;
+  reporterContact?: string;
+  additionalNotes?: string;
+  infrastructureDamage?: DamageIntakeInfrastructureItem[];
+}
+
+export interface DamageReportItem {
+  id: string;
+  incidentId?: string;
+  district: string;
+  location: string;
+  disasterType: string;
+  housesDamaged: number;
+  displacedFamilies: number;
+  reporterName: string;
+  reporterContact: string;
+  additionalNotes: string;
+  infrastructureDamage: DamageIntakeInfrastructureItem[];
+  status: 'Submitted' | 'PendingReview' | 'PlanGenerated' | 'UnderReview' | 'Rejected' | string;
+  recoveryPlanId?: string;
+  createdAt: string;
+  processedAt?: string;
+}
 
 export interface InfrastructureItemInput {
   assetName: string;
   assetType: string;
   damageLevel: string;
   estimatedCost: number;
+  details?: string;
 }
 
 export interface DamageIntakeFormData {
@@ -199,3 +239,4 @@ export interface WorkflowListItem {
   workflowStatus?: string;
   totalAgentDurationMs?: number;
 }
+

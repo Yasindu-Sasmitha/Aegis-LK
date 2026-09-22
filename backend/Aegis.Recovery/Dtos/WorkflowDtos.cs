@@ -110,7 +110,8 @@ public record RecoveryPlanDetailDto(
     DateTime? ReviewedAt,
     int RevisionCount,
     List<TaskDto> Tasks,
-    WorkflowTraceDto? WorkflowTrace    // null if no agentic workflow was run
+    WorkflowTraceDto? WorkflowTrace,    // null if no agentic workflow was run
+    OriginatingIntakeDto? OriginatingIntake = null
 );
 
 public record CreateRecoveryReportRequest(
