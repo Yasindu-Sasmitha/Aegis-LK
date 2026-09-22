@@ -98,7 +98,7 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate, fixedStatus, ti
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div>
+        <div>
           <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: '#0f172a' }}>
             🚨 {title ?? 'Incident Queue'}
           </h2>
@@ -149,8 +149,15 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate, fixedStatus, ti
           alignItems: 'start',
         }}
       >
-        {/* Left column — stacked incident cards */}
-        <div>
+        {/* Left column — stacked incident cards, own scroll area so selecting a
+            lower card doesn't lose the top of the list */}
+        <div
+          style={{
+            maxHeight: 'calc(100vh - 260px)',
+            overflowY: 'auto',
+            paddingRight: '0.25rem',
+          }}
+        >
           {loading ? (
             <div className="ae-card">
               <p style={{ margin: 0, color: '#64748b' }}>Loading incidents…</p>
@@ -175,15 +182,18 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate, fixedStatus, ti
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
                       <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
                         {incident.disasterType}
                       </span>
-                      <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                      {incident.photoUrl && (
+                        <span title="Photo attached" style={{ fontSize: '0.85rem' }}>📷</span>
+                      )}
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>
                         {new Date(incident.createdAt).toLocaleDateString()}
                       </span>
                     </div>
-                    <span className={`ae-chip ${STATUS_CHIP_CLASS[incident.status] ?? 'ae-chip-neutral'}`}>
+                    <span className={`ae-chip ${STATUS_CHIP_CLASS[incident.status] ?? 'ae-chip-neutral'}`} style={{ flexShrink: 0 }}>
                       {incident.status}
                     </span>
                   </div>
@@ -201,14 +211,17 @@ export const IncidentQueuePage: React.FC<Props> = ({ onNavigate, fixedStatus, ti
                     {incident.description}
                   </p>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Plausibility on its own line, severity on its own line below —
+                      keeps the two pieces of info visually distinct rather than
+                      crammed together */}
+                  <div style={{ marginBottom: '0.35rem' }}>
                     <span className={`ae-chip ${plausibilityChipClass(incident.plausibilityScore)}`}>
                       {plausibilityLabel(incident.plausibilityScore)}
                     </span>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      {incident.severityAssessed ?? incident.severityReported}
-                      {!incident.severityAssessed && ' (reported)'}
-                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Severity: {incident.severityAssessed ?? incident.severityReported}
+                    {!incident.severityAssessed && ' (reported)'}
                   </div>
                 </div>
               );
