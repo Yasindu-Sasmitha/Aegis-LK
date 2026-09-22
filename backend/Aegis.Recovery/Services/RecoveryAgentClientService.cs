@@ -898,28 +898,28 @@ public static class RecoveryGuardrails
         var list = new List<GuardrailCheck>();
 
         var budgetPassed = computedBudget > 0 && computedBudget <= 50_000_000m;
-        list.Add(new GuardrailCheck("Code: Budget Sanity Check", budgetPassed,
-            budgetPassed ? $"Budget LKR {computedBudget:N0} is within bounds." : $"Budget LKR {computedBudget:N0} exceeds bounds.", "Code"));
+        list.Add(new GuardrailCheck("Budget Sanity & Policy Limits", budgetPassed,
+            budgetPassed ? $"Budget LKR {computedBudget:N0} is within statutory bounds." : $"Budget LKR {computedBudget:N0} exceeds maximum statutory limit.", "System Policy"));
 
         if (declaredBudget.HasValue && declaredBudget.Value > 0)
         {
             var diff = Math.Abs(declaredBudget.Value - computedBudget);
             var match = diff < 1_000m;
-            list.Add(new GuardrailCheck("Code: Budget Consistency", match,
-                match ? "Declared and computed budgets match." : $"Mismatch: Declared LKR {declaredBudget:N0} vs Computed LKR {computedBudget:N0}.", "Code"));
+            list.Add(new GuardrailCheck("Budget Integrity & Arithmetic Check", match,
+                match ? "Declared and computed budgets match perfectly." : $"Mismatch: Declared LKR {declaredBudget:N0} vs Computed LKR {computedBudget:N0}.", "System Policy"));
         }
 
-        list.Add(new GuardrailCheck("Code: Prompt Safety Check", !inputFlagged,
-            inputFlagged ? "Suspicious patterns detected and redacted from input." : "No injection patterns detected.", "Code"));
+        list.Add(new GuardrailCheck("Prompt Safety & Input Sanitization", !inputFlagged,
+            inputFlagged ? "Suspicious patterns detected and redacted from input." : "Input verified safe — no injection patterns detected.", "Security Guardrail"));
 
         var unverified = tasks.Where(t => !string.IsNullOrEmpty(t.AssignedNgoName) && !approvedNgos.Contains(t.AssignedNgoName, StringComparer.OrdinalIgnoreCase)).Select(t => t.AssignedNgoName!).ToList();
-        list.Add(new GuardrailCheck("Code: NGO Allow-list Check", unverified.Count == 0,
-            unverified.Count == 0 ? "All assigned NGOs are certified." : $"Uncertified NGOs assigned: {string.Join(", ", unverified)}.", "Code"));
+        list.Add(new GuardrailCheck("NGO Accreditation & Allow-List Check", unverified.Count == 0,
+            unverified.Count == 0 ? "All assigned NGOs are certified and accredited." : $"Uncertified NGOs assigned: {string.Join(", ", unverified)}.", "Compliance Rule"));
 
         // Displaced families check
         var hasStipendTask = tasks.Any(t => t.Sector.Contains("Shelter", StringComparison.OrdinalIgnoreCase) || t.Sector.Contains("Social Welfare", StringComparison.OrdinalIgnoreCase));
-        list.Add(new GuardrailCheck("Code: Displaced Families Coverage", hasStipendTask,
-            hasStipendTask ? "Displaced families are covered by shelter or social welfare task." : "Warning: No shelter or stipend task for displaced families.", "Code"));
+        list.Add(new GuardrailCheck("Displaced Families Relief Coverage", hasStipendTask,
+            hasStipendTask ? "Displaced families are fully covered by shelter or social welfare task." : "Warning: No shelter or stipend task for displaced families.", "Humanitarian Standard"));
 
         return list;
     }

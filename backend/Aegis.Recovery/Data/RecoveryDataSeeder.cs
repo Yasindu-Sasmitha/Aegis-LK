@@ -194,6 +194,26 @@ public static class RecoveryDataSeeder
                 "ReportSummary" text NOT NULL DEFAULT '',
                 "GeneratedAt" timestamp with time zone NOT NULL DEFAULT NOW()
             );
+            """,
+
+            """
+            CREATE TABLE IF NOT EXISTS recovery."DamageReports" (
+                "Id" uuid NOT NULL PRIMARY KEY,
+                "IncidentId" uuid NULL,
+                "District" text NOT NULL DEFAULT '',
+                "Location" text NOT NULL DEFAULT '',
+                "DisasterType" text NOT NULL DEFAULT 'Flood',
+                "HousesDamaged" integer NOT NULL DEFAULT 0,
+                "DisplacedFamilies" integer NOT NULL DEFAULT 0,
+                "ReporterName" text NOT NULL DEFAULT '',
+                "ReporterContact" text NOT NULL DEFAULT '',
+                "AdditionalNotes" text NOT NULL DEFAULT '',
+                "InfrastructureJson" text NOT NULL DEFAULT '[]',
+                "Status" text NOT NULL DEFAULT 'Submitted',
+                "RecoveryPlanId" uuid NULL,
+                "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "ProcessedAt" timestamp with time zone NULL
+            );
             """
         };
 

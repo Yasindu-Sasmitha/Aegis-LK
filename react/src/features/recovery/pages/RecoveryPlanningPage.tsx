@@ -5,6 +5,8 @@ import {
   fetchWorkflowDetail,
   fetchWorkflowTrace,
   submitWorkflowDecision,
+  fetchDamageReports,
+  submitCitizenDamageReport,
 } from '../api/recoveryApi';
 import {
   RecoveryPlan,
@@ -13,6 +15,8 @@ import {
   DamageIntakeFormData,
   InfrastructureItemInput,
   ToolCallDto,
+  DamageReportItem,
+  OriginatingIntake,
 } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
 
@@ -32,14 +36,14 @@ export const RecoveryPlanningPage: React.FC = () => {
   const { user } = useAuth();
   const isOfficer = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
 
-  const [activeTab, setActiveTab] = useState<'intake' | 'history'>('intake');
+  const [activeTab, setActiveTab] = useState<'intake' | 'submissions' | 'history'>('intake');
 
-  // Intake Form State — All Fields Start Empty & Required
+  // Intake Form State
   const [district, setDistrict] = useState('');
   const [disasterType, setDisasterType] = useState('');
   const [housesDamaged, setHousesDamaged] = useState<number | ''>('');
   const [displacedFamilies, setDisplacedFamilies] = useState<number | ''>('');
-  const [reportedBy, setReportedBy] = useState('');
+  const [reportedBy, setReportedBy] = useState(user?.fullName || '');
   const [reporterContact, setReporterContact] = useState('');
   const [notes, setNotes] = useState('');
   const [infraItems, setInfraItems] = useState<InfrastructureItemInput[]>([]);
@@ -57,7 +61,7 @@ export const RecoveryPlanningPage: React.FC = () => {
     setDisasterType('');
     setHousesDamaged('');
     setDisplacedFamilies('');
-    setReportedBy('');
+    setReportedBy(user?.fullName || '');
     setReporterContact('');
     setNotes('');
     setInfraItems([]);
@@ -71,6 +75,7 @@ export const RecoveryPlanningPage: React.FC = () => {
   const [workflowTrace, setWorkflowTrace] = useState<WorkflowTrace | null>(null);
   const [traceTab, setTraceTab] = useState<'agents' | 'tasks' | 'tools' | 'guardrails'>('agents');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [submissionSuccessMsg, setSubmissionSuccessMsg] = useState<string | null>(null);
 
   // Revision Modal State
   const [showRevisionModal, setShowRevisionModal] = useState(false);
@@ -81,6 +86,12 @@ export const RecoveryPlanningPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [inspectingHistoryPlan, setInspectingHistoryPlan] = useState<boolean>(false);
 
+  // Citizen Damage Submissions State
+  const [damageReports, setDamageReports] = useState<DamageReportItem[]>([]);
+  const [reportFilterDistrict, setReportFilterDistrict] = useState<string>('all');
+  const [reportFilterStatus, setReportFilterStatus] = useState<string>('all');
+  const [selectedReportDetail, setSelectedReportDetail] = useState<DamageReportItem | null>(null);
+
   const loadWorkflowHistory = useCallback(async () => {
     try {
       const data = await fetchWorkflows(filterStatus === 'all' ? undefined : filterStatus);
@@ -90,70 +101,117 @@ export const RecoveryPlanningPage: React.FC = () => {
     }
   }, [filterStatus]);
 
+  const loadDamageReports = useCallback(async () => {
+    try {
+      const data = await fetchDamageReports(
+        reportFilterStatus === 'all' ? undefined : reportFilterStatus,
+        reportFilterDistrict === 'all' ? undefined : reportFilterDistrict
+      );
+      setDamageReports(data.items || []);
+    } catch {
+      // ignore
+    }
+  }, [reportFilterStatus, reportFilterDistrict]);
+
   useEffect(() => {
     loadWorkflowHistory();
   }, [loadWorkflowHistory]);
 
-  // Launch Multi-Agent Workflow with Comprehensive Form Validation
-  const handleStartIntakeWorkflow = async () => {
+  useEffect(() => {
+    loadDamageReports();
+  }, [loadDamageReports]);
+
+  // Validate Intake Form
+  const validateForm = (): boolean => {
     setErrorMessage(null);
 
-    // 1. District validation
     if (!district.trim()) {
       setErrorMessage('Please select the affected Sri Lankan District.');
-      return;
+      return false;
     }
-
-    // 2. Disaster type validation
     if (!disasterType.trim()) {
       setErrorMessage('Please select the Disaster Type.');
-      return;
+      return false;
     }
-
-    // 3. Houses damaged validation (required field)
     if (housesDamaged === '' || Number(housesDamaged) < 0) {
       setErrorMessage('Please enter the number of Houses Damaged / Destroyed (cannot be empty or negative).');
-      return;
+      return false;
     }
-
-    // 4. Displaced families count validation (required field)
     if (displacedFamilies === '' || Number(displacedFamilies) < 0) {
       setErrorMessage('Please enter the Displaced Families Count (cannot be empty or negative).');
-      return;
+      return false;
     }
-
-    // 5. Check if at least some damage/impact is reported
     if (Number(housesDamaged) === 0 && Number(displacedFamilies) === 0 && infraItems.length === 0) {
       setErrorMessage('Please provide non-zero damage impact: enter affected houses, displaced families, or add damaged infrastructure.');
-      return;
+      return false;
     }
-
-    // 6. Situation Notes validation (required field)
     if (!notes.trim() || notes.trim().length < 10) {
       setErrorMessage('Please provide Disaster Situation & Field Notes (minimum 10 characters describing the situation).');
-      return;
+      return false;
     }
-
-    // 7. Reporter Name validation (required field)
     if (!reportedBy.trim()) {
-      setErrorMessage('Please enter the Reporting Officer / Organization Name.');
-      return;
+      setErrorMessage('Please enter the Reporter / Submitter Name.');
+      return false;
     }
-
-    // 8. Contact phone validation (required field)
     const cleanContact = reporterContact.trim();
     if (!cleanContact || cleanContact.replace(/[^0-9+]/g, '').length < 9) {
       setErrorMessage('Please provide a valid Emergency Contact Phone Number (at least 9–10 digits, e.g. 0771234567 or +94112345670).');
-      return;
+      return false;
     }
-
-    // 9. Infrastructure assets validation (required field)
     if (infraItems.length === 0) {
-      setErrorMessage('Please add at least 1 Damaged Public Infrastructure asset using the form below before executing the AI recovery engine.');
-      return;
+      setErrorMessage('Please add at least 1 Damaged Public Infrastructure asset using the form below.');
+      return false;
     }
+    return true;
+  };
+
+  // 1. Citizen Direct Damage Submission (For Normal Citizens)
+  const handleSubmitCitizenDamageReport = async () => {
+    if (!validateForm()) return;
 
     setLoading(true);
+    setErrorMessage(null);
+    setSubmissionSuccessMsg(null);
+
+    try {
+      await submitCitizenDamageReport({
+        district,
+        location: district,
+        disasterType,
+        housesDamaged: Number(housesDamaged) || 0,
+        displacedFamilies: Number(displacedFamilies) || 0,
+        reporterName: reportedBy.trim(),
+        reporterContact: reporterContact.trim(),
+        additionalNotes: notes.trim(),
+        infrastructureDamage: infraItems.map((i) => ({
+          assetName: i.assetName,
+          assetType: i.assetType,
+          damageLevel: i.damageLevel,
+          estimatedCost: i.estimatedCost,
+        })),
+      });
+
+      setSubmissionSuccessMsg(
+        '✅ Your Disaster Damage & Impact Assessment Form has been submitted successfully! Disaster officers will review the field submission and generate the multi-agent recovery strategy.'
+      );
+      resetForm();
+      loadDamageReports();
+      setActiveTab('submissions');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to submit damage report.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Launch Multi-Agent Workflow (For Disaster Officers & Admins)
+  const handleStartIntakeWorkflow = async (overrideData?: DamageIntakeFormData) => {
+    const isOverride = !!overrideData;
+    if (!isOverride && !validateForm()) return;
+
+    setLoading(true);
+    setErrorMessage(null);
+    setSubmissionSuccessMsg(null);
     setCurrentPlan(null);
     setWorkflowTrace(null);
     setInspectingHistoryPlan(false);
@@ -164,13 +222,13 @@ export const RecoveryPlanningPage: React.FC = () => {
     }, 600);
 
     try {
-      const intakeData: DamageIntakeFormData = {
+      const intakeData: DamageIntakeFormData = overrideData || {
         district,
         disasterType,
         housesDamaged: Number(housesDamaged) || 0,
         displacedFamilies: Number(displacedFamilies) || 0,
         reporterName: reportedBy.trim(),
-        reporterContact: cleanContact,
+        reporterContact: reporterContact.trim(),
         additionalNotes: notes.trim(),
         infrastructureDamage: infraItems,
       };
@@ -186,8 +244,10 @@ export const RecoveryPlanningPage: React.FC = () => {
         const trace = await fetchWorkflowTrace(plan.id);
         setWorkflowTrace(trace);
       }
-      resetForm();
+      if (!isOverride) resetForm();
       loadWorkflowHistory();
+      loadDamageReports();
+      setActiveTab('intake');
     } catch (err: any) {
       clearInterval(stepTimer);
       setErrorMessage(err.message || 'Failed to generate recovery plan.');
@@ -196,16 +256,36 @@ export const RecoveryPlanningPage: React.FC = () => {
     }
   };
 
+  // Trigger Plan Generation from a specific Citizen Damage Submission
+  const handleGeneratePlanFromReport = async (report: DamageReportItem) => {
+    const intakeData: DamageIntakeFormData = {
+      district: report.district,
+      disasterType: report.disasterType,
+      housesDamaged: report.housesDamaged,
+      displacedFamilies: report.displacedFamilies,
+      reporterName: report.reporterName,
+      reporterContact: report.reporterContact,
+      additionalNotes: report.additionalNotes,
+      infrastructureDamage: (report.infrastructureDamage || []).map((i) => ({
+        assetName: i.assetName,
+        assetType: i.assetType,
+        damageLevel: i.damageLevel,
+        estimatedCost: i.estimatedCost || 100000,
+      })),
+    };
+
+    setSelectedReportDetail(null);
+    await handleStartIntakeWorkflow(intakeData);
+  };
+
   // Inspect specific workflow from History list
   const handleSelectWorkflow = async (planId: string) => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      // Fetch full plan detail (includes real incidentId + all recovery tasks)
       const planDetail = await fetchWorkflowDetail(planId);
       setCurrentPlan(planDetail);
 
-      // Fetch the agent execution trace separately
       if (planDetail.workflowTrace) {
         setWorkflowTrace(planDetail.workflowTrace);
       } else {
@@ -333,7 +413,6 @@ export const RecoveryPlanningPage: React.FC = () => {
 
         {/* Structured High-Usability Output */}
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginTop: '0.75rem' }}>
-          {/* Specific Tool 1: Shelter Query */}
           {tool.toolName === 'tool_query_shelter_capacity' && (
             <div>
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
@@ -361,7 +440,6 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           )}
 
-          {/* Specific Tool 2: Cost Benchmarks */}
           {tool.toolName === 'tool_estimate_repair_costs' && (
             <div>
               <div style={{ marginBottom: '0.6rem', fontSize: '0.85rem' }}>
@@ -387,7 +465,6 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           )}
 
-          {/* Specific Tool 3: NGO Matching */}
           {tool.toolName === 'tool_match_ngo_by_sector' && (
             <div>
               <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>
@@ -411,7 +488,6 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           )}
 
-          {/* Specific Tool 4: Cash Stipend Calculator */}
           {tool.toolName === 'tool_calculate_cash_stipend_budget' && (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
@@ -423,7 +499,6 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           )}
 
-          {/* Generic Tool fallback */}
           {tool.toolName !== 'tool_query_shelter_capacity' &&
            tool.toolName !== 'tool_estimate_repair_costs' &&
            tool.toolName !== 'tool_match_ngo_by_sector' &&
@@ -437,16 +512,139 @@ export const RecoveryPlanningPage: React.FC = () => {
     );
   };
 
+  // ── RENDER ORIGINATING INTAKE CARD ──
+  const renderOriginatingIntakeCard = () => {
+    const intake: OriginatingIntake | undefined = currentPlan?.originatingIntake;
+    if (!intake && !district) return null;
+
+    const displayDistrict = intake?.district || district;
+    const displayLocation = intake?.location || district;
+    const displayDisaster = intake?.disasterType || disasterType;
+    const displayHouses = intake ? intake.housesDamaged : (housesDamaged || 0);
+    const displayFamilies = intake ? intake.displacedFamilies : (displacedFamilies || 0);
+    const displayReporter = intake?.reporterName || reportedBy;
+    const displayContact = intake?.reporterContact || reporterContact;
+    const displayNotes = intake?.additionalNotes || notes;
+    const displayInfra = intake?.infrastructureDamage || infraItems;
+
+    return (
+      <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '1.35rem' }}>📋</span>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+              Originating Disaster &amp; Citizen Impact Assessment
+            </h3>
+          </div>
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            padding: '0.25rem 0.75rem',
+            borderRadius: '6px',
+            background: '#e0f2fe',
+            color: '#0369a1',
+            border: '1px solid #bae6fd',
+          }}>
+            📍 Submitted Field Context
+          </span>
+        </div>
+
+        {/* 2-Column Overview */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Incident Scope</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#0f172a' }}>
+              <strong>District:</strong> {displayDistrict} {displayLocation !== displayDistrict && `(${displayLocation})`}
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+              <strong>Disaster Type:</strong> <span style={{ color: '#b91c1c', fontWeight: 700 }}>{displayDisaster}</span>
+            </div>
+          </div>
+
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Human &amp; Housing Impact</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#0f172a' }}>
+              <strong>Houses Damaged / Lost:</strong> <span style={{ fontWeight: 800, color: '#c2410c' }}>{displayHouses}</span>
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+              <strong>Displaced Families:</strong> <span style={{ fontWeight: 800, color: '#1e40af' }}>{displayFamilies}</span>
+            </div>
+          </div>
+
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Reporter Information</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#0f172a' }}>
+              <strong>Submitted By:</strong> {displayReporter || 'Citizen Reporter'}
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+              <strong>Emergency Phone:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{displayContact || 'N/A'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Field Notes */}
+        {displayNotes && (
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+              Situation &amp; Field Observation Notes
+            </span>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: '#334155', fontStyle: 'italic', lineHeight: 1.5 }}>
+              "{displayNotes}"
+            </p>
+          </div>
+        )}
+
+        {/* Damaged Infrastructure Table */}
+        {displayInfra && displayInfra.length > 0 && (
+          <div>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
+              Damaged Lifeline Infrastructure Reported ({displayInfra.length})
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.6rem' }}>
+              {displayInfra.map((item, idx) => (
+                <div key={idx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.6rem 0.8rem', fontSize: '0.825rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                    <strong style={{ color: '#0f172a' }}>🏗️ {item.assetName}</strong>
+                    <span style={{
+                      padding: '0.1rem 0.4rem',
+                      borderRadius: '4px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      background: item.damageLevel === 'Destroyed' ? '#fee2e2' : item.damageLevel === 'Severe' ? '#ffedd5' : '#fef9c3',
+                      color: item.damageLevel === 'Destroyed' ? '#b91c1c' : item.damageLevel === 'Severe' ? '#c2410c' : '#854d0e',
+                    }}>
+                      {item.damageLevel}
+                    </span>
+                  </div>
+                  <div style={{ color: '#64748b' }}>
+                    Type: <span style={{ fontWeight: 600, color: '#334155' }}>{item.assetType}</span>
+                    {item.estimatedCost ? ` • Est. Rs. ${Number(item.estimatedCost).toLocaleString()}` : ''}
+                  </div>
+                  {item.details && <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.2rem' }}>{item.details}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── RENDER PLAN & TRACE SECTION ──
   const renderPlanAndTraceSection = () => {
     if (!workflowTrace) return null;
+    const isAutoApproved = currentPlan?.status === 'Approved' && (!currentPlan?.reviewedBy || currentPlan?.reviewedBy === 'Recovery-Agent-04');
+
     return (
       <div style={{ marginTop: '2.5rem' }}>
+        {/* ── ORIGINATING DISASTER CONTEXT INTAKE CARD ── */}
+        {renderOriginatingIntakeCard()}
+
         {/* Top Banner with Decision Actions & Metadata */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '1.75rem 2rem', marginBottom: '1.5rem', boxShadow: '0 4px 16px -2px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
                 <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>
                   {currentPlan?.planName || 'Autonomous Master Recovery Strategy'}
                 </h2>
@@ -455,27 +653,49 @@ export const RecoveryPlanningPage: React.FC = () => {
                   borderRadius: '8px',
                   fontSize: '0.8rem',
                   fontWeight: 800,
-                  background: workflowTrace.executionStatus === 'Approved' ? '#dcfce7' : workflowTrace.executionStatus === 'PendingApproval' ? '#fef3c7' : '#fee2e2',
-                  color: workflowTrace.executionStatus === 'Approved' ? '#15803d' : workflowTrace.executionStatus === 'PendingApproval' ? '#b45309' : '#b91c1c',
+                  background: currentPlan?.status === 'Approved' ? '#dcfce7' : currentPlan?.status === 'PendingApproval' ? '#fef3c7' : '#fee2e2',
+                  color: currentPlan?.status === 'Approved' ? '#15803d' : currentPlan?.status === 'PendingApproval' ? '#b45309' : '#b91c1c',
                 }}>
-                  ● {workflowTrace.executionStatus}
+                  ● {currentPlan?.status}
                 </span>
+
+                {isAutoApproved ? (
+                  <span style={{ padding: '0.25rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                    🤖 Deterministically Auto-Approved (Within Budget Policy Limits)
+                  </span>
+                ) : currentPlan?.status === 'PendingApproval' ? (
+                  <span style={{ padding: '0.25rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
+                    🛡️ Requires Officer Approval (Exceeds Policy Limits / High Scope)
+                  </span>
+                ) : null}
               </div>
               <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>
                 {workflowTrace.executionSummary}
               </p>
             </div>
 
-            {/* Human-in-the-Loop Action Buttons — Restricted to Disaster Officers & Admins */}
+            {/* Human-in-the-Loop Action Buttons */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {isOfficer ? (
                 <>
                   <button
                     onClick={() => handleDecision('Approve')}
-                    disabled={loading}
-                    style={{ padding: '0.6rem 1.2rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    disabled={loading || currentPlan?.status === 'Approved'}
+                    style={{
+                      padding: '0.6rem 1.2rem',
+                      background: currentPlan?.status === 'Approved' ? '#94a3b8' : '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: currentPlan?.status === 'Approved' ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
                   >
-                    ✓ Approve Plan
+                    ✓ {currentPlan?.status === 'Approved' ? 'Plan Approved' : 'Approve Plan'}
                   </button>
                   <button
                     onClick={() => setShowRevisionModal(true)}
@@ -486,8 +706,20 @@ export const RecoveryPlanningPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleDecision('Reject')}
-                    disabled={loading}
-                    style={{ padding: '0.6rem 1.2rem', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    disabled={loading || currentPlan?.status === 'Rejected'}
+                    style={{
+                      padding: '0.6rem 1.2rem',
+                      background: currentPlan?.status === 'Rejected' ? '#94a3b8' : '#ef4444',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: currentPlan?.status === 'Rejected' ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
                   >
                     ✕ Reject
                   </button>
@@ -495,7 +727,7 @@ export const RecoveryPlanningPage: React.FC = () => {
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
                   <span>🔒</span>
-                  <span>View-Only (Approval requires Officer or Admin)</span>
+                  <span>View-Only (Approval restricted to Officer/Admin)</span>
                 </div>
               )}
               {inspectingHistoryPlan && (
@@ -512,7 +744,7 @@ export const RecoveryPlanningPage: React.FC = () => {
           {/* KPI Metrics */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #f1f5f9' }}>
             <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total Budget</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total Plan Budget</span>
               <p style={{ margin: '0.2rem 0 0 0', fontSize: '1.25rem', fontWeight: 800, color: '#1e3a8a' }}>
                 Rs. {(currentPlan?.estimatedTotalBudget || (currentPlan?.tasks?.reduce((sum, t) => sum + t.estimatedCost, 0) ?? 0)).toLocaleString()}
               </p>
@@ -530,7 +762,7 @@ export const RecoveryPlanningPage: React.FC = () => {
               </p>
             </div>
             <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Agentic Latency</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Agent Latency</span>
               <p style={{ margin: '0.2rem 0 0 0', fontSize: '1.25rem', fontWeight: 800, color: '#7c3aed' }}>
                 {workflowTrace.totalDurationMs} ms
               </p>
@@ -539,28 +771,28 @@ export const RecoveryPlanningPage: React.FC = () => {
         </div>
 
         {/* Trace Sub-Tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', overflowX: 'auto' }}>
           <button
             onClick={() => setTraceTab('agents')}
-            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'agents' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'agents' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem' }}
+            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'agents' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'agents' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
             🤖 4-Agent Reasoning Timeline ({workflowTrace.agentSteps?.length ?? 0})
           </button>
           <button
             onClick={() => setTraceTab('tasks')}
-            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'tasks' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'tasks' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem' }}
+            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'tasks' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'tasks' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
             📌 Actionable Recovery Tasks ({currentPlan?.tasks?.length ?? 0})
           </button>
           <button
             onClick={() => setTraceTab('tools')}
-            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'tools' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'tools' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem' }}
+            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'tools' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'tools' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
             🧰 Verified Tool Activity ({workflowTrace.toolCalls?.length ?? 0})
           </button>
           <button
             onClick={() => setTraceTab('guardrails')}
-            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'guardrails' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'guardrails' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem' }}
+            style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'guardrails' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'guardrails' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
             🛡️ Policy &amp; Guardrail Verification ({workflowTrace.validationResults?.length ?? 0})
           </button>
@@ -636,18 +868,34 @@ export const RecoveryPlanningPage: React.FC = () => {
           </div>
         )}
 
-        {/* Sub-Tab 4: Policy & Safety Guardrails */}
+        {/* Sub-Tab 4: Policy & Safety Guardrails (Cleaned & User-Friendly, No "Code:" tags) */}
         {traceTab === 'guardrails' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {(workflowTrace.validationResults ?? []).map((v, idx) => (
-              <div key={idx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '1.25rem' }}>{v.passed ? '✅' : '⚠️'}</span>
-                <div>
-                  <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{v.ruleName}</strong>
-                  <div style={{ fontSize: '0.85rem', color: '#475569' }}>{v.detail}</div>
+            {(workflowTrace.validationResults ?? []).map((v, idx) => {
+              const cleanTitle = v.ruleName.replace(/^(Code|AI):\s*/i, '').trim();
+              return (
+                <div key={idx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <span style={{ fontSize: '1.4rem', marginTop: '0.1rem' }}>{v.passed ? '✅' : '⚠️'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{cleanTitle}</strong>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 800,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '4px',
+                        background: v.passed ? '#f0fdf4' : '#fff7ed',
+                        color: v.passed ? '#15803d' : '#c2410c',
+                        border: `1px solid ${v.passed ? '#bbf7d0' : '#fed7aa'}`,
+                      }}>
+                        {v.passed ? 'POLICY PASSED' : 'FLAGGED FOR OFFICER REVIEW'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.45 }}>{v.detail}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -667,7 +915,7 @@ export const RecoveryPlanningPage: React.FC = () => {
             </h1>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
-            4-Agent Multi-Step Reasoning Engine powered by Google Gemini with deterministic policy guardrails &amp; allow-listed tool execution.
+            4-Agent Multi-Step Reasoning Engine powered by Google Gemini with deterministic policy guardrails &amp; citizen intake.
           </p>
         </div>
 
@@ -690,13 +938,12 @@ export const RecoveryPlanningPage: React.FC = () => {
             </span>
           </div>
 
-          {/* Tab Switcher */}
+          {/* 3 Main Tabs */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#f1f5f9', padding: '0.3rem', borderRadius: '10px' }}>
             <button
               onClick={() => {
                 setActiveTab('intake');
                 setInspectingHistoryPlan(false);
-                resetForm();
               }}
               style={{
                 padding: '0.55rem 1.1rem',
@@ -710,11 +957,31 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              ✨ New AI Intake &amp; Planner
+              📝 Disaster Damage Intake
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('submissions');
+                loadDamageReports();
+              }}
+              style={{
+                padding: '0.55rem 1.1rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'submissions' ? '#2563eb' : 'transparent',
+                color: activeTab === 'submissions' ? '#ffffff' : '#64748b',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              📋 Citizen Submissions ({damageReports.length})
             </button>
             <button
               onClick={() => {
                 setActiveTab('history');
+                loadWorkflowHistory();
               }}
               style={{
                 padding: '0.55rem 1.1rem',
@@ -728,13 +995,23 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              📋 Past Plans &amp; Audit ({workflowList.length})
+              📜 Past Plans &amp; Audit ({workflowList.length})
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── ERROR NOTIFICATION BANNER ── */}
+      {/* ── NOTIFICATION BANNERS ── */}
+      {submissionSuccessMsg && (
+        <div style={{ padding: '1rem 1.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', color: '#15803d', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.35rem' }}>✅</span>
+            <span style={{ fontSize: '0.925rem', fontWeight: 700 }}>{submissionSuccessMsg}</span>
+          </div>
+          <button onClick={() => setSubmissionSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}>✕</button>
+        </div>
+      )}
+
       {errorMessage && (
         <div style={{ padding: '1rem 1.25rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', color: '#b91c1c', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(220, 38, 38, 0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -746,7 +1023,7 @@ export const RecoveryPlanningPage: React.FC = () => {
       )}
 
       {/* ═════════════════════════════════════════════════════════════════════════
-          TAB 1: NEW AI DAMAGE INTAKE & PLANNER (VERTICAL FORMS UNDER EACH OTHER)
+          TAB 1: DISASTER DAMAGE INTAKE & AI PLAN GENERATOR
          ═════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'intake' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -852,30 +1129,24 @@ export const RecoveryPlanningPage: React.FC = () => {
                 onChange={(e) => setNotes(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.65rem 0.75rem',
-                  border: `1px solid ${notes.trim().length < 10 ? '#fca5a5' : '#cbd5e1'}`,
+                  padding: '0.75rem',
+                  border: `1px solid ${!notes.trim() ? '#fca5a5' : '#cbd5e1'}`,
                   borderRadius: '8px',
                   fontSize: '0.9rem',
-                  boxSizing: 'border-box',
-                  lineHeight: 1.5
+                  boxSizing: 'border-box'
                 }}
               />
-              {notes.trim().length < 10 && (
-                <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.25rem', display: 'block' }}>
-                  * Please provide at least 10 characters of situation notes.
-                </span>
-              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                  Reporting Officer / Organization <span style={{ color: '#dc2626' }}>*</span>
+                  Reporter / Contact Name <span style={{ color: '#dc2626' }}>*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Full Name (e.g. System Administrator)"
+                  placeholder="e.g. Gamini Silva / Grama Niladhari"
                   value={reportedBy}
                   onChange={(e) => setReportedBy(e.target.value)}
                   style={{
@@ -888,14 +1159,15 @@ export const RecoveryPlanningPage: React.FC = () => {
                   }}
                 />
               </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
                   Emergency Contact Phone Number <span style={{ color: '#dc2626' }}>*</span>
                 </label>
                 <input
-                  type="text"
+                  type="tel"
                   required
-                  placeholder="e.g. +94112345670 or 0771234567"
+                  placeholder="e.g. 0771234567 or +94112345670"
                   value={reporterContact}
                   onChange={(e) => setReporterContact(e.target.value)}
                   style={{
@@ -911,26 +1183,25 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Form 2: Damaged Public Infrastructure (Underneath Form 1 with Clear Labeled Fields) */}
+          {/* Form 2: Damaged Public Infrastructure Assets */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.75rem', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.35rem' }}>🏗️</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '1.35rem' }}>🏗️</span>
+              <div>
                 <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                  Damaged Public Infrastructure ({infraItems.length}) <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>(At least 1 Asset Required *)</span>
+                  Damaged Public Infrastructure Assets <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>(Minimum 1 Required *)</span>
                 </h2>
+                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Add affected lifeline facilities such as damaged bridges, roads, hospitals, schools, and water supplies.
+                </span>
               </div>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
-                Agent 2 Infrastructure Analyzer
-              </span>
             </div>
 
-            {/* Clear, Well-Labeled Add New Infrastructure Item Box */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem' }}>
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem', marginBottom: '1.25rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
-                    1. Asset / Facility Name <span style={{ color: '#dc2626' }}>*</span>
+                    1. Asset Name / Location <span style={{ color: '#dc2626' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -943,7 +1214,7 @@ export const RecoveryPlanningPage: React.FC = () => {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
-                    2. Infrastructure Category <span style={{ color: '#dc2626' }}>*</span>
+                    2. Infrastructure Type <span style={{ color: '#dc2626' }}>*</span>
                   </label>
                   <select
                     value={newAsset.assetType}
@@ -1055,36 +1326,64 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Large Primary Action Button: Execute 4-Agent AI Recovery Engine */}
-          <div style={{ marginTop: '0.5rem' }}>
-            <button
-              type="button"
-              onClick={handleStartIntakeWorkflow}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '1.1rem',
-                background: loading ? '#64748b' : 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                fontWeight: 800,
-                fontSize: '1.1rem',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.75rem',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <span style={{ fontSize: '1.35rem' }}>{loading ? '⏳' : '⚡'}</span>
-              <span>{loading ? 'Orchestrating 4-Agent Recovery Engine...' : 'Execute 4-Agent AI Recovery Engine'}</span>
-            </button>
+          {/* Action Buttons: Differentiated for Citizen vs Officer */}
+          <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {!isOfficer ? (
+              <button
+                type="button"
+                onClick={handleSubmitCitizenDamageReport}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '1.1rem',
+                  background: loading ? '#64748b' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '1.1rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.75rem',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.35rem' }}>{loading ? '⏳' : '📤'}</span>
+                <span>{loading ? 'Submitting Damage Report...' : 'Submit Citizen Damage Assessment Report'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleStartIntakeWorkflow()}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '1.1rem',
+                  background: loading ? '#64748b' : 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '1.1rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.75rem',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ fontSize: '1.35rem' }}>{loading ? '⏳' : '⚡'}</span>
+                <span>{loading ? 'Orchestrating 4-Agent Recovery Engine...' : 'Execute 4-Agent AI Recovery Engine'}</span>
+              </button>
+            )}
           </div>
 
-          {/* ── STEP-BY-STEP WORKING PROGRESS BAR (Visible when executing) ── */}
+          {/* Step Progress Bar (Visible when executing AI) */}
           {loading && (
             <div style={{ background: '#ffffff', border: '2px solid #3b82f6', borderRadius: '14px', padding: '1.75rem', marginTop: '1rem', boxShadow: '0 8px 24px rgba(37, 99, 235, 0.15)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -1099,7 +1398,6 @@ export const RecoveryPlanningPage: React.FC = () => {
                 </span>
               </div>
 
-              {/* Animated Progress Bar Fill */}
               <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '1.5rem' }}>
                 <div
                   style={{
@@ -1112,15 +1410,8 @@ export const RecoveryPlanningPage: React.FC = () => {
                 />
               </div>
 
-              {/* 4 Agent Step Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                <div style={{
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  background: currentStep >= 1 ? '#eff6ff' : '#f8fafc',
-                  border: `2px solid ${currentStep === 1 ? '#3b82f6' : currentStep > 1 ? '#86efac' : '#e2e8f0'}`,
-                  transition: 'all 0.3s ease',
-                }}>
+                <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 1 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 1 ? '#3b82f6' : currentStep > 1 ? '#86efac' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 1 ? '#1d4ed8' : '#94a3b8' }}>AGENT 1</span>
                     <span>{currentStep > 1 ? '✅' : currentStep === 1 ? '🔄' : '⏳'}</span>
@@ -1129,13 +1420,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Decomposes disaster scope &amp; priorities</div>
                 </div>
 
-                <div style={{
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  background: currentStep >= 2 ? '#eff6ff' : '#f8fafc',
-                  border: `2px solid ${currentStep === 2 ? '#3b82f6' : currentStep > 2 ? '#86efac' : '#e2e8f0'}`,
-                  transition: 'all 0.3s ease',
-                }}>
+                <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 2 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 2 ? '#3b82f6' : currentStep > 2 ? '#86efac' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 2 ? '#1d4ed8' : '#94a3b8' }}>AGENT 2</span>
                     <span>{currentStep > 2 ? '✅' : currentStep === 2 ? '🔄' : '⏳'}</span>
@@ -1144,13 +1429,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Evaluates capacity &amp; lifeline repairs</div>
                 </div>
 
-                <div style={{
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  background: currentStep >= 3 ? '#eff6ff' : '#f8fafc',
-                  border: `2px solid ${currentStep === 3 ? '#3b82f6' : currentStep > 3 ? '#86efac' : '#e2e8f0'}`,
-                  transition: 'all 0.3s ease',
-                }}>
+                <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 3 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 3 ? '#3b82f6' : currentStep > 3 ? '#86efac' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 3 ? '#1d4ed8' : '#94a3b8' }}>AGENT 3</span>
                     <span>{currentStep > 3 ? '✅' : currentStep === 3 ? '🔄' : '⏳'}</span>
@@ -1159,13 +1438,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Matches NGOs &amp; calculates budgets</div>
                 </div>
 
-                <div style={{
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  background: currentStep >= 4 ? '#eff6ff' : '#f8fafc',
-                  border: `2px solid ${currentStep === 4 ? '#3b82f6' : '#e2e8f0'}`,
-                  transition: 'all 0.3s ease',
-                }}>
+                <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 4 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 4 ? '#3b82f6' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 4 ? '#1d4ed8' : '#94a3b8' }}>AGENT 4</span>
                     <span>{currentStep >= 4 ? '🔄' : '⏳'}</span>
@@ -1183,7 +1456,191 @@ export const RecoveryPlanningPage: React.FC = () => {
       )}
 
       {/* ═════════════════════════════════════════════════════════════════════════
-          TAB 2: PAST PLANS & AUDIT LEDGER
+          TAB 2: CITIZEN DAMAGE INTAKE SUBMISSIONS LEDGER
+         ═════════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'submissions' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
+                📋 {isOfficer ? 'Citizen Disaster Damage Submissions Ledger' : 'My Submitted Disaster Damage Reports'}
+              </h2>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                {isOfficer
+                  ? 'Review originating citizen reports from disaster-affected areas and trigger AI-driven recovery master plans.'
+                  : 'Track the verification and recovery plan status of your submitted disaster assessments.'}
+              </p>
+            </div>
+
+            {/* Filters */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <select
+                value={reportFilterDistrict}
+                onChange={(e) => setReportFilterDistrict(e.target.value)}
+                style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff' }}
+              >
+                <option value="all">All Districts</option>
+                {SRI_LANKA_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+
+              <select
+                value={reportFilterStatus}
+                onChange={(e) => setReportFilterStatus(e.target.value)}
+                style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff' }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="Submitted">Submitted (Awaiting Review)</option>
+                <option value="PendingReview">Pending Review</option>
+                <option value="PlanGenerated">Plan Generated</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Submissions List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {damageReports.length === 0 ? (
+              <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📝</div>
+                <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Damage Submissions Found</h3>
+                <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                  {isOfficer
+                    ? 'No citizen damage reports match your filter criteria.'
+                    : 'Submit your first disaster impact assessment from the Disaster Damage Intake tab.'}
+                </p>
+              </div>
+            ) : (
+              damageReports.map((report) => (
+                <div
+                  key={report.id}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '1.25rem',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
+                        <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+                          📍 {report.district} ({report.disasterType})
+                        </span>
+                        <span style={{
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background:
+                            report.status === 'PlanGenerated' ? '#f0fdf4' :
+                            report.status === 'Submitted' ? '#eff6ff' :
+                            report.status === 'PendingReview' ? '#fef3c7' :
+                            report.status === 'Rejected' ? '#fef2f2' : '#f8fafc',
+                          color:
+                            report.status === 'PlanGenerated' ? '#16a34a' :
+                            report.status === 'Submitted' ? '#1d4ed8' :
+                            report.status === 'PendingReview' ? '#b45309' :
+                            report.status === 'Rejected' ? '#dc2626' : '#475569',
+                        }}>
+                          ● {report.status === 'Submitted' ? 'Submitted – Awaiting Review' : report.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                        Reported By: <strong>{report.reporterName}</strong> ({report.reporterContact}) • Submitted: {new Date(report.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Action Controls for Officers & Admins */}
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button
+                        onClick={() => setSelectedReportDetail(selectedReportDetail?.id === report.id ? null : report)}
+                        style={{
+                          padding: '0.5rem 0.9rem',
+                          background: '#f1f5f9',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {selectedReportDetail?.id === report.id ? 'Hide Details' : '🔍 View Details'}
+                      </button>
+
+                      {isOfficer && (
+                        <button
+                          onClick={() => handleGeneratePlanFromReport(report)}
+                          disabled={loading}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.2)',
+                          }}
+                        >
+                          <span>⚡</span>
+                          <span>Generate AI Plan</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Impact Summary Quick-Stats */}
+                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: '#475569', flexWrap: 'wrap' }}>
+                    <div>🏠 <strong>{report.housesDamaged}</strong> Houses Damaged</div>
+                    <div>👨‍👩‍👧‍👦 <strong>{report.displacedFamilies}</strong> Displaced Families</div>
+                    <div>🏗️ <strong>{(report.infrastructureDamage || []).length}</strong> Lifeline Assets Affected</div>
+                  </div>
+
+                  {/* Expanded Detail View */}
+                  {selectedReportDetail?.id === report.id && (
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginTop: '0.5rem' }}>
+                      <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#334155' }}>
+                        <strong>Field Notes:</strong> <em>"{report.additionalNotes || 'No notes provided.'}"</em>
+                      </div>
+
+                      {report.infrastructureDamage && report.infrastructureDamage.length > 0 && (
+                        <div>
+                          <strong style={{ fontSize: '0.8rem', color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
+                            Damaged Infrastructure:
+                          </strong>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
+                            {report.infrastructureDamage.map((item, idx) => (
+                              <div key={idx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}>
+                                <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.assetName}</div>
+                                <div style={{ color: '#64748b' }}>
+                                  {item.assetType} • <span style={{ color: '#b91c1c', fontWeight: 600 }}>{item.damageLevel}</span>
+                                  {item.estimatedCost ? ` • Rs. ${Number(item.estimatedCost).toLocaleString()}` : ''}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════════════════════
+          TAB 3: PAST PLANS & AUDIT LEDGER
          ═════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'history' && (
         <div>

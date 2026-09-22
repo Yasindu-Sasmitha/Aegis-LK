@@ -223,4 +223,54 @@ class RecoveryService {
     }
     throw Exception('Failed to load recovery reports');
   }
+
+  // ── 7. Citizen Disaster Damage Intake ───────────────────────────────────────
+
+  Future<List<DamageReportModel>> fetchDamageReports({String? status, String? district}) async {
+    final params = <String>[];
+    if (status != null && status.isNotEmpty && status != 'all') params.add('status=$status');
+    if (district != null && district.isNotEmpty && district != 'all') params.add('district=$district');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+    final response = await http.get(Uri.parse('$baseUrl/damage-reports$query'));
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      final List data = decoded is List ? decoded : (decoded['items'] ?? []);
+      return data.map((e) => DamageReportModel.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    throw Exception('Failed to load citizen damage reports');
+  }
+
+  Future<DamageReportModel> submitCitizenDamageReport({
+    required String district,
+    required String location,
+    required String disasterType,
+    required int housesDamaged,
+    required int displacedFamilies,
+    required String reporterName,
+    required String reporterContact,
+    required String additionalNotes,
+    List<DamageIntakeInfrastructureItemModel>? infrastructureDamage,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/damage-reports'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'district': district,
+        'location': location,
+        'disasterType': disasterType,
+        'housesDamaged': housesDamaged,
+        'displacedFamilies': displacedFamilies,
+        'reporterName': reporterName,
+        'reporterContact': reporterContact,
+        'additionalNotes': additionalNotes,
+        'infrastructureDamage': infrastructureDamage?.map((e) => e.toJson()).toList() ?? [],
+      }),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return DamageReportModel.fromJson(jsonDecode(response.body));
+    }
+    final err = jsonDecode(response.body);
+    throw Exception(err['error'] ?? 'Failed to submit citizen damage report');
+  }
 }
+

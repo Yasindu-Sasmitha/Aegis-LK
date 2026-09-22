@@ -468,6 +468,7 @@ class RecoveryPlanModel {
   final int revisionCount;
   final List<RecoveryTaskModel> tasks;
   final WorkflowTraceModel? workflowTrace;
+  final OriginatingIntakeModel? originatingIntake;
 
   RecoveryPlanModel({
     required this.id,
@@ -483,6 +484,7 @@ class RecoveryPlanModel {
     required this.revisionCount,
     required this.tasks,
     this.workflowTrace,
+    this.originatingIntake,
   });
 
   double get totalCost => estimatedTotalBudget;
@@ -506,6 +508,141 @@ class RecoveryPlanModel {
       workflowTrace: json['workflowTrace'] != null
           ? WorkflowTraceModel.fromJson(json['workflowTrace'] as Map<String, dynamic>)
           : null,
+      originatingIntake: json['originatingIntake'] != null
+          ? OriginatingIntakeModel.fromJson(json['originatingIntake'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+class DamageIntakeInfrastructureItemModel {
+  final String assetName;
+  final String assetType;
+  final String damageLevel;
+  final double estimatedCost;
+  final String? details;
+
+  DamageIntakeInfrastructureItemModel({
+    required this.assetName,
+    required this.assetType,
+    required this.damageLevel,
+    this.estimatedCost = 0.0,
+    this.details,
+  });
+
+  factory DamageIntakeInfrastructureItemModel.fromJson(Map<String, dynamic> json) {
+    return DamageIntakeInfrastructureItemModel(
+      assetName: json['assetName']?.toString() ?? json['name']?.toString() ?? '',
+      assetType: json['assetType']?.toString() ?? json['type']?.toString() ?? 'Infrastructure',
+      damageLevel: json['damageLevel']?.toString() ?? json['severity']?.toString() ?? 'Moderate',
+      estimatedCost: (json['estimatedCost'] as num?)?.toDouble() ?? 0.0,
+      details: json['details']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'assetName': assetName,
+    'assetType': assetType,
+    'damageLevel': damageLevel,
+    'estimatedCost': estimatedCost,
+    'details': details,
+  };
+}
+
+class OriginatingIntakeModel {
+  final String district;
+  final String location;
+  final String disasterType;
+  final int housesDamaged;
+  final int displacedFamilies;
+  final String? reporterName;
+  final String? reporterContact;
+  final String? additionalNotes;
+  final List<DamageIntakeInfrastructureItemModel> infrastructureDamage;
+
+  OriginatingIntakeModel({
+    required this.district,
+    required this.location,
+    required this.disasterType,
+    required this.housesDamaged,
+    required this.displacedFamilies,
+    this.reporterName,
+    this.reporterContact,
+    this.additionalNotes,
+    required this.infrastructureDamage,
+  });
+
+  factory OriginatingIntakeModel.fromJson(Map<String, dynamic> json) {
+    return OriginatingIntakeModel(
+      district: json['district']?.toString() ?? '',
+      location: json['location']?.toString() ?? '',
+      disasterType: json['disasterType']?.toString() ?? '',
+      housesDamaged: json['housesDamaged'] is num ? (json['housesDamaged'] as num).toInt() : 0,
+      displacedFamilies: json['displacedFamilies'] is num ? (json['displacedFamilies'] as num).toInt() : 0,
+      reporterName: json['reporterName']?.toString(),
+      reporterContact: json['reporterContact']?.toString(),
+      additionalNotes: json['additionalNotes']?.toString(),
+      infrastructureDamage: (json['infrastructureDamage'] as List<dynamic>? ?? [])
+          .map((e) => DamageIntakeInfrastructureItemModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class DamageReportModel {
+  final String id;
+  final String? incidentId;
+  final String district;
+  final String location;
+  final String disasterType;
+  final int housesDamaged;
+  final int displacedFamilies;
+  final String reporterName;
+  final String reporterContact;
+  final String additionalNotes;
+  final List<DamageIntakeInfrastructureItemModel> infrastructureDamage;
+  final String status;
+  final String? recoveryPlanId;
+  final String createdAt;
+  final String? processedAt;
+
+  DamageReportModel({
+    required this.id,
+    this.incidentId,
+    required this.district,
+    required this.location,
+    required this.disasterType,
+    required this.housesDamaged,
+    required this.displacedFamilies,
+    required this.reporterName,
+    required this.reporterContact,
+    required this.additionalNotes,
+    required this.infrastructureDamage,
+    required this.status,
+    this.recoveryPlanId,
+    required this.createdAt,
+    this.processedAt,
+  });
+
+  factory DamageReportModel.fromJson(Map<String, dynamic> json) {
+    return DamageReportModel(
+      id: json['id']?.toString() ?? '',
+      incidentId: json['incidentId']?.toString(),
+      district: json['district']?.toString() ?? '',
+      location: json['location']?.toString() ?? '',
+      disasterType: json['disasterType']?.toString() ?? '',
+      housesDamaged: json['housesDamaged'] is num ? (json['housesDamaged'] as num).toInt() : 0,
+      displacedFamilies: json['displacedFamilies'] is num ? (json['displacedFamilies'] as num).toInt() : 0,
+      reporterName: json['reporterName']?.toString() ?? '',
+      reporterContact: json['reporterContact']?.toString() ?? '',
+      additionalNotes: json['additionalNotes']?.toString() ?? '',
+      infrastructureDamage: (json['infrastructureDamage'] as List<dynamic>? ?? [])
+          .map((e) => DamageIntakeInfrastructureItemModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      status: json['status']?.toString() ?? 'PendingReview',
+      recoveryPlanId: json['recoveryPlanId']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
+      processedAt: json['processedAt']?.toString(),
     );
   }
 }
