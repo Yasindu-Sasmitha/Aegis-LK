@@ -175,6 +175,59 @@ public record RecoveryPlanDto(
     List<TaskDto> Tasks
 );
 
+public class DamageIntakeInfrastructureItem
+{
+    public string AssetName { get; set; } = string.Empty;
+    public string AssetType { get; set; } = string.Empty;
+    public string DamageLevel { get; set; } = string.Empty;
+    public decimal EstimatedCost { get; set; } = 0;
+    public string? Details { get; set; }
+}
+
+// Damage Report DTOs
+public class CreateDamageReportRequest
+{
+    public string District { get; set; } = string.Empty;
+    public string Location { get; set; } = string.Empty;
+    public string DisasterType { get; set; } = string.Empty;
+    public int HousesDamaged { get; set; }
+    public int DisplacedFamilies { get; set; }
+    public string ReporterName { get; set; } = string.Empty;
+    public string ReporterContact { get; set; } = string.Empty;
+    public string AdditionalNotes { get; set; } = string.Empty;
+    public List<DamageIntakeInfrastructureItem>? InfrastructureDamage { get; set; }
+}
+
+public record DamageReportDto(
+    Guid Id,
+    Guid? IncidentId,
+    string District,
+    string Location,
+    string DisasterType,
+    int HousesDamaged,
+    int DisplacedFamilies,
+    string ReporterName,
+    string ReporterContact,
+    string AdditionalNotes,
+    List<DamageIntakeInfrastructureItem> InfrastructureDamage,
+    string Status,
+    Guid? RecoveryPlanId,
+    DateTime CreatedAt,
+    DateTime? ProcessedAt
+);
+
+public record OriginatingIntakeDto(
+    string District,
+    string Location,
+    string DisasterType,
+    int HousesDamaged,
+    int DisplacedFamilies,
+    string ReporterName,
+    string ReporterContact,
+    string AdditionalNotes,
+    List<DamageIntakeInfrastructureItem> InfrastructureDamage
+);
+
 // Report DTOs
 public record GenerateReportRequest(Guid IncidentId, string Title);
 
@@ -189,3 +242,4 @@ public record RecoveryReportDto(
     string ReportSummary,
     DateTime GeneratedAt
 );
+
