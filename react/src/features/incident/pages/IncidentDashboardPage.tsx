@@ -17,6 +17,30 @@ interface StatusCount {
 
 const STATUS_ORDER = ['Reported', 'Assessed', 'OnHold', 'Rejected', 'MissionApproved', 'Closed'];
 
+// Buckets incidents by day for the trend line, filling in zero-count gaps so
+// the line doesn't skip days with no reports.
+function buildDailyTrend(incidents: IncidentReport[], days: number): { label: string; count: number }[] {
+  const buckets: Record<string, number> = {};
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    buckets[d.toISOString().slice(0, 10)] = 0;
+  }
+
+  for (const incident of incidents) {
+    const key = new Date(incident.createdAt).toISOString().slice(0, 10);
+    if (key in buckets) buckets[key] += 1;
+  }
+
+  return Object.entries(buckets).map(([date, count]) => ({
+    label: new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+    count,
+  }));
+}
+
 export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
   const [incidents, setIncidents] = useState<IncidentReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -308,6 +332,47 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
             );
           })}
         </svg>
+      </div>
+
+      {/* Incident volume over time — line chart */}
+      <div className="ae-card" style={{ marginTop: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+          Incident Volume — Last 14 Days
+        </h3>
+        {(() => {
+          const trend = buildDailyTrend(incidents, 14);
+          const maxTrend = Math.max(1, ...trend.map((t) => t.count));
+          const chartWidth = 600;
+          const chartHeight = 180;
+          const padding = 30;
+          const stepX = (chartWidth - padding * 2) / (trend.length - 1 || 1);
+
+          const points = trend.map((t, i) => {
+            const x = padding + i * stepX;
+            const y = chartHeight - padding - (t.count / maxTrend) * (chartHeight - padding * 2);
+            return { x, y, count: t.count, label: t.label };
+          });
+
+          const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+          const areaPath = `${linePath} L ${points[points.length - 1].x} ${chartHeight - padding} L ${points[0].x} ${chartHeight - padding} Z`;
+
+          return (
+            <svg width="100%" height={chartHeight + 30} viewBox={`0 0 ${chartWidth} ${chartHeight + 30}`} style={{ overflow: 'visible' }}>
+              <path d={areaPath} fill="#38bdf8" opacity={0.12} />
+              <path d={linePath} fill="none" stroke="#38bdf8" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+              {points.map((p, i) => (
+                <g key={i}>
+                  <circle cx={p.x} cy={p.y} r={3} fill="#38bdf8" />
+                  {(i === 0 || i === points.length - 1 || i % 3 === 0) && (
+                    <text x={p.x} y={chartHeight + 20} textAnchor="middle" fontSize="9" fill="#94a3b8">
+                      {p.label}
+                    </text>
+                  )}
+                </g>
+              ))}
+            </svg>
+          );
+        })()}
       </div>
     </div>
   );
