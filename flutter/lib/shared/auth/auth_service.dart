@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'auth_models.dart';
 
 /// Secure token storage contract complying with SE3090 Section 8 requirement
@@ -9,24 +10,24 @@ abstract class SecureTokenStorage {
   Future<void> deleteToken();
 }
 
-/// In-memory & secure storage implementation for token persistence
+/// Production implementation — backed by flutter_secure_storage.
+/// On Android: Android Keystore (AES-256).
+/// On iOS:     Keychain Services.
+/// On Web:     encrypted localStorage (same-origin, HttpOnly not applicable).
 class DefaultSecureTokenStorage implements SecureTokenStorage {
-  static String? _inMemoryToken;
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+  static const _key = 'aegis_auth_token';
 
   @override
-  Future<void> writeToken(String token) async {
-    _inMemoryToken = token;
-  }
+  Future<void> writeToken(String token) => _storage.write(key: _key, value: token);
 
   @override
-  Future<String?> readToken() async {
-    return _inMemoryToken;
-  }
+  Future<String?> readToken() => _storage.read(key: _key);
 
   @override
-  Future<void> deleteToken() async {
-    _inMemoryToken = null;
-  }
+  Future<void> deleteToken() => _storage.delete(key: _key);
 }
 
 class AuthService {

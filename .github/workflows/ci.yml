@@ -1,0 +1,47 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  backend-tests:
+    name: Backend Build & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore backend/Aegis.Tests/Aegis.Tests.csproj
+
+      - name: Run xUnit Tests
+        run: dotnet test backend/Aegis.Tests/Aegis.Tests.csproj --verbosity normal --no-restore
+
+  flutter-analyze:
+    name: Flutter Lint & Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./flutter
+        run: flutter pub get
+
+      - name: Run Flutter Analyze
+        working-directory: ./flutter
+        run: flutter analyze --no-fatal-infos

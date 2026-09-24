@@ -2,12 +2,22 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../shared/auth/auth_service.dart';
 import '../models/weather_models.dart';
 
 class WeatherService {
   final String baseUrl;
 
   WeatherService({this.baseUrl = 'http://localhost:5012/api/weather'});
+
+  /// Headers that include the JWT Bearer token when the user is logged in.
+  /// Used for protected endpoints (predict, review). Public endpoints use
+  /// plain Content-Type only so the backend never sees an unexpected header.
+  Map<String, String> get _authHeaders => {
+        'Content-Type': 'application/json',
+        if (AuthService.currentToken != null)
+          'Authorization': 'Bearer ${AuthService.currentToken}',
+      };
 
   /// Fetch all 25 Sri Lankan districts
   Future<List<District>> fetchDistricts() async {
@@ -34,12 +44,13 @@ class WeatherService {
     );
   }
 
-  /// Trigger autonomous AI multi-hazard prediction for a district
+  /// Trigger autonomous AI multi-hazard prediction for a district.
+  /// Requires DisasterOfficer or Admin role — sends JWT via _authHeaders.
   Future<PredictResponse> runPrediction(String districtId) async {
     final uri = Uri.parse('$baseUrl/predict/$districtId');
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: _authHeaders,
     );
     if (response.statusCode == 200) {
       return PredictResponse.fromJson(jsonDecode(response.body));
@@ -86,7 +97,8 @@ class WeatherService {
     );
   }
 
-  /// Review an alert: Approve or Reject
+  /// Review an alert: Approve or Reject.
+  /// Requires DisasterOfficer or Admin role — sends JWT via _authHeaders.
   Future<bool> reviewAlert({
     required String alertId,
     required String decision,
@@ -95,7 +107,7 @@ class WeatherService {
     final uri = Uri.parse('$baseUrl/alerts/$alertId/review');
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: _authHeaders,
       body: jsonEncode({
         'decision': decision,
         'reviewNotes': reviewNotes ?? '',
