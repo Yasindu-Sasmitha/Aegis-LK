@@ -26,6 +26,7 @@ import {
   IncidentQueuePage,
   IncidentDashboardPage,
   IncidentFullDetailPage,
+  IncidentLogPage,
 } from './features/incident';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'incident';
@@ -76,8 +77,7 @@ const MainPlatform: React.FC = () => {
     ...(isOfficerOrAdmin ? [{ id: 'analytics', label: '📊 Accuracy Analytics' }] : []),
   ];
 
-  // Navigation tabs for Incident module
-  const INCIDENT_TABS = [
+   const INCIDENT_TABS = [
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'all', label: '📋 All Incidents' },
     { id: 'Reported', label: '📥 Reported' },
@@ -86,6 +86,7 @@ const MainPlatform: React.FC = () => {
     { id: 'Rejected', label: '🚫 Rejected' },
     { id: 'MissionApproved', label: '✅ Approved' },
     { id: 'Closed', label: '📁 Closed' },
+    { id: 'log', label: '📋 Activity Log' },
   ];
 
   // Navigation tabs for Recovery module (available across roles)
@@ -778,6 +779,7 @@ const MainPlatform: React.FC = () => {
                     }}
                   />
                 )}
+                {incidentTab === 'log' && <IncidentLogPage />}
               </>
             )}
           </main>
