@@ -82,8 +82,8 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
             return AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              title: Row(
-                children: const [
+              title: const Row(
+                children: [
                   Icon(Icons.add_business_outlined, color: kAccent, size: 22),
                   SizedBox(width: 8),
                   Text('Add Damaged Asset', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
@@ -210,8 +210,8 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
           builder: (ctx) => AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: const [
+            title: const Row(
+              children: [
                 Icon(Icons.check_circle, color: kSuccess, size: 28),
                 SizedBox(width: 10),
                 Expanded(
@@ -334,10 +334,10 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen> {
                       child: const Icon(Icons.crisis_alert, color: Colors.white, size: 28),
                     ),
                     const SizedBox(width: 14),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Disaster Incident & Damage Intake',
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
