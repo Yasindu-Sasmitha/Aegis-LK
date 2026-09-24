@@ -11,6 +11,8 @@ import type {
   NearbyIncidentResponse,
   RelatedReport,
   ReporterProfile,
+  MissionLogEntry,
+  MissionLogListResponse,
 } from '../types/incidentTypes';
 
 const API_BASE = '/api/incidents';
@@ -194,4 +196,22 @@ export async function fetchReporterProfile(userId: string): Promise<ReporterProf
     headers: getAuthHeaders(),
   });
   return handle<ReporterProfile>(res, 'Failed to fetch reporter profile');
+}
+
+// ── GET /api/incidents/logs — global searchable activity log ────────────────
+export async function fetchIncidentLogs(params?: {
+  search?: string;
+  incidentId?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<MissionLogListResponse> {
+  const query = new URLSearchParams();
+  if (params?.search) query.append('search', params.search);
+  if (params?.incidentId) query.append('incidentId', params.incidentId);
+  query.append('page', String(params?.page ?? 1));
+  query.append('pageSize', String(params?.pageSize ?? 50));
+  const res = await fetch(`${API_BASE}/logs?${query.toString()}`, {
+    headers: getAuthHeaders(),
+  });
+  return handle<MissionLogListResponse>(res, 'Failed to fetch logs');
 }

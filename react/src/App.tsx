@@ -26,6 +26,7 @@ import {
   IncidentQueuePage,
   IncidentDashboardPage,
   IncidentFullDetailPage,
+  IncidentLogPage,
 } from './features/incident';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'incident';
@@ -76,28 +77,26 @@ const MainPlatform: React.FC = () => {
     ...(isOfficerOrAdmin ? [{ id: 'analytics', label: '📊 Accuracy Analytics' }] : []),
   ];
 
-  // Navigation tabs for Incident module
-  const INCIDENT_TABS = [
+   const INCIDENT_TABS = [
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'all', label: '📋 All Incidents' },
     { id: 'Reported', label: '📥 Reported' },
-    { id: 'Assessed', label: '🔍 Assessed' },
     { id: 'OnHold', label: '⏸️ On Hold' },
     { id: 'Rejected', label: '🚫 Rejected' },
     { id: 'MissionApproved', label: '✅ Approved' },
     { id: 'Closed', label: '📁 Closed' },
+    { id: 'log', label: '📋 Activity Log' },
   ];
 
   // Navigation tabs for Recovery module (available across roles)
   const RECOVERY_TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'shelters', label: '⛺ Emergency Shelters' },
-    { id: 'aid', label: '🤝 Aid Applications' },
-    { id: 'donations', label: '📦 Donations' },
-    { id: 'compensation', label: '💳 Compensation' },
-    { id: 'ngos', label: '🏢 Partner NGOs' },
-    { id: 'planning', label: '🤖 Agentic AI Planning' },
-    { id: 'reports', label: '📜 Audit Reports' },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'shelters', label: 'Emergency Shelters' },
+    { id: 'aid', label: 'Aid Applications' },
+    { id: 'donations', label: 'Donations' },
+    { id: 'ngos', label: 'Partner NGOs' },
+    { id: 'planning', label: 'Agentic AI Planning' },
+    { id: 'reports', label: 'Audit Reports' },
   ];
 
   const roleBadge = ROLE_BADGES[user?.role ?? 'Citizen'] ?? ROLE_BADGES.Citizen;
@@ -778,6 +777,7 @@ const MainPlatform: React.FC = () => {
                     }}
                   />
                 )}
+                {incidentTab === 'log' && <IncidentLogPage />}
               </>
             )}
           </main>

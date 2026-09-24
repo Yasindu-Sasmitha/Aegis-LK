@@ -18,5 +18,8 @@ public class IncidentDamageReportDto
     public string Location { get; set; } = "Kalutara";
     public int HousesDamaged { get; set; }
     public int DisplacedFamilies { get; set; }
+    public string? ReporterName { get; set; }
+    public string? ReporterContact { get; set; }
+    public string? AdditionalNotes { get; set; }
     public List<InfrastructureDamageItemDto> InfrastructureDamage { get; set; } = new();
 }

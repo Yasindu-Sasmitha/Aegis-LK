@@ -194,11 +194,11 @@ export async function approveRecoveryPlan(planId: string, action: 'Approve' | 'R
 // ── Multi-Agent Workflow Endpoints (NEW) ──────────────────────────────────────
 
 /** Start the full 4-agent recovery workflow with a direct damage intake form */
-export async function startWorkflowFromIntake(intake: DamageIntakeFormData): Promise<RecoveryPlan> {
+export async function startWorkflowFromIntake(intake: DamageIntakeFormData, damageReportId?: string): Promise<RecoveryPlan> {
   const res = await fetch(`${API_BASE}/workflows/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ directDamageIntake: intake }),
+    body: JSON.stringify({ directDamageIntake: intake, damageReportId }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -313,5 +313,15 @@ export async function submitCitizenDamageReport(data: {
     throw new Error(err.error || 'Failed to submit damage report');
   }
   return res.json();
+}
+
+export async function deleteDamageReport(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/damage-reports/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to delete damage report');
+  }
 }
 

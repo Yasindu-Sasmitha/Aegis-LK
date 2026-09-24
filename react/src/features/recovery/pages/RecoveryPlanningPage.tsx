@@ -7,6 +7,7 @@ import {
   submitWorkflowDecision,
   fetchDamageReports,
   submitCitizenDamageReport,
+  deleteDamageReport,
 } from '../api/recoveryApi';
 import {
   RecoveryPlan,
@@ -28,9 +29,21 @@ const SRI_LANKA_DISTRICTS = [
   'Monaragala', 'Ratnapura', 'Kegalle',
 ];
 
-const DISASTER_TYPES = ['Flood', 'Landslide', 'Tsunami', 'Cyclone', 'Drought', 'Coastal Erosion'];
+const DISASTER_TYPES = ['Flood', 'Landslide', 'Tsunami', 'Cyclone', 'Drought', 'Coastal Erosion', 'Other'];
 const DAMAGE_LEVELS = ['Destroyed', 'Severe', 'Moderate', 'Minor'];
-const ASSET_TYPES = ['Bridge', 'Road', 'Water', 'Hospital', 'School', 'Power', 'Other'];
+const ASSET_TYPES = ['Bridge', 'Road', 'Water', 'Hospital', 'School', 'Power', 'Sanitation', 'Other'];
+const IMMEDIATE_NEEDS_OPTIONS = [
+  'Food Rations',
+  'Clean Drinking Water',
+  'Emergency Medical Aid',
+  'Temporary Shelter / Tents',
+  'Blankets & Bedding',
+  'Baby & Infant Care',
+  'Emergency Clothing',
+  'Emergency Transport',
+  'Hygiene & Sanitation Kits',
+  'Psychosocial Support',
+];
 
 export const RecoveryPlanningPage: React.FC = () => {
   const { user } = useAuth();
@@ -38,34 +51,156 @@ export const RecoveryPlanningPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'intake' | 'submissions' | 'history'>('intake');
 
-  // Intake Form State
-  const [district, setDistrict] = useState('');
-  const [disasterType, setDisasterType] = useState('');
-  const [housesDamaged, setHousesDamaged] = useState<number | ''>('');
+  // ── SECTION 1: INCIDENT & GEOGRAPHIC INFORMATION ──
+  const [incidentIdInput, setIncidentIdInput] = useState('');
+  const [disasterType, setDisasterType] = useState('Flood');
+  const [otherDisasterType, setOtherDisasterType] = useState('');
+  const [incidentDate, setIncidentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [incidentTime, setIncidentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+  const [district, setDistrict] = useState(user?.district || '');
+  const [dsDivision, setDsDivision] = useState('');
+  const [gnDivision, setGnDivision] = useState('');
+  const [affectedVillage, setAffectedVillage] = useState('');
+  const [addressLandmark, setAddressLandmark] = useState('');
+
+  // ── SECTION 2: HUMAN IMPACT & VULNERABILITIES ──
+  const [totalAffectedPeople, setTotalAffectedPeople] = useState<number | ''>('');
   const [displacedFamilies, setDisplacedFamilies] = useState<number | ''>('');
-  const [reportedBy, setReportedBy] = useState(user?.fullName || '');
-  const [reporterContact, setReporterContact] = useState('');
-  const [notes, setNotes] = useState('');
+  const [totalDisplacedPeople, setTotalDisplacedPeople] = useState<number | ''>('');
+  const [vulnerableChildren, setVulnerableChildren] = useState<number | ''>('');
+  const [vulnerableElderly, setVulnerableElderly] = useState<number | ''>('');
+  const [vulnerableDisabled, setVulnerableDisabled] = useState<number | ''>('');
+  const [vulnerablePregnant, setVulnerablePregnant] = useState<number | ''>('');
+  const [vulnerableInjured, setVulnerableInjured] = useState<number | ''>('');
+
+  // ── SECTION 3: HOUSING DAMAGE BREAKDOWN ──
+  const [destroyedHouses, setDestroyedHouses] = useState<number | ''>('');
+  const [severeHouses, setSevereHouses] = useState<number | ''>('');
+  const [partialHouses, setPartialHouses] = useState<number | ''>('');
+
+  // Auto-calculated total houses damaged
+  const totalHousesDamaged =
+    (typeof destroyedHouses === 'number' ? destroyedHouses : 0) +
+    (typeof severeHouses === 'number' ? severeHouses : 0) +
+    (typeof partialHouses === 'number' ? partialHouses : 0);
+
+  // ── SECTION 4: INFRASTRUCTURE DAMAGE BUILDER ──
   const [infraItems, setInfraItems] = useState<InfrastructureItemInput[]>([]);
 
-  // Asset Form Temp
   const [newAsset, setNewAsset] = useState<InfrastructureItemInput>({
     assetName: '',
     assetType: 'Road',
     damageLevel: 'Moderate',
     estimatedCost: 100000,
+    details: '',
   });
+  const [editingInfraIndex, setEditingInfraIndex] = useState<number | null>(null);
+
+  // ── SECTION 5: IMMEDIATE ASSISTANCE REQUIRED ──
+  const [immediateNeeds, setImmediateNeeds] = useState<string[]>([]);
+
+  // ── SECTION 6: SAFETY CONDITIONS & UTILITY ACCESS ──
+  const [overallSeverity, setOverallSeverity] = useState<'Low' | 'Moderate' | 'High' | 'Critical'>('Moderate');
+  const [safetyRisk, setSafetyRisk] = useState<'No Immediate Risk' | 'Potential Risk' | 'High Risk' | 'Life Threatening'>('Potential Risk');
+  const [electricityAvailable, setElectricityAvailable] = useState<'Yes' | 'No' | 'Partial'>('Yes');
+  const [waterAvailable, setWaterAvailable] = useState<'Yes' | 'No' | 'Partial'>('Yes');
+  const [roadAccessAvailable, setRoadAccessAvailable] = useState<'Yes' | 'No' | 'Partial'>('Yes');
+  const [networkAvailable, setNetworkAvailable] = useState<'Yes' | 'No' | 'Partial'>('Yes');
+  const [medicalAccessAvailable, setMedicalAccessAvailable] = useState<'Yes' | 'No' | 'Partial'>('Yes');
+
+  // ── SECTION 7: EVIDENCE & FIELD OBSERVATION NOTES ──
+  const [notes, setNotes] = useState('');
+
+  // ── SECTION 8: REPORTER & EMERGENCY CONTACT (Auto-populated from logged-in user) ──
+  const [reportedBy, setReportedBy] = useState(user?.fullName || '');
+  const [reporterContact, setReporterContact] = useState(user?.phoneNumber || '');
+  const [reporterEmail, setReporterEmail] = useState(user?.email || '');
+  const [reporterType, setReporterType] = useState<'Citizen' | 'Field Officer' | 'Disaster Officer' | 'Local Authority' | 'NGO'>(
+    user?.role === 'DisasterOfficer' || user?.role === 'Admin' ? 'Disaster Officer' : 'Citizen'
+  );
+  const [emergencyContactName, setEmergencyContactName] = useState('');
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
+  const [emergencyContactRelation, setEmergencyContactRelation] = useState('');
+
+  // Auto-populate logged-in user account information when user profile loads/changes
+  useEffect(() => {
+    if (user) {
+      if (!reportedBy && user.fullName) setReportedBy(user.fullName);
+      if (!reporterContact && user.phoneNumber) setReporterContact(user.phoneNumber);
+      if (!reporterEmail && user.email) setReporterEmail(user.email);
+      if (!district && user.district) setDistrict(user.district);
+      if (user.role === 'DisasterOfficer' || user.role === 'Admin') {
+        setReporterType('Disaster Officer');
+      }
+    }
+  }, [user]);
+
+  // Draft saving
+  const handleSaveDraft = () => {
+    try {
+      const draft = {
+        district,
+        disasterType,
+        dsDivision,
+        gnDivision,
+        affectedVillage,
+        addressLandmark,
+        displacedFamilies,
+        destroyedHouses,
+        severeHouses,
+        partialHouses,
+        infraItems,
+        immediateNeeds,
+        overallSeverity,
+        safetyRisk,
+        notes,
+        reportedBy,
+        reporterContact,
+      };
+      localStorage.setItem('aegis_damage_intake_draft', JSON.stringify(draft));
+      setSubmissionSuccessMsg('Field assessment draft saved locally.');
+    } catch {
+      // ignore
+    }
+  };
 
   const resetForm = () => {
-    setDistrict('');
-    setDisasterType('');
-    setHousesDamaged('');
+    setDistrict(user?.district || '');
+    setDisasterType('Flood');
+    setOtherDisasterType('');
+    setDsDivision('');
+    setGnDivision('');
+    setAffectedVillage('');
+    setAddressLandmark('');
+    setTotalAffectedPeople('');
     setDisplacedFamilies('');
-    setReportedBy(user?.fullName || '');
-    setReporterContact('');
+    setTotalDisplacedPeople('');
+    setVulnerableChildren('');
+    setVulnerableElderly('');
+    setVulnerableDisabled('');
+    setVulnerablePregnant('');
+    setVulnerableInjured('');
+    setDestroyedHouses('');
+    setSevereHouses('');
+    setPartialHouses('');
     setNotes('');
     setInfraItems([]);
-    setNewAsset({ assetName: '', assetType: 'Road', damageLevel: 'Moderate', estimatedCost: 100000 });
+    setImmediateNeeds([]);
+    setOverallSeverity('Moderate');
+    setSafetyRisk('Potential Risk');
+    setElectricityAvailable('Yes');
+    setWaterAvailable('Yes');
+    setRoadAccessAvailable('Yes');
+    setNetworkAvailable('Yes');
+    setMedicalAccessAvailable('Yes');
+    setReportedBy(user?.fullName || '');
+    setReporterContact(user?.phoneNumber || '');
+    setReporterEmail(user?.email || '');
+    setReporterType(user?.role === 'DisasterOfficer' || user?.role === 'Admin' ? 'Disaster Officer' : 'Citizen');
+    setEmergencyContactName('');
+    setEmergencyContactPhone('');
+    setEmergencyContactRelation('');
+    setNewAsset({ assetName: '', assetType: 'Road', damageLevel: 'Moderate', estimatedCost: 100000, details: '' });
   };
 
   // Execution & Trace State
@@ -83,19 +218,22 @@ export const RecoveryPlanningPage: React.FC = () => {
 
   // Workflow History List State
   const [workflowList, setWorkflowList] = useState<WorkflowListItem[]>([]);
+  const [totalWorkflowCount, setTotalWorkflowCount] = useState<number>(0);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [inspectingHistoryPlan, setInspectingHistoryPlan] = useState<boolean>(false);
 
   // Citizen Damage Submissions State
   const [damageReports, setDamageReports] = useState<DamageReportItem[]>([]);
+  const [totalReportsCount, setTotalReportsCount] = useState<number>(0);
   const [reportFilterDistrict, setReportFilterDistrict] = useState<string>('all');
   const [reportFilterStatus, setReportFilterStatus] = useState<string>('all');
   const [selectedReportDetail, setSelectedReportDetail] = useState<DamageReportItem | null>(null);
 
   const loadWorkflowHistory = useCallback(async () => {
     try {
-      const data = await fetchWorkflows(filterStatus === 'all' ? undefined : filterStatus);
+      const data = await fetchWorkflows(filterStatus === 'all' ? undefined : filterStatus, 1, 100);
       setWorkflowList(data.items || []);
+      setTotalWorkflowCount(data.total ?? (data.items ? data.items.length : 0));
     } catch {
       // ignore
     }
@@ -108,6 +246,7 @@ export const RecoveryPlanningPage: React.FC = () => {
         reportFilterDistrict === 'all' ? undefined : reportFilterDistrict
       );
       setDamageReports(data.items || []);
+      setTotalReportsCount(data.total ?? (data.items ? data.items.length : 0));
     } catch {
       // ignore
     }
@@ -129,24 +268,24 @@ export const RecoveryPlanningPage: React.FC = () => {
       setErrorMessage('Please select the affected Sri Lankan District.');
       return false;
     }
-    if (!disasterType.trim()) {
-      setErrorMessage('Please select the Disaster Type.');
+    if (!disasterType.trim() || (disasterType === 'Other' && !otherDisasterType.trim())) {
+      setErrorMessage('Please select the Disaster Type or specify Other.');
       return false;
     }
-    if (housesDamaged === '' || Number(housesDamaged) < 0) {
-      setErrorMessage('Please enter the number of Houses Damaged / Destroyed (cannot be empty or negative).');
+    if (totalHousesDamaged < 0) {
+      setErrorMessage('Housing damage counts cannot be negative.');
       return false;
     }
     if (displacedFamilies === '' || Number(displacedFamilies) < 0) {
       setErrorMessage('Please enter the Displaced Families Count (cannot be empty or negative).');
       return false;
     }
-    if (Number(housesDamaged) === 0 && Number(displacedFamilies) === 0 && infraItems.length === 0) {
+    if (totalHousesDamaged === 0 && Number(displacedFamilies) === 0 && infraItems.length === 0) {
       setErrorMessage('Please provide non-zero damage impact: enter affected houses, displaced families, or add damaged infrastructure.');
       return false;
     }
-    if (!notes.trim() || notes.trim().length < 10) {
-      setErrorMessage('Please provide Disaster Situation & Field Notes (minimum 10 characters describing the situation).');
+    if (!notes.trim() || notes.trim().length < 5) {
+      setErrorMessage('Please provide Disaster Situation & Field Notes describing the field conditions.');
       return false;
     }
     if (!reportedBy.trim()) {
@@ -158,14 +297,75 @@ export const RecoveryPlanningPage: React.FC = () => {
       setErrorMessage('Please provide a valid Emergency Contact Phone Number (at least 9–10 digits, e.g. 0771234567 or +94112345670).');
       return false;
     }
-    if (infraItems.length === 0) {
-      setErrorMessage('Please add at least 1 Damaged Public Infrastructure asset using the form below.');
-      return false;
-    }
     return true;
   };
 
-  // 1. Citizen Direct Damage Submission (For Normal Citizens)
+  // Helper to cleanly parse structured notes into distinct human-readable fields
+  const parseStructuredAssessment = (raw?: string) => {
+    if (!raw) return { observationNotes: '', immediateNeeds: [] as string[], vulnerabilities: [] as string[], safetyRisk: '' };
+
+    if (!raw.includes('[Geographic Scope]:') && !raw.includes('[Field Observation Details]:')) {
+      return {
+        observationNotes: raw.trim(),
+        immediateNeeds: [] as string[],
+        vulnerabilities: [] as string[],
+        safetyRisk: '',
+      };
+    }
+
+    const obsMatch = raw.match(/\[Field Observation Details\]:\s*([\s\S]*)$/i);
+    const observationNotes = obsMatch ? obsMatch[1].trim() : '';
+
+    const needsMatch = raw.match(/\[Immediate Relief Needs\]:\s*([^[\n\r]+)/i);
+    let immediateNeeds: string[] = [];
+    if (needsMatch && needsMatch[1].trim() && needsMatch[1].trim() !== 'None specified') {
+      immediateNeeds = needsMatch[1].split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    const vulnMatch = raw.match(/\[Vulnerabilities\]:\s*([^[\n\r]+)/i);
+    let vulnerabilities: string[] = [];
+    if (vulnMatch && vulnMatch[1].trim()) {
+      vulnerabilities = vulnMatch[1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => {
+          const count = parseInt(s.split(':')[1] || '0', 10);
+          return count > 0;
+        });
+    }
+
+    const safetyMatch = raw.match(/\[Safety & Utilities\]:\s*([^[\n\r]+)/i);
+    let safetyRisk = '';
+    if (safetyMatch && safetyMatch[1].trim()) {
+      const parts = safetyMatch[1].split('|').map((s) => s.trim());
+      const riskPart = parts.find((p) => p.startsWith('Risk Level:'));
+      if (riskPart) safetyRisk = riskPart.replace('Risk Level:', '').trim();
+    }
+
+    return {
+      observationNotes: observationNotes || raw,
+      immediateNeeds,
+      vulnerabilities,
+      safetyRisk,
+    };
+  };
+
+  // Compile full structured notes for backend & AI
+  const compileStructuredNotes = () => {
+    const lines = [
+      `[Geographic Scope]: District: ${district}, DS Division: ${dsDivision || 'N/A'}, GN Division: ${gnDivision || 'N/A'}, Village: ${affectedVillage || 'N/A'}, Landmark: ${addressLandmark || 'N/A'}`,
+      `[Human Impact]: Total Affected: ${totalAffectedPeople || 'N/A'} | Displaced Persons: ${totalDisplacedPeople || 'N/A'} | Displaced Families: ${displacedFamilies}`,
+      `[Vulnerabilities]: Children: ${vulnerableChildren || 0}, Elderly: ${vulnerableElderly || 0}, Disabled: ${vulnerableDisabled || 0}, Pregnant: ${vulnerablePregnant || 0}, Injured: ${vulnerableInjured || 0}`,
+      `[Housing Breakdown]: Destroyed: ${destroyedHouses || 0}, Severe: ${severeHouses || 0}, Partial: ${partialHouses || 0} (Total Damaged Houses: ${totalHousesDamaged})`,
+      `[Immediate Relief Needs]: ${immediateNeeds.join(', ') || 'None specified'}`,
+      `[Safety & Utilities]: Overall Severity: ${overallSeverity} | Risk Level: ${safetyRisk} | Power: ${electricityAvailable}, Water: ${waterAvailable}, Roads: ${roadAccessAvailable}, Mobile: ${networkAvailable}, Medical: ${medicalAccessAvailable}`,
+      `[Reporter Profile]: Type: ${reporterType}, Submitter: ${reportedBy} (${reporterContact}), Email: ${reporterEmail || 'N/A'} | Emergency Contact: ${emergencyContactName} (${emergencyContactPhone} - ${emergencyContactRelation})`,
+      `[Field Observation Details]: ${notes}`,
+    ];
+    return lines.join('\n');
+  };
+
+  // 1. Citizen Direct Damage Submission
   const handleSubmitCitizenDamageReport = async () => {
     if (!validateForm()) return;
 
@@ -174,15 +374,18 @@ export const RecoveryPlanningPage: React.FC = () => {
     setSubmissionSuccessMsg(null);
 
     try {
+      const activeDisasterType = disasterType === 'Other' ? otherDisasterType : disasterType;
+      const compiledNotes = compileStructuredNotes();
+
       await submitCitizenDamageReport({
         district,
-        location: district,
-        disasterType,
-        housesDamaged: Number(housesDamaged) || 0,
+        location: affectedVillage ? `${affectedVillage}, ${district}` : district,
+        disasterType: activeDisasterType,
+        housesDamaged: totalHousesDamaged,
         displacedFamilies: Number(displacedFamilies) || 0,
         reporterName: reportedBy.trim(),
         reporterContact: reporterContact.trim(),
-        additionalNotes: notes.trim(),
+        additionalNotes: compiledNotes,
         infrastructureDamage: infraItems.map((i) => ({
           assetName: i.assetName,
           assetType: i.assetType,
@@ -192,7 +395,7 @@ export const RecoveryPlanningPage: React.FC = () => {
       });
 
       setSubmissionSuccessMsg(
-        '✅ Your Disaster Damage & Impact Assessment Form has been submitted successfully! Disaster officers will review the field submission and generate the multi-agent recovery strategy.'
+        '✅ Your Disaster Damage & Impact Assessment Form has been submitted successfully! Disaster officers will review the submission and generate the multi-agent recovery strategy.'
       );
       resetForm();
       loadDamageReports();
@@ -204,8 +407,8 @@ export const RecoveryPlanningPage: React.FC = () => {
     }
   };
 
-  // 2. Launch Multi-Agent Workflow (For Disaster Officers & Admins)
-  const handleStartIntakeWorkflow = async (overrideData?: DamageIntakeFormData) => {
+  // 2. Launch Multi-Agent Workflow
+  const handleStartIntakeWorkflow = async (overrideData?: DamageIntakeFormData, damageReportId?: string) => {
     const isOverride = !!overrideData;
     if (!isOverride && !validateForm()) return;
 
@@ -222,18 +425,21 @@ export const RecoveryPlanningPage: React.FC = () => {
     }, 600);
 
     try {
+      const activeDisasterType = disasterType === 'Other' ? otherDisasterType : disasterType;
+      const compiledNotes = compileStructuredNotes();
+
       const intakeData: DamageIntakeFormData = overrideData || {
         district,
-        disasterType,
-        housesDamaged: Number(housesDamaged) || 0,
+        disasterType: activeDisasterType,
+        housesDamaged: totalHousesDamaged,
         displacedFamilies: Number(displacedFamilies) || 0,
         reporterName: reportedBy.trim(),
         reporterContact: reporterContact.trim(),
-        additionalNotes: notes.trim(),
+        additionalNotes: compiledNotes,
         infrastructureDamage: infraItems,
       };
 
-      const plan = await startWorkflowFromIntake(intakeData);
+      const plan = await startWorkflowFromIntake(intakeData, damageReportId);
       clearInterval(stepTimer);
       setCurrentStep(4);
       setCurrentPlan(plan);
@@ -275,7 +481,21 @@ export const RecoveryPlanningPage: React.FC = () => {
     };
 
     setSelectedReportDetail(null);
-    await handleStartIntakeWorkflow(intakeData);
+    await handleStartIntakeWorkflow(intakeData, report.id);
+  };
+
+  const handleDeleteReport = async (reportId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this disaster damage submission?')) return;
+    try {
+      setLoading(true);
+      await deleteDamageReport(reportId);
+      await loadDamageReports();
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to delete damage report.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Inspect specific workflow from History list
@@ -329,7 +549,7 @@ export const RecoveryPlanningPage: React.FC = () => {
     }
   };
 
-  const addInfraItem = () => {
+  const addOrUpdateInfraItem = () => {
     if (!newAsset.assetName.trim()) {
       alert('Please enter an infrastructure asset or facility name (e.g. Kalu Ganga Bridge).');
       return;
@@ -338,12 +558,35 @@ export const RecoveryPlanningPage: React.FC = () => {
       alert('Please enter a valid estimated repair cost greater than LKR 0.');
       return;
     }
-    setInfraItems([...infraItems, { ...newAsset, assetName: newAsset.assetName.trim() }]);
-    setNewAsset({ assetName: '', assetType: 'Road', damageLevel: 'Moderate', estimatedCost: 100000 });
+
+    if (editingInfraIndex !== null) {
+      const updated = [...infraItems];
+      updated[editingInfraIndex] = { ...newAsset, assetName: newAsset.assetName.trim() };
+      setInfraItems(updated);
+      setEditingInfraIndex(null);
+    } else {
+      setInfraItems([...infraItems, { ...newAsset, assetName: newAsset.assetName.trim() }]);
+    }
+    setNewAsset({ assetName: '', assetType: 'Road', damageLevel: 'Moderate', estimatedCost: 100000, details: '' });
+  };
+
+  const handleEditInfra = (index: number) => {
+    setNewAsset(infraItems[index]);
+    setEditingInfraIndex(index);
   };
 
   const removeInfraItem = (index: number) => {
     setInfraItems(infraItems.filter((_, i) => i !== index));
+    if (editingInfraIndex === index) {
+      setEditingInfraIndex(null);
+      setNewAsset({ assetName: '', assetType: 'Road', damageLevel: 'Moderate', estimatedCost: 100000, details: '' });
+    }
+  };
+
+  const toggleImmediateNeed = (need: string) => {
+    setImmediateNeeds((prev) =>
+      prev.includes(need) ? prev.filter((n) => n !== need) : [...prev, need]
+    );
   };
 
   // ── USER-FRIENDLY FORMATTER FOR ALLOW-LISTED TOOL ACTIVITY ──
@@ -394,7 +637,6 @@ export const RecoveryPlanningPage: React.FC = () => {
 
     return (
       <div key={idx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-        {/* Tool Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <span style={{ fontSize: '1.4rem' }}>{meta.icon}</span>
@@ -411,7 +653,6 @@ export const RecoveryPlanningPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Structured High-Usability Output */}
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginTop: '0.75rem' }}>
           {tool.toolName === 'tool_query_shelter_capacity' && (
             <div>
@@ -433,7 +674,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#991b1b', fontSize: '0.825rem' }}>
                   <strong>⚠️ No Registered Shelters Found in {parsedInput.district || district || 'District'}:</strong>{' '}
                   <span>
-                    0 open beds registered in this district. Full capacity deficit of {parsedInput.requiredBeds || parsedOutput.deficit || parsedOutput.Deficit || 0} beds requires immediate temporary relief shelter or tent allocation.
+                    0 open beds registered in this district. Deficit of {parsedInput.requiredBeds || parsedOutput.deficit || parsedOutput.Deficit || 0} beds requires emergency temporary relief shelter allocation.
                   </span>
                 </div>
               )}
@@ -518,14 +759,15 @@ export const RecoveryPlanningPage: React.FC = () => {
     if (!intake && !district) return null;
 
     const displayDistrict = intake?.district || district;
-    const displayLocation = intake?.location || district;
-    const displayDisaster = intake?.disasterType || disasterType;
-    const displayHouses = intake ? intake.housesDamaged : (housesDamaged || 0);
+    const displayDisaster = intake?.disasterType || (disasterType === 'Other' ? otherDisasterType : disasterType);
+    const displayHouses = intake ? intake.housesDamaged : totalHousesDamaged;
     const displayFamilies = intake ? intake.displacedFamilies : (displacedFamilies || 0);
     const displayReporter = intake?.reporterName || reportedBy;
     const displayContact = intake?.reporterContact || reporterContact;
-    const displayNotes = intake?.additionalNotes || notes;
+    const rawNotes = intake?.additionalNotes || notes;
     const displayInfra = intake?.infrastructureDamage || infraItems;
+
+    const parsed = parseStructuredAssessment(rawNotes);
 
     return (
       <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
@@ -549,12 +791,11 @@ export const RecoveryPlanningPage: React.FC = () => {
           </span>
         </div>
 
-        {/* 2-Column Overview */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
             <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Incident Scope</div>
             <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#0f172a' }}>
-              <strong>District:</strong> {displayDistrict} {displayLocation !== displayDistrict && `(${displayLocation})`}
+              <strong>District:</strong> {displayDistrict}
             </div>
             <div style={{ fontSize: '0.9rem', color: '#0f172a' }}>
               <strong>Disaster Type:</strong> <span style={{ color: '#b91c1c', fontWeight: 700 }}>{displayDisaster}</span>
@@ -564,7 +805,7 @@ export const RecoveryPlanningPage: React.FC = () => {
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
             <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Human &amp; Housing Impact</div>
             <div style={{ marginTop: '0.35rem', fontSize: '0.9rem', color: '#0f172a' }}>
-              <strong>Houses Damaged / Lost:</strong> <span style={{ fontWeight: 800, color: '#c2410c' }}>{displayHouses}</span>
+              <strong>Houses Damaged:</strong> <span style={{ fontWeight: 800, color: '#c2410c' }}>{displayHouses}</span>
             </div>
             <div style={{ fontSize: '0.9rem', color: '#0f172a' }}>
               <strong>Displaced Families:</strong> <span style={{ fontWeight: 800, color: '#1e40af' }}>{displayFamilies}</span>
@@ -582,19 +823,39 @@ export const RecoveryPlanningPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Field Notes */}
-        {displayNotes && (
+        {/* Immediate Needs & Vulnerability Tags */}
+        {(parsed.immediateNeeds.length > 0 || parsed.vulnerabilities.length > 0 || parsed.safetyRisk) && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
+            {parsed.safetyRisk && (
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '6px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>
+                ⚠️ Risk: {parsed.safetyRisk}
+              </span>
+            )}
+            {parsed.immediateNeeds.map((need, idx) => (
+              <span key={idx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: '6px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                🚨 {need}
+              </span>
+            ))}
+            {parsed.vulnerabilities.map((vuln, idx) => (
+              <span key={idx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: '6px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                👥 {vuln}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Clean Observation Notes */}
+        {parsed.observationNotes && (
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem', marginBottom: '1rem' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
               Situation &amp; Field Observation Notes
             </span>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: '#334155', fontStyle: 'italic', lineHeight: 1.5 }}>
-              "{displayNotes}"
+            <p style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b', fontStyle: 'normal', lineHeight: 1.5 }}>
+              {parsed.observationNotes}
             </p>
           </div>
         )}
 
-        {/* Damaged Infrastructure Table */}
         {displayInfra && displayInfra.length > 0 && (
           <div>
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>
@@ -620,7 +881,6 @@ export const RecoveryPlanningPage: React.FC = () => {
                     Type: <span style={{ fontWeight: 600, color: '#334155' }}>{item.assetType}</span>
                     {item.estimatedCost ? ` • Est. Rs. ${Number(item.estimatedCost).toLocaleString()}` : ''}
                   </div>
-                  {item.details && <div style={{ color: '#475569', fontSize: '0.75rem', marginTop: '0.2rem' }}>{item.details}</div>}
                 </div>
               ))}
             </div>
@@ -637,7 +897,6 @@ export const RecoveryPlanningPage: React.FC = () => {
 
     return (
       <div style={{ marginTop: '2.5rem' }}>
-        {/* ── ORIGINATING DISASTER CONTEXT INTAKE CARD ── */}
         {renderOriginatingIntakeCard()}
 
         {/* Top Banner with Decision Actions & Metadata */}
@@ -665,7 +924,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                   </span>
                 ) : currentPlan?.status === 'PendingApproval' ? (
                   <span style={{ padding: '0.25rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
-                    🛡️ Requires Officer Approval (Exceeds Policy Limits / High Scope)
+                    🛡️ Requires Officer Approval (High Scope / Policy Boundary)
                   </span>
                 ) : null}
               </div>
@@ -674,7 +933,7 @@ export const RecoveryPlanningPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Human-in-the-Loop Action Buttons */}
+            {/* Actions */}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {isOfficer ? (
                 <>
@@ -776,25 +1035,25 @@ export const RecoveryPlanningPage: React.FC = () => {
             onClick={() => setTraceTab('agents')}
             style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'agents' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'agents' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
-            🤖 4-Agent Reasoning Timeline ({workflowTrace.agentSteps?.length ?? 0})
+            4-Agent Reasoning Timeline ({workflowTrace.agentSteps?.length ?? 0})
           </button>
           <button
             onClick={() => setTraceTab('tasks')}
             style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'tasks' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'tasks' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
-            📌 Actionable Recovery Tasks ({currentPlan?.tasks?.length ?? 0})
+            Actionable Recovery Tasks ({currentPlan?.tasks?.length ?? 0})
           </button>
           <button
             onClick={() => setTraceTab('tools')}
             style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'tools' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'tools' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
-            🧰 Verified Tool Activity ({workflowTrace.toolCalls?.length ?? 0})
+            Verified Tool Activity ({workflowTrace.toolCalls?.length ?? 0})
           </button>
           <button
             onClick={() => setTraceTab('guardrails')}
             style={{ padding: '0.5rem 1rem', border: 'none', background: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: traceTab === 'guardrails' ? '#2563eb' : '#64748b', borderBottom: traceTab === 'guardrails' ? '2px solid #2563eb' : 'none', marginBottom: '-0.5rem', whiteSpace: 'nowrap' }}
           >
-            🛡️ Policy &amp; Guardrail Verification ({workflowTrace.validationResults?.length ?? 0})
+            Policy &amp; Guardrail Verification ({workflowTrace.validationResults?.length ?? 0})
           </button>
         </div>
 
@@ -861,21 +1120,21 @@ export const RecoveryPlanningPage: React.FC = () => {
           </div>
         )}
 
-        {/* Sub-Tab 3: User-Friendly Allow-Listed Tool Activity */}
+        {/* Sub-Tab 3: Tool Activity */}
         {traceTab === 'tools' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {(workflowTrace.toolCalls ?? []).map((tool, idx) => renderToolCard(tool, idx))}
           </div>
         )}
 
-        {/* Sub-Tab 4: Policy & Safety Guardrails (Cleaned & User-Friendly, No "Code:" tags) */}
+        {/* Sub-Tab 4: Policy & Guardrails */}
         {traceTab === 'guardrails' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {(workflowTrace.validationResults ?? []).map((v, idx) => {
               const cleanTitle = v.ruleName.replace(/^(Code|AI):\s*/i, '').trim();
               return (
                 <div key={idx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <span style={{ fontSize: '1.4rem', marginTop: '0.1rem' }}>{v.passed ? '✅' : '⚠️'}</span>
+                  <span style={{ fontSize: '1rem', marginTop: '0.1rem', color: v.passed ? '#16a34a' : '#ea580c', fontWeight: 800 }}>{v.passed ? '✓' : '!'}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
                       <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{cleanTitle}</strong>
@@ -903,19 +1162,18 @@ export const RecoveryPlanningPage: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '1.5rem 1rem', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", color: '#0f172a' }}>
       
       {/* ── HEADER & NAVIGATION TABS ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>🤖</span>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Autonomous Disaster Recovery Planning Agent
             </h1>
           </div>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
-            4-Agent Multi-Step Reasoning Engine powered by Google Gemini with deterministic policy guardrails &amp; citizen intake.
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>
+            4-Agent Multi-Step Reasoning Engine powered by Google Gemini with deterministic policy guardrails &amp; field intake.
           </p>
         </div>
 
@@ -934,7 +1192,7 @@ export const RecoveryPlanningPage: React.FC = () => {
               textTransform: 'uppercase',
               letterSpacing: '0.04em'
             }}>
-              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+              {user?.role === 'Admin' ? 'System Admin' : user?.role === 'DisasterOfficer' ? 'Disaster Officer' : user?.role === 'Responder' ? 'Field Responder' : 'Citizen'}
             </span>
           </div>
 
@@ -957,7 +1215,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              📝 Disaster Damage Intake
+              Field Damage Assessment
             </button>
             <button
               onClick={() => {
@@ -976,7 +1234,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              📋 Citizen Submissions ({damageReports.length})
+              Citizen Submissions ({totalReportsCount || damageReports.length})
             </button>
             <button
               onClick={() => {
@@ -995,7 +1253,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              📜 Past Plans &amp; Audit ({workflowList.length})
+              Past Plans &amp; Audit ({totalWorkflowCount || workflowList.length})
             </button>
           </div>
         </div>
@@ -1004,383 +1262,688 @@ export const RecoveryPlanningPage: React.FC = () => {
       {/* ── NOTIFICATION BANNERS ── */}
       {submissionSuccessMsg && (
         <div style={{ padding: '1rem 1.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', color: '#15803d', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.35rem' }}>✅</span>
-            <span style={{ fontSize: '0.925rem', fontWeight: 700 }}>{submissionSuccessMsg}</span>
-          </div>
-          <button onClick={() => setSubmissionSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}>✕</button>
+          <span style={{ fontSize: '0.925rem', fontWeight: 700 }}>{submissionSuccessMsg}</span>
+          <button onClick={() => setSubmissionSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}>x</button>
         </div>
       )}
 
       {errorMessage && (
         <div style={{ padding: '1rem 1.25rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', color: '#b91c1c', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(220, 38, 38, 0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.35rem' }}>⚠️</span>
-            <span style={{ fontSize: '0.925rem', fontWeight: 700 }}>{errorMessage}</span>
-          </div>
-          <button onClick={() => setErrorMessage(null)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}>✕</button>
+          <span style={{ fontSize: '0.925rem', fontWeight: 700 }}>{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}>x</button>
         </div>
       )}
 
       {/* ═════════════════════════════════════════════════════════════════════════
-          TAB 1: DISASTER DAMAGE INTAKE & AI PLAN GENERATOR
+          TAB 1: PROFESSIONAL 8-SECTION DISASTER DAMAGE INTAKE FORM
          ═════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'intake' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
-          {/* Form 1: Disaster & Impact Parameters */}
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.75rem', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '1.35rem' }}>📍</span>
-              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                Disaster &amp; Impact Parameters <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>(All Fields Required *)</span>
-              </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+          {/* Global scoped styles for form fields */}
+          <style>{`
+            .rf-section { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+            .rf-section-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.75rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.9rem; }
+            .rf-section-header h3 { margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; }
+            .rf-section-header span { font-size: 0.775rem; color: #64748b; display: block; margin-top: 0.15rem; }
+            .rf-grid { display: grid; gap: 1.5rem; margin-bottom: 1.5rem; }
+            .rf-grid-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+            .rf-grid-4 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+            .rf-grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+            .rf-grid-5 { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); }
+            .rf-grid:last-of-type { margin-bottom: 0; }
+            .rf-field { display: flex; flex-direction: column; gap: 0.45rem; }
+            .rf-field label { font-size: 0.8rem; font-weight: 700; color: #334155; letter-spacing: 0.01em; }
+            .rf-field input, .rf-field select, .rf-field textarea {
+              width: 100%; padding: 0.65rem 0.85rem; border: 1.5px solid #cbd5e1; border-radius: 8px;
+              font-size: 0.875rem; font-family: inherit; background: #fff;
+              transition: border-color 0.15s ease, box-shadow 0.15s ease;
+              box-sizing: border-box;
+            }
+            .rf-field input:focus, .rf-field select:focus, .rf-field textarea:focus {
+              outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
+            }
+            .rf-field input::placeholder, .rf-field textarea::placeholder { color: #94a3b8; }
+            .rf-field .rf-hint { font-size: 0.7rem; color: #94a3b8; margin-top: 0.1rem; }
+            .rf-subcard { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem 1.5rem; }
+            .rf-subcard-label { font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 1rem; }
+          `}</style>
+
+          {/* SECTION 1: INCIDENT INFORMATION */}
+          <div className="rf-section">
+            <div className="rf-section-header">
+              <div>
+                <h3>Section 1: Incident &amp; Geographic Information</h3>
+                <span>Disaster origin, date/time, and exact administrative location</span>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                  District <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                <select
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.75rem', border: `1px solid ${!district ? '#fca5a5' : '#cbd5e1'}`, borderRadius: '8px', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
-                >
-                  <option value="">-- Select Affected District --</option>
-                  {SRI_LANKA_DISTRICTS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
+            <div className="rf-grid rf-grid-3">
+              <div className="rf-field">
+                <label>Disaster Type <span style={{ color: '#dc2626' }}>*</span></label>
+                <select value={disasterType} onChange={(e) => setDisasterType(e.target.value)}>
+                  {DISASTER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                  Disaster Type <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                <select
-                  value={disasterType}
-                  onChange={(e) => setDisasterType(e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.75rem', border: `1px solid ${!disasterType ? '#fca5a5' : '#cbd5e1'}`, borderRadius: '8px', fontSize: '0.9rem', background: '#fff', boxSizing: 'border-box' }}
-                >
-                  <option value="">-- Select Disaster Type --</option>
-                  {DISASTER_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
+              {disasterType === 'Other' && (
+                <div className="rf-field">
+                  <label>Specify Disaster Type <span style={{ color: '#dc2626' }}>*</span></label>
+                  <input type="text" placeholder="e.g. Chemical Spill, Cyclone Surge" value={otherDisasterType} onChange={(e) => setOtherDisasterType(e.target.value)} />
+                </div>
+              )}
+
+              <div className="rf-field">
+                <label>District <span style={{ color: '#dc2626' }}>*</span></label>
+                <select value={district} onChange={(e) => setDistrict(e.target.value)}>
+                  {SRI_LANKA_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                  Houses Damaged / Destroyed <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  placeholder="Enter number of houses (e.g. 45)"
-                  value={housesDamaged}
-                  onChange={(e) => setHousesDamaged(e.target.value === '' ? '' : Number(e.target.value))}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.75rem',
-                    border: `1px solid ${housesDamaged === '' ? '#fca5a5' : '#cbd5e1'}`,
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                  Displaced Families Count <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  placeholder="Enter number of families (e.g. 38)"
-                  value={displacedFamilies}
-                  onChange={(e) => setDisplacedFamilies(e.target.value === '' ? '' : Number(e.target.value))}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.75rem',
-                    border: `1px solid ${displacedFamilies === '' ? '#fca5a5' : '#cbd5e1'}`,
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
+              <div className="rf-field">
+                <label>Incident Date &amp; Time</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input type="date" value={incidentDate} onChange={(e) => setIncidentDate(e.target.value)} style={{ flex: 1 }} />
+                  <input type="time" value={incidentTime} onChange={(e) => setIncidentTime(e.target.value)} style={{ width: '115px' }} />
+                </div>
               </div>
             </div>
 
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                Disaster Situation &amp; Field Observation Notes <span style={{ color: '#dc2626' }}>*</span>
-              </label>
-              <textarea
-                rows={3}
-                required
-                placeholder="Describe flooded zones, impassable bridges, power line damage, isolated communities, stranded persons..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${!notes.trim() ? '#fca5a5' : '#cbd5e1'}`,
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                  Reporter / Contact Name <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Gamini Silva / Grama Niladhari"
-                  value={reportedBy}
-                  onChange={(e) => setReportedBy(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.75rem',
-                    border: `1px solid ${!reportedBy.trim() ? '#fca5a5' : '#cbd5e1'}`,
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
+            <div className="rf-grid rf-grid-4" style={{ marginBottom: 0 }}>
+              <div className="rf-field">
+                <label>DS Division (Divisional Secretariat)</label>
+                <input type="text" placeholder="e.g. Kalutara / Horana" value={dsDivision} onChange={(e) => setDsDivision(e.target.value)} />
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-                  Emergency Contact Phone Number <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="e.g. 0771234567 or +94112345670"
-                  value={reporterContact}
-                  onChange={(e) => setReporterContact(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.75rem',
-                    border: `1px solid ${!reporterContact.trim() ? '#fca5a5' : '#cbd5e1'}`,
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                    boxSizing: 'border-box'
-                  }}
-                />
+              <div className="rf-field">
+                <label>GN Division (Grama Niladhari)</label>
+                <input type="text" placeholder="e.g. 714-B Kalutara North" value={gnDivision} onChange={(e) => setGnDivision(e.target.value)} />
+              </div>
+              <div className="rf-field">
+                <label>Affected Village / Town</label>
+                <input type="text" placeholder="e.g. Nagoda, Deshashree Village" value={affectedVillage} onChange={(e) => setAffectedVillage(e.target.value)} />
+              </div>
+              <div className="rf-field">
+                <label>Nearby Landmark / Reference</label>
+                <input type="text" placeholder="e.g. Near Nagoda Hospital Junction" value={addressLandmark} onChange={(e) => setAddressLandmark(e.target.value)} />
               </div>
             </div>
           </div>
 
-          {/* Form 2: Damaged Public Infrastructure Assets */}
-          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.75rem', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '1.35rem' }}>🏗️</span>
+          {/* SECTION 2: HUMAN IMPACT & VULNERABILITY */}
+          <div className="rf-section">
+            <div className="rf-section-header">
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                  Damaged Public Infrastructure Assets <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: 600 }}>(Minimum 1 Required *)</span>
-                </h2>
-                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                  Add affected lifeline facilities such as damaged bridges, roads, hospitals, schools, and water supplies.
-                </span>
+                <h3>Section 2: Human Impact &amp; Vulnerable Population</h3>
+                <span>Displaced families and high-priority vulnerable individuals</span>
               </div>
             </div>
 
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
-                    1. Asset Name / Location <span style={{ color: '#dc2626' }}>*</span>
-                  </label>
+            <div className="rf-grid rf-grid-3">
+              <div className="rf-field">
+                <label>Displaced Families Count <span style={{ color: '#dc2626' }}>*</span></label>
+                <input type="number" min="0" required placeholder="e.g. 25" value={displacedFamilies}
+                  onChange={(e) => setDisplacedFamilies(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="rf-field">
+                <label>Total Displaced Persons</label>
+                <input type="number" min="0" placeholder="e.g. 110" value={totalDisplacedPeople}
+                  onChange={(e) => setTotalDisplacedPeople(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="rf-field">
+                <label>Total Affected Persons in Area</label>
+                <input type="number" min="0" placeholder="e.g. 350" value={totalAffectedPeople}
+                  onChange={(e) => setTotalAffectedPeople(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+              </div>
+            </div>
+
+            <div className="rf-subcard">
+              <span className="rf-subcard-label">Vulnerable Persons Breakdown (Optional Field Triage)</span>
+              <div className="rf-grid rf-grid-5" style={{ marginBottom: 0 }}>
+                <div className="rf-field">
+                  <label>Children (&lt;12y)</label>
+                  <input type="number" min="0" placeholder="0" value={vulnerableChildren}
+                    onChange={(e) => setVulnerableChildren(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+                </div>
+                <div className="rf-field">
+                  <label>Elderly (&gt;65y)</label>
+                  <input type="number" min="0" placeholder="0" value={vulnerableElderly}
+                    onChange={(e) => setVulnerableElderly(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+                </div>
+                <div className="rf-field">
+                  <label>Disabled Persons</label>
+                  <input type="number" min="0" placeholder="0" value={vulnerableDisabled}
+                    onChange={(e) => setVulnerableDisabled(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+                </div>
+                <div className="rf-field">
+                  <label>Pregnant Women</label>
+                  <input type="number" min="0" placeholder="0" value={vulnerablePregnant}
+                    onChange={(e) => setVulnerablePregnant(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+                </div>
+                <div className="rf-field">
+                  <label>Injured Persons</label>
+                  <input type="number" min="0" placeholder="0" value={vulnerableInjured}
+                    onChange={(e) => setVulnerableInjured(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: HOUSING DAMAGE BREAKDOWN */}
+          <div className="rf-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '0.9rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Section 3: Housing Damage Severity Breakdown</h3>
+                <span style={{ fontSize: '0.775rem', color: '#64748b' }}>Categorized assessment with automatic total calculation</span>
+              </div>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.35rem 0.85rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 700 }}>Total Damaged Houses:</span>
+                <strong style={{ fontSize: '1.1rem', color: '#1e3a8a' }}>{totalHousesDamaged}</strong>
+              </div>
+            </div>
+
+            <div className="rf-grid rf-grid-3" style={{ marginBottom: 0 }}>
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '1.25rem' }}>
+                <div className="rf-field">
+                  <label style={{ color: '#991b1b', fontWeight: 800 }}>Fully Destroyed Houses</label>
+                  <input type="number" min="0" placeholder="0" value={destroyedHouses}
+                    onChange={(e) => setDestroyedHouses(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                    style={{ borderColor: '#fca5a5' }} />
+                  <span className="rf-hint" style={{ color: '#b91c1c' }}>100% Structural Loss</span>
+                </div>
+              </div>
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', padding: '1.25rem' }}>
+                <div className="rf-field">
+                  <label style={{ color: '#9a3412', fontWeight: 800 }}>Severely Damaged Houses</label>
+                  <input type="number" min="0" placeholder="0" value={severeHouses}
+                    onChange={(e) => setSevereHouses(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                    style={{ borderColor: '#fdba74' }} />
+                  <span className="rf-hint" style={{ color: '#c2410c' }}>Major Roof / Wall Collapses</span>
+                </div>
+              </div>
+              <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '10px', padding: '1.25rem' }}>
+                <div className="rf-field">
+                  <label style={{ color: '#854d0e', fontWeight: 800 }}>Partially Damaged Houses</label>
+                  <input type="number" min="0" placeholder="0" value={partialHouses}
+                    onChange={(e) => setPartialHouses(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                    style={{ borderColor: '#fde047' }} />
+                  <span className="rf-hint" style={{ color: '#a16207' }}>Inundated / Minor Repairs</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 4: INFRASTRUCTURE DAMAGE BUILDER */}
+          <div className="rf-section">
+            <div className="rf-section-header">
+              <div>
+                <h3>Section 4: Damaged Public Infrastructure Builder</h3>
+                <span>Lifeline bridges, roads, hospitals, schools, electricity &amp; water conduits</span>
+              </div>
+            </div>
+
+            {/* Sub-form to Add or Edit */}
+            <div className="rf-subcard">
+              <span className="rf-subcard-label">Log Individual Infrastructure Asset</span>
+              <div className="rf-grid rf-grid-4">
+                <div className="rf-field">
+                  <label>Asset Name / Description <span style={{ color: '#dc2626' }}>*</span></label>
                   <input
                     type="text"
                     placeholder="e.g. Kalu Ganga Main Bridge"
                     value={newAsset.assetName}
                     onChange={(e) => setNewAsset({ ...newAsset, assetName: e.target.value })}
-                    style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
-                    2. Infrastructure Type <span style={{ color: '#dc2626' }}>*</span>
-                  </label>
+                <div className="rf-field">
+                  <label>Infrastructure Type</label>
                   <select
                     value={newAsset.assetType}
                     onChange={(e) => setNewAsset({ ...newAsset, assetType: e.target.value })}
-                    style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', boxSizing: 'border-box' }}
                   >
                     {ASSET_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
-                    3. Damage Severity <span style={{ color: '#dc2626' }}>*</span>
-                  </label>
+                <div className="rf-field">
+                  <label>Damage Severity</label>
                   <select
                     value={newAsset.damageLevel}
                     onChange={(e) => setNewAsset({ ...newAsset, damageLevel: e.target.value })}
-                    style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', background: '#fff', boxSizing: 'border-box' }}
                   >
                     {DAMAGE_LEVELS.map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
-                    4. Estimated Cost (LKR) <span style={{ color: '#dc2626' }}>*</span>
-                  </label>
+                <div className="rf-field">
+                  <label>Estimated Repair Cost (LKR)</label>
                   <input
                     type="number"
                     step="10000"
-                    placeholder="e.g. 100000"
+                    placeholder="e.g. 500000"
                     value={newAsset.estimatedCost}
                     onChange={(e) => setNewAsset({ ...newAsset, estimatedCost: Number(e.target.value) })}
-                    style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                   />
                 </div>
+              </div>
 
-                <div>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+                {editingInfraIndex !== null && (
                   <button
                     type="button"
-                    onClick={addInfraItem}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 1rem',
-                      background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontWeight: 700,
-                      fontSize: '0.875rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.35rem',
-                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                    onClick={() => {
+                      setEditingInfraIndex(null);
+                      setNewAsset({ assetName: '', assetType: 'Road', damageLevel: 'Moderate', estimatedCost: 100000, details: '' });
                     }}
+                    style={{ padding: '0.55rem 0.95rem', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
                   >
-                    <span>➕</span>
-                    <span>Add Asset</span>
+                    Cancel
                   </button>
-                </div>
+                )}
+                <button
+                  type="button"
+                  onClick={addOrUpdateInfraItem}
+                  style={{
+                    padding: '0.55rem 1.1rem',
+                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                  }}
+                >
+                  <span>{editingInfraIndex !== null ? 'Update Asset' : '+ Add Damaged Asset'}</span>
+                </button>
               </div>
             </div>
 
-            {/* Infrastructure List Table */}
-            <div>
-              {infraItems.length === 0 ? (
-                <div style={{ padding: '1.75rem 1rem', textAlign: 'center', background: '#fef2f2', border: '1px dashed #fca5a5', borderRadius: '8px', color: '#b91c1c', fontSize: '0.9rem', fontWeight: 600 }}>
-                  ⚠️ No infrastructure assets added yet. Please use the form above to add at least 1 damaged facility (e.g. Bridge, Road, Hospital, or Water Supply).
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  {infraItems.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{item.assetName}</span>
-                        <span style={{ padding: '0.15rem 0.5rem', background: '#eff6ff', color: '#1e40af', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
-                          {item.assetType}
-                        </span>
-                        <span style={{
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          background: item.damageLevel === 'Destroyed' ? '#fee2e2' : item.damageLevel === 'Severe' ? '#ffedd5' : '#fef9c3',
-                          color: item.damageLevel === 'Destroyed' ? '#b91c1c' : item.damageLevel === 'Severe' ? '#c2410c' : '#854d0e',
-                        }}>
-                          {item.damageLevel}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.95rem' }}>
-                          Rs. {item.estimatedCost.toLocaleString()}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeInfraItem(idx)}
-                          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}
-                          title="Remove item"
-                        >
-                          ✕
-                        </button>
-                      </div>
+            {/* List of Assets */}
+            {infraItems.length === 0 ? (
+              <div style={{ padding: '1.25rem', textAlign: 'center', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px', color: '#64748b', fontSize: '0.85rem' }}>
+                No damaged infrastructure records added yet. Use the form above to log roads, bridges, or facilities.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {infraItems.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#0f172a' }}>{item.assetName}</strong>
+                      <span style={{ padding: '0.15rem 0.45rem', background: '#eff6ff', color: '#1e40af', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700 }}>
+                        {item.assetType}
+                      </span>
+                      <span style={{
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        background: item.damageLevel === 'Destroyed' ? '#fee2e2' : item.damageLevel === 'Severe' ? '#ffedd5' : '#fef9c3',
+                        color: item.damageLevel === 'Destroyed' ? '#b91c1c' : item.damageLevel === 'Severe' ? '#c2410c' : '#854d0e',
+                      }}>
+                        {item.damageLevel}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                      <strong style={{ color: '#15803d' }}>
+                        Rs. {Number(item.estimatedCost).toLocaleString()}
+                      </strong>
+                      <button
+                        type="button"
+                        onClick={() => handleEditInfra(idx)}
+                        style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeInfraItem(idx)}
+                        style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700 }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 5: IMMEDIATE ASSISTANCE REQUIRED */}
+          <div className="rf-section">
+            <div className="rf-section-header">
+              <div>
+                <h3>Section 5: Immediate Humanitarian Assistance Required</h3>
+                <span>Select urgent relief supplies needed for the displaced population</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+              {IMMEDIATE_NEEDS_OPTIONS.map((need) => {
+                const active = immediateNeeds.includes(need);
+                return (
+                  <button
+                    key={need}
+                    type="button"
+                    onClick={() => toggleImmediateNeed(need)}
+                    style={{
+                      padding: '0.5rem 0.95rem',
+                      borderRadius: '20px',
+                      border: `1px solid ${active ? '#2563eb' : '#cbd5e1'}`,
+                      background: active ? '#eff6ff' : '#ffffff',
+                      color: active ? '#1d4ed8' : '#475569',
+                      fontWeight: active ? 700 : 500,
+                      fontSize: '0.825rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <span>{active ? '✓' : '+'}</span>
+                    <span>{need}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Action Buttons: Differentiated for Citizen vs Officer */}
-          <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            {!isOfficer ? (
+          {/* SECTION 6: SAFETY CONDITIONS & UTILITY ACCESS */}
+          <div className="rf-section">
+            <div className="rf-section-header">
+              <div>
+                <h3>Section 6: Safety Conditions &amp; Utility Accessibility</h3>
+                <span>Field situation risk ratings and operational utilities</span>
+              </div>
+            </div>
+
+            <div className="rf-grid rf-grid-2">
+              <div className="rf-field">
+                <label>Overall Severity Level</label>
+                <select value={overallSeverity} onChange={(e) => setOverallSeverity(e.target.value as any)}>
+                  <option value="Low">Low</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+              <div className="rf-field">
+                <label>Immediate Safety Risk</label>
+                <select value={safetyRisk} onChange={(e) => setSafetyRisk(e.target.value as any)}>
+                  <option value="No Immediate Risk">No Immediate Risk</option>
+                  <option value="Potential Risk">Potential Risk</option>
+                  <option value="High Risk">High Risk</option>
+                  <option value="Life Threatening">Life Threatening</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="rf-subcard">
+              <span className="rf-subcard-label">Utility &amp; Access Status</span>
+              <div className="rf-grid rf-grid-5" style={{ marginBottom: 0 }}>
+                <div className="rf-field">
+                  <label>Electricity Grid</label>
+                  <select value={electricityAvailable} onChange={(e) => setElectricityAvailable(e.target.value as any)}>
+                    <option value="Yes">Yes (Fully Available)</option>
+                    <option value="Partial">Partial / Blackouts</option>
+                    <option value="No">No (Grid Offline)</option>
+                  </select>
+                </div>
+                <div className="rf-field">
+                  <label>Clean Pipe Water</label>
+                  <select value={waterAvailable} onChange={(e) => setWaterAvailable(e.target.value as any)}>
+                    <option value="Yes">Yes (Available)</option>
+                    <option value="Partial">Partial (Wells contaminated)</option>
+                    <option value="No">No (Cut Off)</option>
+                  </select>
+                </div>
+                <div className="rf-field">
+                  <label>Road Access</label>
+                  <select value={roadAccessAvailable} onChange={(e) => setRoadAccessAvailable(e.target.value as any)}>
+                    <option value="Yes">Yes (Open)</option>
+                    <option value="Partial">Partial (4x4 only)</option>
+                    <option value="No">No (Submerged / Blocked)</option>
+                  </select>
+                </div>
+                <div className="rf-field">
+                  <label>Mobile Network</label>
+                  <select value={networkAvailable} onChange={(e) => setNetworkAvailable(e.target.value as any)}>
+                    <option value="Yes">Yes (Active)</option>
+                    <option value="Partial">Partial (Weak signal)</option>
+                    <option value="No">No (Towers down)</option>
+                  </select>
+                </div>
+                <div className="rf-field">
+                  <label>Medical Access</label>
+                  <select value={medicalAccessAvailable} onChange={(e) => setMedicalAccessAvailable(e.target.value as any)}>
+                    <option value="Yes">Yes (Hospital open)</option>
+                    <option value="Partial">Partial (First aid only)</option>
+                    <option value="No">No (Inaccessible)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 7: EVIDENCE & FIELD OBSERVATIONS */}
+          <div className="rf-section">
+            <div className="rf-section-header">
+              <div>
+                <h3>Section 7: Field Observations &amp; Damage Evidence Notes</h3>
+                <span>Detailed narrative, isolated pockets, or stranded communities</span>
+              </div>
+            </div>
+            <div className="rf-field">
+              <label>Observation Notes <span style={{ color: '#dc2626' }}>*</span></label>
+              <textarea
+                rows={5}
+                required
+                placeholder="Describe additional damage, urgent risks, blocked roads, vulnerable persons, or other important observations..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* SECTION 8: REPORTER INFORMATION */}
+          <div className="rf-section">
+            <div className="rf-section-header">
+              <div>
+                <h3>Section 8: Reporter &amp; Emergency Contact Verification</h3>
+                <span>Accountability and immediate field verification contact</span>
+              </div>
+            </div>
+
+            <div className="rf-grid rf-grid-4">
+              <div className="rf-field">
+                <label>Reporter Full Name <span style={{ color: '#dc2626' }}>*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Kasun Perera"
+                  value={reportedBy}
+                  onChange={(e) => setReportedBy(e.target.value)}
+                />
+              </div>
+
+              <div className="rf-field">
+                <label>Phone Number <span style={{ color: '#dc2626' }}>*</span></label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 0771234567"
+                  value={reporterContact}
+                  onChange={(e) => setReporterContact(e.target.value)}
+                />
+              </div>
+
+              <div className="rf-field">
+                <label>Reporter Role / Type</label>
+                <select
+                  value={reporterType}
+                  onChange={(e) => setReporterType(e.target.value as any)}
+                >
+                  <option value="Citizen">Citizen Reporter</option>
+                  <option value="Field Officer">Field Officer (DMC)</option>
+                  <option value="Disaster Officer">Disaster Management Officer</option>
+                  <option value="Local Authority">Grama Niladhari / Local Authority</option>
+                  <option value="NGO">Accredited NGO Volunteer</option>
+                </select>
+              </div>
+
+              <div className="rf-field">
+                <label>Email Address (Optional)</label>
+                <input
+                  type="email"
+                  placeholder="e.g. officer@dmc.gov.lk"
+                  value={reporterEmail}
+                  onChange={(e) => setReporterEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="rf-subcard">
+              <span className="rf-subcard-label">Secondary / Local Emergency Contact</span>
+              <div className="rf-grid rf-grid-3" style={{ marginBottom: 0 }}>
+                <div className="rf-field">
+                  <label>Emergency Contact Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gamini Silva"
+                    value={emergencyContactName}
+                    onChange={(e) => setEmergencyContactName(e.target.value)}
+                  />
+                </div>
+
+                <div className="rf-field">
+                  <label>Emergency Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. 0112136136"
+                    value={emergencyContactPhone}
+                    onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                  />
+                </div>
+
+                <div className="rf-field">
+                  <label>Relationship</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. GN / Spouse / Desk Officer"
+                    value={emergencyContactRelation}
+                    onChange={(e) => setEmergencyContactRelation(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PRE-SUBMISSION SUMMARY CARD & ACTION CONTROLS */}
+          <div style={{
+            background: '#07162c',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            color: '#ffffff',
+            boxShadow: '0 8px 24px rgba(7, 22, 44, 0.25)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#ffffff' }}>
+                  Assessment Summary Preview
+                </h4>
+                <span style={{ fontSize: '0.775rem', color: '#94a3b8' }}>
+                  Review verified impact parameters before launching autonomous orchestration
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  {district} ({disasterType === 'Other' ? otherDisasterType : disasterType})
+                </span>
+                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  {totalHousesDamaged} Houses
+                </span>
+                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  {displacedFamilies || 0} Families
+                </span>
+                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  {infraItems.length} Lifelines
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
               <button
                 type="button"
-                onClick={handleSubmitCitizenDamageReport}
-                disabled={loading}
+                onClick={handleSaveDraft}
                 style={{
-                  flex: 1,
-                  padding: '1.1rem',
-                  background: loading ? '#64748b' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  padding: '0.85rem 1.25rem',
+                  background: 'rgba(255,255,255,0.1)',
                   color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontWeight: 800,
-                  fontSize: '1.1rem',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.75rem',
-                  transition: 'all 0.2s ease',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
                 }}
               >
-                <span style={{ fontSize: '1.35rem' }}>{loading ? '⏳' : '📤'}</span>
-                <span>{loading ? 'Submitting Damage Report...' : 'Submit Citizen Damage Assessment Report'}</span>
+                Save Draft
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleStartIntakeWorkflow()}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  padding: '1.1rem',
-                  background: loading ? '#64748b' : 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontWeight: 800,
-                  fontSize: '1.1rem',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.75rem',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <span style={{ fontSize: '1.35rem' }}>{loading ? '⏳' : '⚡'}</span>
-                <span>{loading ? 'Orchestrating 4-Agent Recovery Engine...' : 'Execute 4-Agent AI Recovery Engine'}</span>
-              </button>
-            )}
+
+              {!isOfficer ? (
+                <button
+                  type="button"
+                  onClick={handleSubmitCitizenDamageReport}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    padding: '0.85rem 1.5rem',
+                    background: loading ? '#64748b' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <span>{loading ? 'Submitting Damage Report...' : 'Submit Citizen Damage Assessment Report'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleStartIntakeWorkflow()}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    padding: '0.85rem 1.5rem',
+                    background: loading ? '#64748b' : 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+                  }}
+                >
+                  <span>{loading ? 'Orchestrating 4-Agent Recovery Engine...' : 'Execute 4-Agent AI Recovery Engine'}</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Step Progress Bar (Visible when executing AI) */}
@@ -1450,7 +2013,6 @@ export const RecoveryPlanningPage: React.FC = () => {
             </div>
           )}
 
-          {/* Render Generated Strategy & Trace Below Intake Form */}
           {renderPlanAndTraceSection()}
         </div>
       )}
@@ -1463,7 +2025,7 @@ export const RecoveryPlanningPage: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
-                📋 {isOfficer ? 'Citizen Disaster Damage Submissions Ledger' : 'My Submitted Disaster Damage Reports'}
+                {isOfficer ? 'Citizen Disaster Damage Submissions Ledger' : 'My Submitted Disaster Damage Reports'}
               </h2>
               <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
                 {isOfficer
@@ -1501,7 +2063,7 @@ export const RecoveryPlanningPage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {damageReports.length === 0 ? (
               <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📝</div>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#94a3b8' }}>—</div>
                 <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Damage Submissions Found</h3>
                 <p style={{ margin: 0, fontSize: '0.9rem' }}>
                   {isOfficer
@@ -1528,7 +2090,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
                         <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
-                          📍 {report.district} ({report.disasterType})
+                          {report.district} — {report.disasterType}
                         </span>
                         <span style={{
                           padding: '0.2rem 0.6rem',
@@ -1554,7 +2116,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Action Controls for Officers & Admins */}
+                    {/* Action Controls */}
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                       <button
                         onClick={() => setSelectedReportDetail(selectedReportDetail?.id === report.id ? null : report)}
@@ -1572,15 +2134,19 @@ export const RecoveryPlanningPage: React.FC = () => {
                         {selectedReportDetail?.id === report.id ? 'Hide Details' : '🔍 View Details'}
                       </button>
 
-                      {isOfficer && (
+                      {/* If plan is already generated, allow directly viewing the plan */}
+                      {((report.status === 'PlanGenerated' && report.recoveryPlanId) || (report.incidentId && workflowList.some((w: WorkflowListItem) => w.incidentId === report.incidentId))) && (
                         <button
-                          onClick={() => handleGeneratePlanFromReport(report)}
+                          onClick={() => {
+                            const targetPlanId = report.recoveryPlanId || workflowList.find((w: WorkflowListItem) => w.incidentId === report.incidentId)?.id;
+                            if (targetPlanId) handleSelectWorkflow(targetPlanId);
+                          }}
                           disabled={loading}
                           style={{
-                            padding: '0.5rem 1rem',
-                            background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-                            color: '#ffffff',
-                            border: 'none',
+                            padding: '0.5rem 0.9rem',
+                            background: '#f0fdf4',
+                            color: '#15803d',
+                            border: '1px solid #bbf7d0',
                             borderRadius: '8px',
                             fontWeight: 700,
                             fontSize: '0.8rem',
@@ -1588,11 +2154,53 @@ export const RecoveryPlanningPage: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.35rem',
-                            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.2)',
                           }}
                         >
-                          <span>⚡</span>
-                          <span>Generate AI Plan</span>
+                          <span>View AI Plan</span>
+                        </button>
+                      )}
+
+                      {/* For Officers/Admins: Generate AI Plan or Regenerate */}
+                      {isOfficer && (
+                        <button
+                          onClick={() => handleGeneratePlanFromReport(report)}
+                          disabled={loading}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: report.status === 'PlanGenerated' ? '#f8fafc' : 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                            color: report.status === 'PlanGenerated' ? '#2563eb' : '#ffffff',
+                            border: report.status === 'PlanGenerated' ? '1px solid #bfdbfe' : 'none',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            boxShadow: report.status === 'PlanGenerated' ? 'none' : '0 2px 6px rgba(37, 99, 235, 0.2)',
+                          }}
+                        >
+                          <span>{report.status === 'PlanGenerated' ? 'Regenerate Plan' : 'Generate AI Plan'}</span>
+                        </button>
+                      )}
+
+                      {/* Delete button */}
+                      {isOfficer && (
+                        <button
+                          onClick={(e) => handleDeleteReport(report.id, e)}
+                          title="Delete submission"
+                          style={{
+                            padding: '0.5rem 0.65rem',
+                            background: '#fff',
+                            color: '#ef4444',
+                            border: '1px solid #fecaca',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          🗑️
                         </button>
                       )}
                     </div>
@@ -1600,17 +2208,43 @@ export const RecoveryPlanningPage: React.FC = () => {
 
                   {/* Impact Summary Quick-Stats */}
                   <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: '#475569', flexWrap: 'wrap' }}>
-                    <div>🏠 <strong>{report.housesDamaged}</strong> Houses Damaged</div>
-                    <div>👨‍👩‍👧‍👦 <strong>{report.displacedFamilies}</strong> Displaced Families</div>
-                    <div>🏗️ <strong>{(report.infrastructureDamage || []).length}</strong> Lifeline Assets Affected</div>
+                    <div><strong>{report.housesDamaged}</strong> Houses Damaged</div>
+                    <div><strong>{report.displacedFamilies}</strong> Displaced Families</div>
+                    <div><strong>{(report.infrastructureDamage || []).length}</strong> Lifeline Assets Affected</div>
                   </div>
 
                   {/* Expanded Detail View */}
-                  {selectedReportDetail?.id === report.id && (
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginTop: '0.5rem' }}>
-                      <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#334155' }}>
-                        <strong>Field Notes:</strong> <em>"{report.additionalNotes || 'No notes provided.'}"</em>
-                      </div>
+                  {selectedReportDetail?.id === report.id && (() => {
+                    const parsedReport = parseStructuredAssessment(report.additionalNotes);
+                    return (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginTop: '0.5rem' }}>
+                        {/* Triage Badges */}
+                        {(parsedReport.immediateNeeds.length > 0 || parsedReport.vulnerabilities.length > 0 || parsedReport.safetyRisk) && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginBottom: '0.75rem', alignItems: 'center' }}>
+                            {parsedReport.safetyRisk && (
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '6px', background: '#fee2e2', color: '#b91c1c' }}>
+                                ⚠️ Risk: {parsedReport.safetyRisk}
+                              </span>
+                            )}
+                            {parsedReport.immediateNeeds.map((need, nIdx) => (
+                              <span key={nIdx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '6px', background: '#eff6ff', color: '#1d4ed8' }}>
+                                🚨 {need}
+                              </span>
+                            ))}
+                            {parsedReport.vulnerabilities.map((v, vIdx) => (
+                              <span key={vIdx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '6px', background: '#fef3c7', color: '#92400e' }}>
+                                👥 {v}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#334155' }}>
+                          <strong style={{ display: 'block', marginBottom: '0.2rem', color: '#0f172a' }}>Field Assessment Notes:</strong>
+                          <p style={{ margin: '0.25rem 0 0 0', lineHeight: 1.5, color: '#334155' }}>
+                            {parsedReport.observationNotes || 'No additional notes provided.'}
+                          </p>
+                        </div>
 
                       {report.infrastructureDamage && report.infrastructureDamage.length > 0 && (
                         <div>
@@ -1631,7 +2265,8 @@ export const RecoveryPlanningPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  )}
+                  );
+                })()}
                 </div>
               ))
             )}
@@ -1659,97 +2294,97 @@ export const RecoveryPlanningPage: React.FC = () => {
           ) : (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
-                  📜 Autonomous AI Workflow Execution Ledger
-                </h2>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {['all', 'Approved', 'PendingApproval', 'Rejected'].map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => setFilterStatus(status)}
-                      style={{
-                        padding: '0.4rem 0.8rem',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        background: filterStatus === status ? '#0f172a' : '#ffffff',
-                        color: filterStatus === status ? '#ffffff' : '#475569',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {status === 'all' ? 'All Plans' : status}
-                    </button>
-                  ))}
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
+                    Historical Recovery Plans &amp; Observability Audit Log
+                  </h2>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    Immutable registry of AI multi-agent plan executions, guardrail outcomes, and officer approvals.
+                  </p>
                 </div>
+
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff' }}
+                >
+                  <option value="all">All Plan Statuses</option>
+                  <option value="Approved">Approved</option>
+                  <option value="PendingApproval">Pending Approval</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="RevisionRequested">Revision Requested</option>
+                </select>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {workflowList.length === 0 ? (
                   <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📑</div>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#94a3b8' }}>—</div>
                     <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Recovery Plans Found</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>Run a new intake workflow to generate the first autonomous recovery plan.</p>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>Generate your first recovery plan from the Disaster Damage Intake tab.</p>
                   </div>
                 ) : (
-                  workflowList.map((wf) => (
+                  workflowList.map((plan) => (
                     <div
-                      key={wf.id}
+                      key={plan.id}
+                      onClick={() => handleSelectWorkflow(plan.id)}
                       style={{
                         background: '#ffffff',
                         border: '1px solid #e2e8f0',
-                        borderRadius: '10px',
+                        borderRadius: '12px',
                         padding: '1.25rem',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                        cursor: 'pointer',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         flexWrap: 'wrap',
                         gap: '1rem',
+                        transition: 'transform 0.15s ease, border-color 0.15s ease',
                       }}
                     >
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-                          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>{wf.planName}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                          <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+                            {plan.planName}
+                          </span>
                           <span style={{
                             padding: '0.2rem 0.6rem',
                             borderRadius: '6px',
                             fontSize: '0.75rem',
                             fontWeight: 700,
-                            background: wf.status === 'Approved' ? '#f0fdf4' : wf.status === 'PendingApproval' ? '#fef3c7' : '#fef2f2',
-                            color: wf.status === 'Approved' ? '#16a34a' : wf.status === 'PendingApproval' ? '#b45309' : '#dc2626',
+                            background:
+                              plan.status === 'Approved' ? '#f0fdf4' :
+                              plan.status === 'PendingApproval' ? '#fef3c7' :
+                              plan.status === 'Rejected' ? '#fef2f2' : '#f8fafc',
+                            color:
+                              plan.status === 'Approved' ? '#16a34a' :
+                              plan.status === 'PendingApproval' ? '#b45309' :
+                              plan.status === 'Rejected' ? '#dc2626' : '#475569',
                           }}>
-                            ● {wf.status}
+                            ● {plan.status}
                           </span>
-                          {wf.revisionCount > 0 && (
-                            <span style={{ padding: '0.2rem 0.5rem', background: '#f1f5f9', color: '#475569', borderRadius: '4px', fontSize: '0.7rem' }}>
-                              Rev {wf.revisionCount}
-                            </span>
-                          )}
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                          Budget: <strong>LKR {wf.estimatedTotalBudget.toLocaleString()}</strong> • Duration: {wf.totalAgentDurationMs || 0}ms • Created: {new Date(wf.createdAt).toLocaleString()}
+                          Budget: <strong style={{ color: '#0f172a' }}>Rs. {plan.estimatedTotalBudget.toLocaleString()}</strong>
+                          {' • Created: '}{new Date(plan.createdAt).toLocaleString()}
+                          {plan.reviewedBy && ` • Reviewed by: ${plan.reviewedBy}`}
                         </div>
                       </div>
 
                       <button
-                        onClick={() => handleSelectWorkflow(wf.id)}
                         style={{
-                          padding: '0.55rem 1.15rem',
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe',
+                          padding: '0.45rem 0.95rem',
+                          background: '#f1f5f9',
+                          color: '#1e293b',
+                          border: '1px solid #cbd5e1',
                           borderRadius: '8px',
                           fontWeight: 700,
-                          fontSize: '0.85rem',
+                          fontSize: '0.8rem',
                           cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          boxShadow: '0 1px 3px rgba(37,99,235,0.1)',
                         }}
                       >
-                        <span>🔍 Inspect Trace &amp; Tasks →</span>
+                        Inspect Full Audit Trace →
                       </button>
                     </div>
                   ))
@@ -1760,34 +2395,72 @@ export const RecoveryPlanningPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── REVISION MODAL ── */}
+      {/* ── REVISION GUIDANCE MODAL ── */}
       {showRevisionModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#ffffff', padding: '2rem', borderRadius: '12px', width: '500px', maxWidth: '90%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>🔄 Request Plan Revision</h3>
-            <p style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '1rem' }}>
-              Provide specific guidance for the Agent Orchestrator to re-plan the recovery strategy.
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999,
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            maxWidth: '540px',
+            width: '100%',
+            padding: '2rem',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+          }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+              Request AI Plan Revision
+            </h3>
+            <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.9rem', color: '#64748b' }}>
+              Provide specific policy, budgetary, or operational guidance to instruct the Multi-Agent reasoning engine to recalculate this plan.
             </p>
+
             <textarea
               rows={4}
-              placeholder="e.g. Prioritize clean water restoration over road repairs; increase temporary shelter allocation for flood victims."
               value={revisionGuidance}
               onChange={(e) => setRevisionGuidance(e.target.value)}
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box', marginBottom: '1.25rem' }}
+              placeholder="e.g. Prioritize school repairs first, cap total budget at LKR 1,500,000, and assign sanitation tasks to Red Cross..."
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.9rem',
+                marginBottom: '1.5rem',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+              }}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button
                 onClick={() => setShowRevisionModal(false)}
-                style={{ padding: '0.5rem 1rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#fff', cursor: 'pointer' }}
+                style={{ padding: '0.6rem 1.2rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', color: '#475569' }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDecision('Revise')}
-                disabled={!revisionGuidance.trim() || loading}
-                style={{ padding: '0.5rem 1.25rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}
+                disabled={loading || !revisionGuidance.trim()}
+                style={{
+                  padding: '0.6rem 1.2rem',
+                  background: loading || !revisionGuidance.trim() ? '#94a3b8' : '#f59e0b',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  cursor: loading || !revisionGuidance.trim() ? 'not-allowed' : 'pointer',
+                }}
               >
-                Submit Revision Prompt
+                {loading ? 'Re-executing Agents...' : 'Submit & Re-run Multi-Agent Pipeline'}
               </button>
             </div>
           </div>

@@ -9,6 +9,7 @@ import {
 } from '../api/incidentApi';
 import { IncidentReport, ReporterProfile } from '../types/incidentTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
+import { InfoHint } from '../components/InfoHint';
 
 interface Props {
   incidentId: string;
@@ -30,7 +31,7 @@ function statusChipClass(status: string): string {
 function scoreChipClass(score: number | null, invert = false): string {
   if (score === null) return 'ae-chip-neutral';
   const high = invert ? score < 40 : score >= 70;
-  const mid = invert ? score >= 40 && score < 70 : score >= 40 && score < 70;
+  const mid = score >= 40 && score < 70;
   if (high) return invert ? 'ae-chip-high' : 'ae-chip-safe';
   if (mid) return 'ae-chip-moderate';
   return invert ? 'ae-chip-safe' : 'ae-chip-high';
@@ -113,7 +114,6 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
   const canApproveOrTriage = isOfficerOrAdmin && ['Assessed', 'OnHold', 'Reported'].includes(incident.status);
   const isFinal = ['Rejected', 'MissionApproved', 'Closed'].includes(incident.status);
 
-  // Small bounding box around the point so OpenStreetMap's free embed shows useful context
   const d = 0.01;
   const bbox = `${incident.longitude - d},${incident.latitude - d},${incident.longitude + d},${incident.latitude + d}`;
   const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${incident.latitude},${incident.longitude}`;
@@ -130,7 +130,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '1.5rem', alignItems: 'start' }}>
-        {/* Left: main content */}
+        {/* ── LEFT COLUMN: main info + map ── */}
         <div>
           <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
@@ -189,11 +189,78 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
             </div>
           </div>
 
+          {/* Map — bottom of left column */}
+          <div className="ae-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '0.85rem 1rem 0.6rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>📍 Location</h3>
+              <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
+                {incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}
+              </p>
+            </div>
+            <iframe
+              title="Incident location map"
+              src={osmEmbedUrl}
+              width="100%"
+              height="320"
+              frameBorder="0"
+              loading="lazy"
+              style={{ display: 'block', border: 0 }}
+            />
+            <div style={{ padding: '0.5rem 1rem' }}>
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${incident.latitude}&mlon=${incident.longitude}#map=15/${incident.latitude}/${incident.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 600, textDecoration: 'none' }}
+              >
+                View larger map →
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* ── RIGHT COLUMN: reporter contact, agent cards, actions ── */}
+        <div>
+          <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
+            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
+              📞 Reporter Contact
+            </h3>
+            {reporter ? (
+              <>
+                <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem', color: '#334155' }}>{reporter.fullName}</p>
+                {reporter.phoneNumber ? (
+                  <a href={`tel:${reporter.phoneNumber}`} style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 600 }}>
+                    {reporter.phoneNumber}
+                  </a>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>No phone number on file</p>
+                )}
+                {reporter.district && (
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>📍 {reporter.district}</p>
+                )}
+              </>
+            ) : (
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>Reporter details unavailable</p>
+            )}
+          </div>
+
+          {incident.rescueMission && (
+            <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
+                🚁 Rescue Mission
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                Teams required: <strong>{incident.rescueMission.teamsRequired}</strong>
+              </p>
+            </div>
+          )}
+
           {/* ── Agent 1: Assessment ── */}
           <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center' }}>
                 🔍 Assessment Agent
+                <InfoHint text="Reads the report's disaster type, description and location, then estimates real-world severity and how many rescue teams are likely needed. Runs when an officer clicks 'Assess'." />
               </h3>
               {incident.severityAssessed && (
                 <span className="ae-chip ae-chip-neutral">{incident.severityAssessed}</span>
@@ -214,8 +281,9 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
           {/* ── Agent 2: Plausibility ── */}
           <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center' }}>
                 🌦️ Plausibility Agent
+                <InfoHint text="Checks real rainfall data for the district against what was reported, to flag reports that seem inconsistent with actual weather. A score, not a hoax detector — always a signal for officer attention, never a hard pass/fail." />
               </h3>
               <span className={`ae-chip ${scoreChipClass(incident.plausibilityScore)}`}>
                 {incident.plausibilityScore !== null ? `${incident.plausibilityScore}/100` : 'Not screened'}
@@ -235,8 +303,9 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
           {/* ── Agent 3: Dedup ── */}
           <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center' }}>
                 🧬 Dedup Agent
+                <InfoHint text="Searches nearby recent reports to check if this is the same real-world event as one already logged, so officers don't triage the same disaster twice. If wrong, an officer can reverse it from the duplicates list." />
               </h3>
               {incident.linkedIncidentId && (
                 <span className={`ae-chip ${scoreChipClass(incident.dedupConfidence, true)}`}>
@@ -255,7 +324,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
             )}
           </div>
 
-          {/* Officer actions */}
+          {/* Officer actions — right column */}
           {isOfficerOrAdmin && !isFinal && (
             <div className="ae-card">
               <h3 style={{ margin: '0 0 0.85rem', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
@@ -335,72 +404,6 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
               )}
             </div>
           )}
-        </div>
-
-        {/* Right: reporter contact, mission info, map at the bottom */}
-        <div>
-          <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
-              📞 Reporter Contact
-            </h3>
-            {reporter ? (
-              <>
-                <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem', color: '#334155' }}>{reporter.fullName}</p>
-                {reporter.phoneNumber ? (
-                  <a href={`tel:${reporter.phoneNumber}`} style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 600 }}>
-                    {reporter.phoneNumber}
-                  </a>
-                ) : (
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>No phone number on file</p>
-                )}
-                {reporter.district && (
-                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>📍 {reporter.district}</p>
-                )}
-              </>
-            ) : (
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>Reporter details unavailable</p>
-            )}
-          </div>
-
-          {incident.rescueMission && (
-            <div className="ae-card" style={{ marginBottom: '1.25rem' }}>
-              <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>
-                🚁 Rescue Mission
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-                Teams required: <strong>{incident.rescueMission.teamsRequired}</strong>
-              </p>
-            </div>
-          )}
-
-          {/* Map — always last in the right column */}
-          <div className="ae-card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '0.85rem 1rem 0.6rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#334155' }}>📍 Location</h3>
-              <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>
-                {incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}
-              </p>
-            </div>
-            <iframe
-              title="Incident location map"
-              src={osmEmbedUrl}
-              width="100%"
-              height="260"
-              frameBorder="0"
-              loading="lazy"
-              style={{ display: 'block', border: 0 }}
-            />
-            <div style={{ padding: '0.5rem 1rem' }}>
-              <a
-                href={`https://www.openstreetmap.org/?mlat=${incident.latitude}&mlon=${incident.longitude}#map=15/${incident.latitude}/${incident.longitude}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 600, textDecoration: 'none' }}
-              >
-                View larger map →
-              </a>
-            </div>
-          </div>
         </div>
       </div>
     </div>
