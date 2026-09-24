@@ -314,6 +314,36 @@ public static class IncidentEndpoints
             return Results.Ok(related);
         });
 
+        // GET /api/incidents/logs — global, searchable activity log across all
+        // incidents: every agent run and every officer action, in one feed.
+        group.MapGet("/logs", async (
+            string? search,
+            Guid? incidentId,
+            int? page,
+            int? pageSize,
+            IncidentDbContext db) =>
+        {
+            var pageNum = page is null or < 1 ? 1 : page.Value;
+            var size = pageSize is null or < 1 ? 50 : pageSize.Value;
+
+            var query = db.MissionLogs.AsQueryable();
+
+            if (incidentId is not null)
+                query = query.Where(l => l.IncidentId == incidentId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(l => l.Note.ToLower().Contains(search.ToLower()));
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(l => l.Timestamp)
+                .Skip((pageNum - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            return Results.Ok(new { total, page = pageNum, pageSize = size, items });
+        });
+
                 // POST /api/incidents/{id}/unlink — officer manually reverses a wrong Dedup Agent match.
         // Called on the DUPLICATE (not the primary): clears its link, restoring it as its own
         // primary incident, visible again in the main queue. No reason required — this corrects
