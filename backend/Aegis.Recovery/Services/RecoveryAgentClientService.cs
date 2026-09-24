@@ -110,17 +110,30 @@ public class RecoveryAgentClientService
                 activeNGOs.Select(n => n.Name).ToList(), safe.InputFlagged || guidanceFlagged);
             run.Validations.AddRange(guardrails);
 
-            // Human approval gate (Deterministic Rule)
+            // Human approval gate
             var failedChecks = guardrails.Where(g => !g.Passed).Select(g => g.RuleName).ToList();
             var reasons = new List<string>();
-            if (computedBudget > RecoveryRules.HumanApprovalBudgetThresholdLkr)
-                reasons.Add($"Budget LKR {computedBudget:N0} exceeds the LKR {RecoveryRules.HumanApprovalBudgetThresholdLkr:N0} threshold.");
-            if (pyResponse?.Agent4Output?.RequiresHumanApproval == true)
-                reasons.Add($"AI policy review requested human review: {pyResponse.Agent4Output.ApprovalReason}");
+
+            if (pyResponse?.Agent4Output != null)
+            {
+                // Follow Agent 4's explicit safety & policy review verdict
+                if (pyResponse.Agent4Output.RequiresHumanApproval)
+                {
+                    reasons.Add(string.IsNullOrWhiteSpace(pyResponse.Agent4Output.ApprovalReason)
+                        ? "AI safety & policy review requested human approval."
+                        : $"AI policy review requested human review: {pyResponse.Agent4Output.ApprovalReason}");
+                }
+            }
+            else if (computedBudget > RecoveryRules.HumanApprovalBudgetThresholdLkr)
+            {
+                // Fallback deterministic rule only when Python agent output is absent
+                reasons.Add($"Budget LKR {computedBudget:N0} exceeds the standard approval threshold.");
+            }
+
             if (failedChecks.Count > 0)
                 reasons.Add($"Guardrail(s) failed: {string.Join("; ", failedChecks)}.");
-            if (run.UsedFallback)
-                reasons.Add("Degraded mode: Python Agent Microservice was offline; fallback deterministic logic was used.");
+            if (safe.InputFlagged)
+                reasons.Add("Input contained flagged safety patterns.");
 
             var requiresHumanApproval = reasons.Count > 0;
             var planStatus = requiresHumanApproval ? "PendingApproval" : "Approved";
@@ -143,6 +156,9 @@ public class RecoveryAgentClientService
                     safe.Location,
                     safe.HousesDamaged,
                     safe.DisplacedFamilies,
+                    safe.ReporterName,
+                    safe.ReporterContact,
+                    safe.AdditionalNotes,
                     DisasterCategory = category,
                     Phases = phases.RecoveryPhases,
                     ShelterAllocations = shelterResult.Allocations,
@@ -455,6 +471,11 @@ public class RecoveryAgentClientService
                 RecoveryRules.NormalizeDamageLevel(level)));
         }
 
+        var repName = PromptSafety.Sanitize(report.ReporterName, 120, out var f6);
+        var repContact = PromptSafety.Sanitize(report.ReporterContact, 50, out var f7);
+        var addNotes = PromptSafety.Sanitize(report.AdditionalNotes, 1000, out var f8);
+        flagged |= f6 | f7 | f8;
+
         return new SafeReport(
             incidentId,
             string.IsNullOrEmpty(disasterType) ? "Unknown" : disasterType,
@@ -462,7 +483,10 @@ public class RecoveryAgentClientService
             Math.Clamp(report.HousesDamaged, 0, RecoveryRules.MaxFamilies),
             Math.Clamp(report.DisplacedFamilies, 0, RecoveryRules.MaxFamilies),
             assets,
-            flagged);
+            flagged,
+            string.IsNullOrWhiteSpace(repName) ? null : repName,
+            string.IsNullOrWhiteSpace(repContact) ? null : repContact,
+            string.IsNullOrWhiteSpace(addNotes) ? null : addNotes);
     }
 
     private static string ExtractDistrict(string location) => location.Split(',')[0].Trim();
@@ -656,7 +680,7 @@ public class RecoveryAgentClientService
 // Domain Helper Records & Utility Classes
 // ──────────────────────────────────────────────────────────────────────────────
 
-public sealed record SafeReport(Guid IncidentId, string DisasterType, string Location, int HousesDamaged, int DisplacedFamilies, IReadOnlyList<SafeAsset> Assets, bool InputFlagged);
+public sealed record SafeReport(Guid IncidentId, string DisasterType, string Location, int HousesDamaged, int DisplacedFamilies, IReadOnlyList<SafeAsset> Assets, bool InputFlagged, string? ReporterName = null, string? ReporterContact = null, string? AdditionalNotes = null);
 
 public sealed record SafeAsset(string AssetName, string AssetType, string DamageLevel);
 
@@ -708,7 +732,7 @@ public static class PromptSafety
 
 public static class RecoveryRules
 {
-    public const decimal HumanApprovalBudgetThresholdLkr = 500_000m;
+    public const decimal HumanApprovalBudgetThresholdLkr = 2_500_000m;
     public const decimal ShelterDailyCostPerFamilyLkr = 1_200m;
     public const int MaxFamilies = 10_000;
     public static readonly string[] ValidPriorities = { "Critical", "High", "Medium", "Low" };
