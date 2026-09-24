@@ -147,3 +147,18 @@ export interface ReporterProfile {
   phoneNumber: string | null;
   createdAt: string;
 }
+
+// ── GET /api/incidents/logs ──────────────────────────────────────────────────
+export interface MissionLogEntry {
+  id: string;
+  incidentId: string;
+  note: string;
+  timestamp: string;
+}
+
+export interface MissionLogListResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: MissionLogEntry[];
+}
