@@ -90,14 +90,13 @@ const MainPlatform: React.FC = () => {
 
   // Navigation tabs for Recovery module (available across roles)
   const RECOVERY_TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'shelters', label: '⛺ Emergency Shelters' },
-    { id: 'aid', label: '🤝 Aid Applications' },
-    { id: 'donations', label: '📦 Donations' },
-    { id: 'compensation', label: '💳 Compensation' },
-    { id: 'ngos', label: '🏢 Partner NGOs' },
-    { id: 'planning', label: '🤖 Agentic AI Planning' },
-    { id: 'reports', label: '📜 Audit Reports' },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'shelters', label: 'Emergency Shelters' },
+    { id: 'aid', label: 'Aid Applications' },
+    { id: 'donations', label: 'Donations' },
+    { id: 'ngos', label: 'Partner NGOs' },
+    { id: 'planning', label: 'Agentic AI Planning' },
+    { id: 'reports', label: 'Audit Reports' },
   ];
 
   const roleBadge = ROLE_BADGES[user?.role ?? 'Citizen'] ?? ROLE_BADGES.Citizen;
