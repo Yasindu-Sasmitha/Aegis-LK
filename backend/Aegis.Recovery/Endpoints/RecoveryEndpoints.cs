@@ -505,6 +505,16 @@ public static class RecoveryEndpoints
             }
         });
 
+        /// DELETE /api/recovery/damage-reports/{id:guid}
+        group.MapDelete("/damage-reports/{id:guid}", async (Guid id, RecoveryDbContext db) =>
+        {
+            var r = await db.DamageReports.FindAsync(id);
+            if (r is null) return Results.NotFound(new { error = "Damage report not found." });
+            db.DamageReports.Remove(r);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         #endregion
 
         #region Agentic AI Workflow — Independent Entry Points
@@ -544,6 +554,9 @@ public static class RecoveryEndpoints
                     Location = intake.District,
                     HousesDamaged = intake.HousesDamaged,
                     DisplacedFamilies = intake.DisplacedFamilies,
+                    ReporterName = intake.ReporterName,
+                    ReporterContact = intake.ReporterContact,
+                    AdditionalNotes = intake.AdditionalNotes,
                     InfrastructureDamage = intake.InfrastructureDamage.Select(i => new InfrastructureDamageItemDto
                     {
                         AssetName = i.AssetName,
@@ -553,25 +566,40 @@ public static class RecoveryEndpoints
                     }).ToList()
                 };
 
-                // Store or link citizen damage report in database
-                var infraJson = JsonSerializer.Serialize(intake.InfrastructureDamage, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-                dbDamageReport = new DamageReport
+                // Check if this workflow is for an existing damage report
+                if (request.DamageReportId.HasValue && request.DamageReportId.Value != Guid.Empty)
                 {
-                    IncidentId = incidentId,
-                    District = intake.District.Trim(),
-                    Location = intake.District.Trim(),
-                    DisasterType = intake.DisasterType,
-                    HousesDamaged = intake.HousesDamaged,
-                    DisplacedFamilies = intake.DisplacedFamilies,
-                    ReporterName = string.IsNullOrWhiteSpace(intake.ReporterName) ? "Citizen Reporter" : intake.ReporterName.Trim(),
-                    ReporterContact = intake.ReporterContact?.Trim() ?? string.Empty,
-                    AdditionalNotes = intake.AdditionalNotes?.Trim() ?? string.Empty,
-                    InfrastructureJson = infraJson,
-                    Status = "PlanGenerated",
-                    ProcessedAt = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow
-                };
-                db.DamageReports.Add(dbDamageReport);
+                    dbDamageReport = await db.DamageReports.FindAsync(request.DamageReportId.Value);
+                    if (dbDamageReport != null)
+                    {
+                        dbDamageReport.IncidentId = incidentId;
+                        dbDamageReport.Status = "PlanGenerated";
+                        dbDamageReport.ProcessedAt = DateTime.UtcNow;
+                    }
+                }
+
+                // If not an existing report, create a new record (direct intake from Intake tab)
+                if (dbDamageReport == null)
+                {
+                    var infraJson = JsonSerializer.Serialize(intake.InfrastructureDamage, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    dbDamageReport = new DamageReport
+                    {
+                        IncidentId = incidentId,
+                        District = intake.District.Trim(),
+                        Location = intake.District.Trim(),
+                        DisasterType = intake.DisasterType,
+                        HousesDamaged = intake.HousesDamaged,
+                        DisplacedFamilies = intake.DisplacedFamilies,
+                        ReporterName = string.IsNullOrWhiteSpace(intake.ReporterName) ? "Citizen Reporter" : intake.ReporterName.Trim(),
+                        ReporterContact = intake.ReporterContact?.Trim() ?? string.Empty,
+                        AdditionalNotes = intake.AdditionalNotes?.Trim() ?? string.Empty,
+                        InfrastructureJson = infraJson,
+                        Status = "PlanGenerated",
+                        ProcessedAt = DateTime.UtcNow,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    db.DamageReports.Add(dbDamageReport);
+                }
                 await db.SaveChangesAsync();
             }
             else
@@ -579,7 +607,7 @@ public static class RecoveryEndpoints
                 return Results.BadRequest(new { error = "Provide either an IncidentId or a DirectDamageIntake." });
             }
 
-            var workflowResult = await RunWorkflowInternal(incidentId, damageReport, request.RevisionGuidance, db, agentClient);
+            var workflowResult = await RunWorkflowInternal(incidentId, damageReport, request.RevisionGuidance, db, agentClient, null, dbDamageReport);
             return workflowResult;
         });
 
@@ -743,12 +771,11 @@ public static class RecoveryEndpoints
         {
             var incidentId = request.IncidentId != Guid.Empty ? request.IncidentId : Guid.NewGuid();
             var shelteredCount = await db.Shelters.SumAsync(s => s.CurrentOccupancy);
+            var activeShelters = await db.Shelters.CountAsync(s => s.Status == "Active");
             var fulfilledAid = await db.AidRequests.CountAsync(a => a.Status == "Fulfilled");
-            var compensationTotal = await db.Compensations
-                .Where(c => c.Status == "Disbursed" || c.Status == "Approved")
-                .SumAsync(c => c.ApprovedAmount ?? 0);
+            var totalAidRequests = await db.AidRequests.CountAsync();
+            var totalNgos = await db.NGOs.CountAsync();
             var budgetSpent = await db.RecoveryTasks
-                .Where(t => t.Status == "Completed" || t.Status == "InProgress")
                 .SumAsync(t => t.EstimatedCost);
 
             var incidentRef = request.IncidentId != Guid.Empty
@@ -761,10 +788,9 @@ public static class RecoveryEndpoints
                 Title = string.IsNullOrWhiteSpace(request.Title) ? "Post-Disaster Recovery Summary Report" : request.Title,
                 TotalSheltered = shelteredCount,
                 TotalAidRequestsFulfilled = fulfilledAid,
-                TotalCompensationDisbursed = compensationTotal,
+                TotalCompensationDisbursed = 0,
                 TotalBudgetSpent = budgetSpent,
-                ReportSummary = $"Comprehensive audit summary for {incidentRef}: {shelteredCount} sheltered citizens, " +
-                                $"{fulfilledAid} aid requests fulfilled, and LKR {compensationTotal:N0} compensation disbursed.",
+                ReportSummary = $"Official recovery audit for {incidentRef}: {shelteredCount} citizens accommodated across {activeShelters} emergency shelters, {fulfilledAid} of {totalAidRequests} humanitarian aid packages fulfilled, and LKR {budgetSpent:N0} allocated across active recovery operations with {totalNgos} accredited NGO partners.",
                 GeneratedAt = DateTime.UtcNow
             };
 
@@ -792,7 +818,7 @@ public static class RecoveryEndpoints
     private static async Task<IResult> RunWorkflowInternal(
         Guid incidentId, IncidentDamageReportDto damageReport, string? revisionGuidance,
         RecoveryDbContext db, RecoveryAgentClientService agentClient,
-        Guid? existingPlanId = null)
+        Guid? existingPlanId = null, DamageReport? linkedDamageReport = null)
     {
         try
         {
@@ -833,6 +859,10 @@ public static class RecoveryEndpoints
             }
 
             db.RecoveryPlans.Add(plan);
+            if (linkedDamageReport != null)
+            {
+                linkedDamageReport.RecoveryPlanId = plan.Id;
+            }
             await db.SaveChangesAsync();
 
             // Save infra damage from the new plan
@@ -1065,6 +1095,12 @@ public static class RecoveryEndpoints
                         hd = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v1) ? v1 : 0;
                     else if (prop.Name.Equals("DisplacedFamilies", StringComparison.OrdinalIgnoreCase))
                         df = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v2) ? v2 : 0;
+                    else if (prop.Name.Equals("ReporterName", StringComparison.OrdinalIgnoreCase))
+                        repName = prop.Value.GetString() ?? repName;
+                    else if (prop.Name.Equals("ReporterContact", StringComparison.OrdinalIgnoreCase))
+                        repContact = prop.Value.GetString() ?? repContact;
+                    else if (prop.Name.Equals("AdditionalNotes", StringComparison.OrdinalIgnoreCase))
+                        notes = prop.Value.GetString() ?? notes;
                 }
             }
             catch { }
@@ -1086,8 +1122,12 @@ public static class RecoveryEndpoints
                         hd = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v1) ? v1 : 0;
                     else if (prop.Name.Equals("DisplacedFamilies", StringComparison.OrdinalIgnoreCase))
                         df = prop.Value.ValueKind == JsonValueKind.Number ? prop.Value.GetInt32() : int.TryParse(prop.Value.GetString(), out var v2) ? v2 : 0;
-                    else if (prop.Name.Equals("RevisionGuidance", StringComparison.OrdinalIgnoreCase))
-                        notes = prop.Value.GetString() ?? "";
+                    else if (prop.Name.Equals("ReporterName", StringComparison.OrdinalIgnoreCase))
+                        repName = prop.Value.GetString() ?? repName;
+                    else if (prop.Name.Equals("ReporterContact", StringComparison.OrdinalIgnoreCase))
+                        repContact = prop.Value.GetString() ?? repContact;
+                    else if (prop.Name.Equals("RevisionGuidance", StringComparison.OrdinalIgnoreCase) || prop.Name.Equals("AdditionalNotes", StringComparison.OrdinalIgnoreCase))
+                        notes = prop.Value.GetString() ?? notes;
                 }
             }
             catch { }
