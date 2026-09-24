@@ -81,7 +81,6 @@ const MainPlatform: React.FC = () => {
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'all', label: '📋 All Incidents' },
     { id: 'Reported', label: '📥 Reported' },
-    { id: 'Assessed', label: '🔍 Assessed' },
     { id: 'OnHold', label: '⏸️ On Hold' },
     { id: 'Rejected', label: '🚫 Rejected' },
     { id: 'MissionApproved', label: '✅ Approved' },
