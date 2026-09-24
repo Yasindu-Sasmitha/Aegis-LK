@@ -27,7 +27,6 @@ import {
   IncidentDashboardPage,
   IncidentFullDetailPage,
   IncidentLogPage,
-  IncidentReportPage,
 } from './features/incident';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'incident';
@@ -87,7 +86,6 @@ const MainPlatform: React.FC = () => {
     { id: 'MissionApproved', label: '✅ Approved' },
     { id: 'Closed', label: '📁 Closed' },
     { id: 'log', label: '📋 Activity Log' },
-    { id: 'reports', label: '📈 Reports' },
   ];
 
   // Navigation tabs for Recovery module (available across roles)
@@ -781,7 +779,6 @@ const MainPlatform: React.FC = () => {
                   />
                 )}
                 {incidentTab === 'log' && <IncidentLogPage />}
-                {incidentTab === 'reports' && <IncidentReportPage />}
               </>
             )}
           </main>
