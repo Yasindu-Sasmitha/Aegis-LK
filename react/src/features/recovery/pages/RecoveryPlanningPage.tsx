@@ -596,31 +596,27 @@ export const RecoveryPlanningPage: React.FC = () => {
     try { parsedInput = JSON.parse(tool.inputJson); } catch {}
     try { parsedOutput = JSON.parse(tool.outputJson); } catch {}
 
-    const toolMeta: Record<string, { title: string; icon: string; bg: string; color: string; desc: string }> = {
+    const toolMeta: Record<string, { title: string; bg: string; color: string; desc: string }> = {
       tool_query_shelter_capacity: {
         title: 'Emergency Evacuation Shelter Capacity Query',
-        icon: '⛺',
         bg: '#eff6ff',
         color: '#1d4ed8',
         desc: 'Scanned official shelter registry for active centers with open bed capacity in the affected district.',
       },
       tool_estimate_repair_costs: {
         title: 'Civil Infrastructure Repair Cost Benchmark Estimator',
-        icon: '🏗️',
         bg: '#f0f9ff',
         color: '#0369a1',
         desc: 'Calculated official public infrastructure repair cost benchmarks based on damage severity ratings.',
       },
       tool_match_ngo_by_sector: {
         title: 'Registered NGO Partner Capability Matcher',
-        icon: '🤝',
         bg: '#f0fdf4',
         color: '#15803d',
         desc: 'Filtered accredited humanitarian partner organizations by sector expertise and operational districts.',
       },
       tool_calculate_cash_stipend_budget: {
         title: 'Emergency Citizen Subsistence Cash Calculator',
-        icon: '💳',
         bg: '#faf5ff',
         color: '#7e22ce',
         desc: 'Calculated statutory emergency living stipends based on displaced family count and relief duration.',
@@ -629,7 +625,6 @@ export const RecoveryPlanningPage: React.FC = () => {
 
     const meta = toolMeta[tool.toolName] || {
       title: tool.toolName.replace(/_/g, ' ').toUpperCase(),
-      icon: '🛠️',
       bg: '#f8fafc',
       color: '#334155',
       desc: 'Deterministic system calculation and allow-listed database query.',
@@ -639,7 +634,6 @@ export const RecoveryPlanningPage: React.FC = () => {
       <div key={idx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1.4rem' }}>{meta.icon}</span>
             <div>
               <strong style={{ fontSize: '0.95rem', color: '#0f172a', display: 'block' }}>{meta.title}</strong>
               <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{meta.desc}</span>
@@ -647,9 +641,9 @@ export const RecoveryPlanningPage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '6px', background: meta.bg, color: meta.color }}>
-              ✓ Verified Allow-Listed
+              Verified Allow-Listed
             </span>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>⏱️ {tool.durationMs}ms</span>
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{tool.durationMs}ms</span>
           </div>
         </div>
 
@@ -664,7 +658,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.5rem' }}>
                   {parsedOutput.availableShelters.map((s: any, sIdx: number) => (
                     <div key={sIdx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem' }}>
-                      <strong style={{ color: '#0f172a', display: 'block' }}>⛺ {s.name || s.Name || s.shelterName || 'Shelter Center'}</strong>
+                      <strong style={{ color: '#0f172a', display: 'block' }}>{s.name || s.Name || s.shelterName || 'Shelter Center'}</strong>
                       <span style={{ color: '#64748b' }}>{s.district || s.District || s.location || s.Location || ''} • Available Beds: </span>
                       <strong style={{ color: '#16a34a' }}>{s.remainingBeds ?? s.RemainingBeds ?? s.remainingCapacity ?? s.RemainingCapacity ?? 0}</strong>
                     </div>
@@ -672,7 +666,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.6rem 0.8rem', color: '#991b1b', fontSize: '0.825rem' }}>
-                  <strong>⚠️ No Registered Shelters Found in {parsedInput.district || district || 'District'}:</strong>{' '}
+                  <strong>No Registered Shelters Found in {parsedInput.district || district || 'District'}:</strong>{' '}
                   <span>
                     0 open beds registered in this district. Deficit of {parsedInput.requiredBeds || parsedOutput.deficit || parsedOutput.Deficit || 0} beds requires emergency temporary relief shelter allocation.
                   </span>
@@ -690,7 +684,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.6rem' }}>
                   {parsedOutput.map((item: any, bIdx: number) => (
                     <div key={bIdx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.7rem 0.9rem', borderRadius: '6px', fontSize: '0.8rem' }}>
-                      <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.85rem' }}>🏗️ {item.assetName || item.AssetName || 'Infrastructure Asset'}</strong>
+                      <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.85rem' }}>{item.assetName || item.AssetName || 'Infrastructure Asset'}</strong>
                       <div style={{ color: '#64748b', margin: '0.2rem 0' }}>
                         Type: <span style={{ fontWeight: 600, color: '#334155' }}>{item.assetType || item.AssetType || 'General'}</span>
                       </div>
@@ -715,7 +709,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.5rem' }}>
                   {parsedOutput.qualifiedNGOs.map((ngo: any, nIdx: number) => (
                     <div key={nIdx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem' }}>
-                      <strong style={{ color: '#0f172a', display: 'block' }}>🏢 {ngo.name || ngo.Name || ngo.ngoName || 'Humanitarian Partner'}</strong>
+                      <strong style={{ color: '#0f172a', display: 'block' }}>{ngo.name || ngo.Name || ngo.ngoName || 'Humanitarian Partner'}</strong>
                       <span style={{ color: '#64748b' }}>Matched Sectors: {Array.isArray(ngo.matchedSectors || ngo.MatchedSectors) ? (ngo.matchedSectors || ngo.MatchedSectors).join(', ') : (ngo.sectors || ngo.Sectors || 'General')}</span>
                       <div style={{ marginTop: '0.2rem', color: '#15803d', fontWeight: 700 }}>
                         Operating Districts: {Array.isArray(ngo.operatingDistricts || ngo.OperatingDistricts) ? (ngo.operatingDistricts || ngo.OperatingDistricts).join(', ') : 'All Districts'}
@@ -773,7 +767,6 @@ export const RecoveryPlanningPage: React.FC = () => {
       <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1.35rem' }}>📋</span>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
               Originating Disaster &amp; Citizen Impact Assessment
             </h3>
@@ -787,7 +780,7 @@ export const RecoveryPlanningPage: React.FC = () => {
             color: '#0369a1',
             border: '1px solid #bae6fd',
           }}>
-            📍 Submitted Field Context
+            Submitted Field Context
           </span>
         </div>
 
@@ -828,17 +821,17 @@ export const RecoveryPlanningPage: React.FC = () => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
             {parsed.safetyRisk && (
               <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '6px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>
-                ⚠️ Risk: {parsed.safetyRisk}
+                Risk: {parsed.safetyRisk}
               </span>
             )}
             {parsed.immediateNeeds.map((need, idx) => (
               <span key={idx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: '6px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                🚨 {need}
+                {need}
               </span>
             ))}
             {parsed.vulnerabilities.map((vuln, idx) => (
               <span key={idx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: '6px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
-                👥 {vuln}
+                {vuln}
               </span>
             ))}
           </div>
@@ -865,7 +858,7 @@ export const RecoveryPlanningPage: React.FC = () => {
               {displayInfra.map((item, idx) => (
                 <div key={idx} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.6rem 0.8rem', fontSize: '0.825rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                    <strong style={{ color: '#0f172a' }}>🏗️ {item.assetName}</strong>
+                    <strong style={{ color: '#0f172a' }}>{item.assetName}</strong>
                     <span style={{
                       padding: '0.1rem 0.4rem',
                       borderRadius: '4px',
@@ -920,11 +913,11 @@ export const RecoveryPlanningPage: React.FC = () => {
 
                 {isAutoApproved ? (
                   <span style={{ padding: '0.25rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                    🤖 Deterministically Auto-Approved (Within Budget Policy Limits)
+                    Deterministically Auto-Approved (Within Budget Policy Limits)
                   </span>
                 ) : currentPlan?.status === 'PendingApproval' ? (
                   <span style={{ padding: '0.25rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
-                    🛡️ Requires Officer Approval (High Scope / Policy Boundary)
+                    Requires Officer Approval (High Scope / Policy Boundary)
                   </span>
                 ) : null}
               </div>
@@ -954,14 +947,14 @@ export const RecoveryPlanningPage: React.FC = () => {
                       gap: '0.4rem',
                     }}
                   >
-                    ✓ {currentPlan?.status === 'Approved' ? 'Plan Approved' : 'Approve Plan'}
+                    {currentPlan?.status === 'Approved' ? 'Plan Approved' : 'Approve Plan'}
                   </button>
                   <button
                     onClick={() => setShowRevisionModal(true)}
                     disabled={loading}
                     style={{ padding: '0.6rem 1.2rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                   >
-                    🔄 Request Revision
+                    Request Revision
                   </button>
                   <button
                     onClick={() => handleDecision('Reject')}
@@ -980,12 +973,11 @@ export const RecoveryPlanningPage: React.FC = () => {
                       gap: '0.4rem',
                     }}
                   >
-                    ✕ Reject
+                    Reject
                   </button>
                 </>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                  <span>🔒</span>
                   <span>View-Only (Approval restricted to Officer/Admin)</span>
                 </div>
               )}
@@ -1951,7 +1943,6 @@ export const RecoveryPlanningPage: React.FC = () => {
             <div style={{ background: '#ffffff', border: '2px solid #3b82f6', borderRadius: '14px', padding: '1.75rem', marginTop: '1rem', boxShadow: '0 8px 24px rgba(37, 99, 235, 0.15)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span style={{ fontSize: '1.5rem' }}>🤖</span>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1e40af' }}>
                     Multi-Agent Reasoning Pipeline in Progress...
                   </h3>
@@ -1977,7 +1968,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 1 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 1 ? '#3b82f6' : currentStep > 1 ? '#86efac' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 1 ? '#1d4ed8' : '#94a3b8' }}>AGENT 1</span>
-                    <span>{currentStep > 1 ? '✅' : currentStep === 1 ? '🔄' : '⏳'}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: currentStep > 1 ? '#16a34a' : currentStep === 1 ? '#2563eb' : '#94a3b8' }}>{currentStep > 1 ? 'Complete' : currentStep === 1 ? 'Running' : 'Queued'}</span>
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Strategic Planner</div>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Decomposes disaster scope &amp; priorities</div>
@@ -1986,7 +1977,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 2 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 2 ? '#3b82f6' : currentStep > 2 ? '#86efac' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 2 ? '#1d4ed8' : '#94a3b8' }}>AGENT 2</span>
-                    <span>{currentStep > 2 ? '✅' : currentStep === 2 ? '🔄' : '⏳'}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: currentStep > 2 ? '#16a34a' : currentStep === 2 ? 'Running' : 'Queued' }}>{currentStep > 2 ? 'Complete' : currentStep === 2 ? 'Running' : 'Queued'}</span>
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Infra &amp; Shelter Analyzer</div>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Evaluates capacity &amp; lifeline repairs</div>
@@ -1995,7 +1986,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 3 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 3 ? '#3b82f6' : currentStep > 3 ? '#86efac' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 3 ? '#1d4ed8' : '#94a3b8' }}>AGENT 3</span>
-                    <span>{currentStep > 3 ? '✅' : currentStep === 3 ? '🔄' : '⏳'}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: currentStep > 3 ? '#16a34a' : currentStep === 3 ? 'Running' : 'Queued' }}>{currentStep > 3 ? 'Complete' : currentStep === 3 ? 'Running' : 'Queued'}</span>
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Tool &amp; NGO Dispatcher</div>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Matches NGOs &amp; calculates budgets</div>
@@ -2004,7 +1995,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <div style={{ padding: '1rem', borderRadius: '10px', background: currentStep >= 4 ? '#eff6ff' : '#f8fafc', border: `2px solid ${currentStep === 4 ? '#3b82f6' : '#e2e8f0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: currentStep >= 4 ? '#1d4ed8' : '#94a3b8' }}>AGENT 4</span>
-                    <span>{currentStep >= 4 ? '🔄' : '⏳'}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: currentStep >= 4 ? '#2563eb' : '#94a3b8' }}>{currentStep >= 4 ? 'Validating' : 'Queued'}</span>
                   </div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Policy &amp; Guardrail Validator</div>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Verifies limits &amp; compiles audit trace</div>
@@ -2131,7 +2122,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                           cursor: 'pointer',
                         }}
                       >
-                        {selectedReportDetail?.id === report.id ? 'Hide Details' : '🔍 View Details'}
+                        {selectedReportDetail?.id === report.id ? 'Hide Details' : 'View Details'}
                       </button>
 
                       {/* If plan is already generated, allow directly viewing the plan */}
@@ -2200,7 +2191,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                             cursor: 'pointer',
                           }}
                         >
-                          🗑️
+                          Delete
                         </button>
                       )}
                     </div>
@@ -2223,17 +2214,17 @@ export const RecoveryPlanningPage: React.FC = () => {
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginBottom: '0.75rem', alignItems: 'center' }}>
                             {parsedReport.safetyRisk && (
                               <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '6px', background: '#fee2e2', color: '#b91c1c' }}>
-                                ⚠️ Risk: {parsedReport.safetyRisk}
+                                Risk: {parsedReport.safetyRisk}
                               </span>
                             )}
                             {parsedReport.immediateNeeds.map((need, nIdx) => (
                               <span key={nIdx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '6px', background: '#eff6ff', color: '#1d4ed8' }}>
-                                🚨 {need}
+                                {need}
                               </span>
                             ))}
                             {parsedReport.vulnerabilities.map((v, vIdx) => (
                               <span key={vIdx} style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '6px', background: '#fef3c7', color: '#92400e' }}>
-                                👥 {v}
+                                {v}
                               </span>
                             ))}
                           </div>
