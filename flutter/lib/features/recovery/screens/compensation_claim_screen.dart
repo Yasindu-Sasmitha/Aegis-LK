@@ -99,8 +99,8 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
           builder: (ctx) => AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            title: Row(
-              children: const [
+            title: const Row(
+              children: [
                 Icon(Icons.check_circle, color: kSuccess, size: 24),
                 SizedBox(width: 8),
                 Text('Claim Registered!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
@@ -214,10 +214,10 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
                     child: const Icon(Icons.home_work_outlined, color: Colors.white, size: 28),
                   ),
                   const SizedBox(width: 14),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           'National Property Relief Scheme',
                           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
@@ -275,7 +275,7 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _district,
+                      initialValue: _district,
                       decoration: const InputDecoration(labelText: 'District of Damaged Property', border: OutlineInputBorder(), isDense: true),
                       items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                       onChanged: (val) => setState(() => _district = val ?? 'Kalutara'),
@@ -296,7 +296,7 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
                     const Text('Damage Category & Bank Transfer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
                     const Divider(height: 20),
                     DropdownButtonFormField<String>(
-                      value: _damageCategory,
+                      initialValue: _damageCategory,
                       decoration: const InputDecoration(labelText: 'Damage Assessment Category', border: OutlineInputBorder(), isDense: true),
                       items: _damageCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (val) => setState(() => _damageCategory = val ?? _damageCategories.first),

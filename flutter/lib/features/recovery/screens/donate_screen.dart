@@ -89,15 +89,15 @@ class _DonateScreenState extends State<DonateScreen> with SingleTickerProviderSt
           builder: (ctx) => AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            title: Row(
-              children: const [
+            title: const Row(
+              children: [
                 Icon(Icons.volunteer_activism, color: kSuccess, size: 24),
                 SizedBox(width: 8),
                 Text('Thank You!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
               ],
             ),
             content: Text(
-              'Your generous relief contribution of ${_donationType == "Monetary" ? "LKR " + amountVal.toStringAsFixed(0) : amountVal.toStringAsFixed(0) + " units"} has been logged into the national disaster relief ledger.',
+              'Your generous relief contribution of ${_donationType == "Monetary" ? "LKR ${amountVal.toStringAsFixed(0)}" : "${amountVal.toStringAsFixed(0)} units"} has been logged into the national disaster relief ledger.',
               style: const TextStyle(fontSize: 13, color: kTextSecondary),
             ),
             actions: [
@@ -188,10 +188,10 @@ class _DonateScreenState extends State<DonateScreen> with SingleTickerProviderSt
                     child: const Icon(Icons.volunteer_activism, color: Colors.white, size: 28),
                   ),
                   const SizedBox(width: 14),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           'Community Relief Fund',
                           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
@@ -219,7 +219,7 @@ class _DonateScreenState extends State<DonateScreen> with SingleTickerProviderSt
                     const Text('Contribution Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
                     const Divider(height: 20),
                     DropdownButtonFormField<String>(
-                      value: _donationType,
+                      initialValue: _donationType,
                       decoration: const InputDecoration(
                         labelText: 'Donation Category',
                         border: OutlineInputBorder(),
@@ -274,7 +274,7 @@ class _DonateScreenState extends State<DonateScreen> with SingleTickerProviderSt
 
                     if (_shelters.isNotEmpty)
                       DropdownButtonFormField<String>(
-                        value: _selectedShelterId,
+                        initialValue: _selectedShelterId,
                         decoration: const InputDecoration(
                           labelText: 'Target Emergency Shelter (Optional)',
                           border: OutlineInputBorder(),
@@ -463,7 +463,7 @@ class _DonateScreenState extends State<DonateScreen> with SingleTickerProviderSt
                               Text(d.donorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary)),
                               const SizedBox(height: 2),
                               Text(
-                                '${d.donationType}  •  ${isMoney ? "LKR " + d.amountOrQuantity.toStringAsFixed(0) : d.amountOrQuantity.toStringAsFixed(0) + " items"}',
+                                '${d.donationType}  •  ${isMoney ? "LKR ${d.amountOrQuantity.toStringAsFixed(0)}" : "${d.amountOrQuantity.toStringAsFixed(0)} items"}',
                                 style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF047857), fontSize: 13),
                               ),
                               if (d.itemDescription.isNotEmpty)

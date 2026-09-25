@@ -373,11 +373,11 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen> wit
                       ),
                     ],
                   ),
-                  Row(
+                  const Row(
                     children: [
-                      const Text('Inspect Trace & Tasks', style: TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward, size: 14, color: Color(0xFF2563EB)),
+                      Text('Inspect Trace & Tasks', style: TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600)),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward, size: 14, color: Color(0xFF2563EB)),
                     ],
                   ),
                 ],

@@ -90,8 +90,8 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
           builder: (ctx) => AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            title: Row(
-              children: const [
+            title: const Row(
+              children: [
                 Icon(Icons.check_circle, color: kSuccess, size: 24),
                 SizedBox(width: 8),
                 Text('Request Submitted!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
@@ -176,10 +176,10 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                       child: const Icon(Icons.handshake_outlined, color: Colors.white, size: 28),
                     ),
                     const SizedBox(width: 14),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Emergency Relief Application',
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
@@ -229,7 +229,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _district,
+                        initialValue: _district,
                         decoration: const InputDecoration(
                           labelText: 'District',
                           border: OutlineInputBorder(),
@@ -258,7 +258,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                       const Text('Aid Requirement Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
                       const Divider(height: 20),
                       DropdownButtonFormField<String>(
-                        value: _aidType,
+                        initialValue: _aidType,
                         decoration: const InputDecoration(
                           labelText: 'Primary Aid Category',
                           border: OutlineInputBorder(),
@@ -286,7 +286,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _urgency,
+                              initialValue: _urgency,
                               decoration: const InputDecoration(
                                 labelText: 'Urgency Level',
                                 border: OutlineInputBorder(),
@@ -308,7 +308,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                         )
                       else if (_availableShelters.isNotEmpty)
                         DropdownButtonFormField<String>(
-                          value: _selectedShelterId,
+                          initialValue: _selectedShelterId,
                           decoration: const InputDecoration(
                             labelText: 'Preferred Target Shelter (Optional)',
                             border: OutlineInputBorder(),
