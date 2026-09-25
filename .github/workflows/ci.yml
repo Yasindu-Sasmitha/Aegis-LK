@@ -26,9 +26,6 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -41,18 +38,24 @@ jobs:
         run: dotnet tool install --global dotnet-ef
 
       - name: Apply database migrations
-        working-directory: backend
         env:
           ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
         run: |
           export PATH="$PATH:/root/.dotnet/tools"
-          dotnet ef database update --project Aegis.Api/Aegis.Api.csproj --startup-project Aegis.Api/Aegis.Api.csproj
+          dotnet ef database update \
+            --project backend/Aegis.Weather/Aegis.Weather.csproj \
+            --startup-project backend/Aegis.Api/Aegis.Api.csproj \
+            --context WeatherDbContext
+
+          dotnet ef database update \
+            --project backend/Aegis.Shared/Aegis.Shared.csproj \
+            --startup-project backend/Aegis.Api/Aegis.Api.csproj \
+            --context AuthDbContext
 
       - name: Run xUnit Tests
         run: dotnet test backend/Aegis.Tests/Aegis.Tests.csproj --verbosity normal --no-restore
         env:
           ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
-
   flutter-analyze:
     name: Flutter Lint & Analyze
     runs-on: ubuntu-latest
