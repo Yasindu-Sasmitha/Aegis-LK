@@ -32,6 +32,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+    env:
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
