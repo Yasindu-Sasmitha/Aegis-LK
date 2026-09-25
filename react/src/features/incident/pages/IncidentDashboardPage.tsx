@@ -17,28 +17,85 @@ interface StatusCount {
 
 const STATUS_ORDER = ['Reported', 'Assessed', 'OnHold', 'Rejected', 'MissionApproved', 'Closed'];
 
-// Buckets incidents by day for the trend line, filling in zero-count gaps so
-// the line doesn't skip days with no reports.
-function buildDailyTrend(incidents: IncidentReport[], days: number): { label: string; count: number }[] {
-  const buckets: Record<string, number> = {};
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+const STATUS_LINE_COLORS: Record<string, string> = {
+  Reported: '#f59e0b',
+  Assessed: '#8b5cf6',
+  OnHold: '#eab308',
+  Rejected: '#ef4444',
+  MissionApproved: '#10b981',
+  Closed: '#64748b',
+};
 
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    buckets[d.toISOString().slice(0, 10)] = 0;
+// Lighter, gradient-friendly fills for the status bar chart (paired with a
+// slightly darker top color via an SVG gradient, defined per-bar at render time).
+const STATUS_BAR_COLORS: Record<string, { light: string; dark: string }> = {
+  Reported: { light: '#fde68a', dark: '#f59e0b' },
+  Assessed: { light: '#e2e8f0', dark: '#94a3b8' },
+  OnHold: { light: '#fef08a', dark: '#eab308' },
+  Rejected: { light: '#fecaca', dark: '#ef4444' },
+  MissionApproved: { light: '#a7f3d0', dark: '#10b981' },
+  Closed: { light: '#e2e8f0', dark: '#64748b' },
+};
+
+function formatDateInput(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// Buckets each status separately by day across an arbitrary date range
+// (inclusive), filling zero-count gaps so every line spans the same days.
+function buildDailyTrendByStatus(
+  incidents: IncidentReport[],
+  startDate: Date,
+  endDate: Date
+): { label: string; date: string; counts: Record<string, number> }[] {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+
+  const days: { label: string; date: string; counts: Record<string, number> }[] = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateKey = formatDateInput(d);
+    const counts: Record<string, number> = {};
+    STATUS_ORDER.forEach((s) => (counts[s] = 0));
+    days.push({
+      label: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+      date: dateKey,
+      counts,
+    });
   }
+
+  const dayIndex: Record<string, number> = {};
+  days.forEach((d, i) => (dayIndex[d.date] = i));
 
   for (const incident of incidents) {
     const key = new Date(incident.createdAt).toISOString().slice(0, 10);
-    if (key in buckets) buckets[key] += 1;
+    const idx = dayIndex[key];
+    if (idx !== undefined && incident.status in days[idx].counts) {
+      days[idx].counts[incident.status] += 1;
+    }
   }
 
-  return Object.entries(buckets).map(([date, count]) => ({
-    label: new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-    count,
-  }));
+  return days;
+}
+
+// Converts a series of points into a smooth Catmull-Rom-to-Bezier path,
+// giving rounded curves instead of sharp straight-line joins.
+function smoothPath(points: { x: number; y: number }[]): string {
+  if (points.length < 2) return points.length === 1 ? `M ${points[0].x} ${points[0].y}` : '';
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? i : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
 }
 
 export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
@@ -46,6 +103,21 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const [trendStart, setTrendStart] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 13);
+    return formatDateInput(d);
+  });
+  const [trendEnd, setTrendEnd] = useState<string>(() => formatDateInput(new Date()));
+
+  const setQuickRange = (daysBack: number) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (daysBack - 1));
+    setTrendStart(formatDateInput(start));
+    setTrendEnd(formatDateInput(end));
+  };
 
   useEffect(() => {
     // pageSize large enough to cover realistic totals for a dashboard summary;
@@ -167,6 +239,25 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
       </div>
     );
   }
+
+  const start = new Date(trendStart);
+  const end = new Date(trendEnd);
+  const trend = buildDailyTrendByStatus(incidents, start, end);
+  const maxCountAcrossAll = Math.max(1, ...trend.flatMap((t) => STATUS_ORDER.map((s) => t.counts[s])));
+  const chartWidth = 700;
+  const chartHeight = 220;
+  const paddingLeft = 40;
+  const paddingBottom = 30;
+  const paddingTop = 10;
+  const paddingRight = 10;
+  const plotWidth = chartWidth - paddingLeft - paddingRight;
+  const plotHeight = chartHeight - paddingTop - paddingBottom;
+  const stepX = plotWidth / (trend.length - 1 || 1);
+  const yTickCount = 4;
+  const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) =>
+    Math.round((maxCountAcrossAll / yTickCount) * i)
+  );
+  const labelEvery = Math.max(1, Math.ceil(trend.length / 8));
 
   return (
     <div>
@@ -305,75 +396,166 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Status breakdown bar chart */}
-      <div className="ae-card">
-        <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
-          Incidents by Status
-        </h3>
-        <svg width="100%" height={220} viewBox="0 0 600 220" style={{ overflow: 'visible' }}>
-          {STATUS_ORDER.map((status, idx) => {
-            const count = countByStatus(status);
-            const barWidth = 70;
-            const gap = 20;
-            const x = idx * (barWidth + gap) + 20;
-            const barHeight = (count / maxCount) * 150;
-            const y = 170 - barHeight;
-            const s = statusCounts.find((sc) => sc.status === status);
-            return (
-              <g key={status}>
-                <rect x={x} y={y} width={barWidth} height={barHeight} fill={s?.color ?? '#94a3b8'} rx={4} />
-                <text x={x + barWidth / 2} y={y - 6} textAnchor="middle" fontSize="12" fontWeight="700" fill="#334155">
-                  {count}
-                </text>
-                <text x={x + barWidth / 2} y={190} textAnchor="middle" fontSize="10" fill="#64748b">
-                  {status}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-
-      {/* Incident volume over time — line chart */}
-      <div className="ae-card" style={{ marginTop: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
-          Incident Volume — Last 14 Days
-        </h3>
-        {(() => {
-          const trend = buildDailyTrend(incidents, 14);
-          const maxTrend = Math.max(1, ...trend.map((t) => t.count));
-          const chartWidth = 600;
-          const chartHeight = 180;
-          const padding = 30;
-          const stepX = (chartWidth - padding * 2) / (trend.length - 1 || 1);
-
-          const points = trend.map((t, i) => {
-            const x = padding + i * stepX;
-            const y = chartHeight - padding - (t.count / maxTrend) * (chartHeight - padding * 2);
-            return { x, y, count: t.count, label: t.label };
-          });
-
-          const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-          const areaPath = `${linePath} L ${points[points.length - 1].x} ${chartHeight - padding} L ${points[0].x} ${chartHeight - padding} Z`;
-
-          return (
-            <svg width="100%" height={chartHeight + 30} viewBox={`0 0 ${chartWidth} ${chartHeight + 30}`} style={{ overflow: 'visible' }}>
-              <path d={areaPath} fill="#38bdf8" opacity={0.12} />
-              <path d={linePath} fill="none" stroke="#38bdf8" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-              {points.map((p, i) => (
-                <g key={i}>
-                  <circle cx={p.x} cy={p.y} r={3} fill="#38bdf8" />
-                  {(i === 0 || i === points.length - 1 || i % 3 === 0) && (
-                    <text x={p.x} y={chartHeight + 20} textAnchor="middle" fontSize="9" fill="#94a3b8">
-                      {p.label}
-                    </text>
-                  )}
-                </g>
+      {/* Both charts side by side on wide screens via .ae-charts-grid */}
+      <div className="ae-charts-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.5rem' }}>
+        {/* Status breakdown bar chart */}
+        <div className="ae-card">
+          <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+            Incidents by Status
+          </h3>
+          <svg width="100%" height={220} viewBox="0 0 600 220" style={{ overflow: 'visible' }}>
+            <defs>
+              {STATUS_ORDER.map((status) => (
+                <linearGradient key={status} id={`bar-gradient-${status}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={STATUS_BAR_COLORS[status].dark} stopOpacity={0.85} />
+                  <stop offset="100%" stopColor={STATUS_BAR_COLORS[status].light} stopOpacity={0.85} />
+                </linearGradient>
               ))}
-            </svg>
-          );
-        })()}
+            </defs>
+            {STATUS_ORDER.map((status, idx) => {
+              const count = countByStatus(status);
+              const barWidth = 70;
+              const gap = 20;
+              const x = idx * (barWidth + gap) + 20;
+              const barHeight = (count / maxCount) * 150;
+              const y = 170 - barHeight;
+              return (
+                <g key={status}>
+                  <rect x={x} y={y} width={barWidth} height={barHeight} fill={`url(#bar-gradient-${status})`} rx={6} />
+                  <text x={x + barWidth / 2} y={y - 6} textAnchor="middle" fontSize="12" fontWeight="700" fill="#334155">
+                    {count}
+                  </text>
+                  <text x={x + barWidth / 2} y={190} textAnchor="middle" fontSize="10" fill="#64748b">
+                    {status}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {/* Incident volume over time — one curve per status, with date-range controls */}
+        <div className="ae-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+              Incident Volume by Status
+            </h3>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => setQuickRange(14)} style={quickRangeButtonStyle}>Last 14 days</button>
+              <button onClick={() => setQuickRange(30)} style={quickRangeButtonStyle}>Last month</button>
+              <input
+                type="date"
+                value={trendStart}
+                max={trendEnd}
+                onChange={(e) => setTrendStart(e.target.value)}
+                style={dateInputStyle}
+              />
+              <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>to</span>
+              <input
+                type="date"
+                value={trendEnd}
+                min={trendStart}
+                max={formatDateInput(new Date())}
+                onChange={(e) => setTrendEnd(e.target.value)}
+                style={dateInputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            {STATUS_ORDER.map((s) => (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#64748b' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: STATUS_LINE_COLORS[s], display: 'inline-block' }} />
+                {s}
+              </div>
+            ))}
+          </div>
+
+          <svg width="100%" height={chartHeight + 20} viewBox={`0 0 ${chartWidth} ${chartHeight + 20}`} style={{ overflow: 'visible' }}>
+            {/* Y-axis gridlines + labels */}
+            {yTicks.map((tick, i) => {
+              const y = paddingTop + plotHeight - (tick / maxCountAcrossAll) * plotHeight;
+              return (
+                <g key={i}>
+                  <line x1={paddingLeft} y1={y} x2={chartWidth - paddingRight} y2={y} stroke="#f1f5f9" strokeWidth={1} />
+                  <text x={paddingLeft - 8} y={y + 3} textAnchor="end" fontSize="9" fill="#94a3b8">{tick}</text>
+                </g>
+              );
+            })}
+
+            {/* Y-axis title */}
+            <text
+              x={12}
+              y={paddingTop + plotHeight / 2}
+              textAnchor="middle"
+              fontSize="9"
+              fill="#64748b"
+              transform={`rotate(-90, 12, ${paddingTop + plotHeight / 2})`}
+            >
+              Incidents Reported
+            </text>
+
+            {/* One smooth line per status */}
+            {STATUS_ORDER.map((status) => {
+              const points = trend.map((t, i) => ({
+                x: paddingLeft + i * stepX,
+                y: paddingTop + plotHeight - (t.counts[status] / maxCountAcrossAll) * plotHeight,
+              }));
+              return (
+                <path
+                  key={status}
+                  d={smoothPath(points)}
+                  fill="none"
+                  stroke={STATUS_LINE_COLORS[status]}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                />
+              );
+            })}
+
+            {/* X-axis labels */}
+            {trend.map((t, i) => (
+              i % labelEvery === 0 || i === trend.length - 1 ? (
+                <text
+                  key={i}
+                  x={paddingLeft + i * stepX}
+                  y={chartHeight}
+                  textAnchor="middle"
+                  fontSize="9"
+                  fill="#94a3b8"
+                >
+                  {t.label}
+                </text>
+              ) : null
+            ))}
+
+            {/* X-axis title */}
+            <text x={paddingLeft + plotWidth / 2} y={chartHeight + 16} textAnchor="middle" fontSize="9" fill="#64748b">
+              Date
+            </text>
+          </svg>
+        </div>
       </div>
     </div>
   );
+};
+
+const quickRangeButtonStyle: React.CSSProperties = {
+  padding: '0.4rem 0.75rem',
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  backgroundColor: '#ffffff',
+  color: '#334155',
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const dateInputStyle: React.CSSProperties = {
+  padding: '0.35rem 0.5rem',
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  fontSize: '0.75rem',
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
 };
