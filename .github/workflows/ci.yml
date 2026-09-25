@@ -2,27 +2,39 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "**" ]
+    branches:
+      - "**"
   pull_request:
-    branches: [ dev, main ]
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   backend-tests:
     name: Backend Build & Tests
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16
         env:
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: aegis_lk_ci
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d aegis_lk_ci"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+
+    env:
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,19 +42,63 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
-      - name: Restore dependencies
-        run: dotnet restore backend/Aegis.Tests/Aegis.Tests.csproj
+      - name: Verify backend project files
+        run: |
+          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Tests/Aegis.Tests.csproj"
+          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Api/Aegis.Api.csproj"
+          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Weather/Aegis.Weather.csproj"
+          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Incident/Aegis.Incident.csproj"
+          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Recovery/Aegis.Recovery.csproj"
+          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Shared/Aegis.Shared.csproj"
 
-      - name: Run xUnit Tests
-        run: dotnet test backend/Aegis.Tests/Aegis.Tests.csproj --verbosity normal --no-restore
-        env:
-          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
+      - name: Restore backend dependencies
+        run: dotnet restore "${GITHUB_WORKSPACE}/backend/Aegis.Tests/Aegis.Tests.csproj"
+
+      - name: Build backend
+        run: dotnet build "${GITHUB_WORKSPACE}/backend/Aegis.Tests/Aegis.Tests.csproj" --configuration Debug --no-restore
+
+      - name: Install EF Core CLI
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.*
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Apply Auth database migrations
+        run: >-
+          dotnet ef database update
+          --project "${GITHUB_WORKSPACE}/backend/Aegis.Shared/Aegis.Shared.csproj"
+          --startup-project "${GITHUB_WORKSPACE}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context AuthDbContext
+
+      - name: Apply Weather database migrations
+        run: >-
+          dotnet ef database update
+          --project "${GITHUB_WORKSPACE}/backend/Aegis.Weather/Aegis.Weather.csproj"
+          --startup-project "${GITHUB_WORKSPACE}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context WeatherDbContext
+
+      - name: Apply Incident database migrations
+        run: >-
+          dotnet ef database update
+          --project "${GITHUB_WORKSPACE}/backend/Aegis.Incident/Aegis.Incident.csproj"
+          --startup-project "${GITHUB_WORKSPACE}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context IncidentDbContext
+
+      - name: Apply Recovery database migrations
+        run: >-
+          dotnet ef database update
+          --project "${GITHUB_WORKSPACE}/backend/Aegis.Recovery/Aegis.Recovery.csproj"
+          --startup-project "${GITHUB_WORKSPACE}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context RecoveryDbContext
+
+      - name: Run xUnit tests
+        run: dotnet test "${GITHUB_WORKSPACE}/backend/Aegis.Tests/Aegis.Tests.csproj" --configuration Debug --verbosity normal --no-restore --no-build
 
   flutter-analyze:
     name: Flutter Lint & Analyze
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,13 +106,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Install dependencies
-        working-directory: ./flutter
+        working-directory: "${{ github.workspace }}/flutter"
         run: flutter pub get
 
       - name: Run Flutter Analyze
-        working-directory: ./flutter
+        working-directory: "${{ github.workspace }}/flutter"
         run: flutter analyze --no-fatal-infos
