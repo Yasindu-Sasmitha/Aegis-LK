@@ -15,16 +15,15 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: aegis_lk
+          POSTGRES_DB: aegis_lk_ci
         ports:
-          - 5433:5432
+          - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres -d aegis_lk"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout repository
@@ -38,15 +37,25 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore backend/Aegis.Tests/Aegis.Tests.csproj
 
-      - name: Run xUnit Tests
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef
+
+      - name: Apply database migrations
+        working-directory: backend
         env:
-            ConnectionStrings__DefaultConnection: "Host=localhost;Port=5433;Database=aegis_lk;Username=postgres;Password=postgres"
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
+        run: |
+          export PATH="$PATH:/root/.dotnet/tools"
+          dotnet ef database update --project Aegis.Api/Aegis.Api.csproj --startup-project Aegis.Api/Aegis.Api.csproj
+
+      - name: Run xUnit Tests
         run: dotnet test backend/Aegis.Tests/Aegis.Tests.csproj --verbosity normal --no-restore
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
 
   flutter-analyze:
     name: Flutter Lint & Analyze
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
