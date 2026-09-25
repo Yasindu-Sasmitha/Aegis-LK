@@ -64,10 +64,6 @@ jobs:
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
       - name: Apply Auth database migrations
-        env:
-          ASPNETCORE_ENVIRONMENT: CI
-          DOTNET_ENVIRONMENT: CI
-          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Shared/Aegis.Shared.csproj"
@@ -76,10 +72,6 @@ jobs:
           --no-build
 
       - name: Apply Weather database migrations
-        env:
-          ASPNETCORE_ENVIRONMENT: CI
-          DOTNET_ENVIRONMENT: CI
-          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Weather/Aegis.Weather.csproj"
@@ -88,10 +80,6 @@ jobs:
           --no-build
 
       - name: Apply Incident database migrations
-        env:
-          ASPNETCORE_ENVIRONMENT: CI
-          DOTNET_ENVIRONMENT: CI
-          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Incident/Aegis.Incident.csproj"
@@ -100,10 +88,6 @@ jobs:
           --no-build
 
       - name: Apply Recovery database migrations
-        env:
-          ASPNETCORE_ENVIRONMENT: CI
-          DOTNET_ENVIRONMENT: CI
-          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Recovery/Aegis.Recovery.csproj"
@@ -112,10 +96,6 @@ jobs:
           --no-build
 
       - name: Run xUnit tests
-        env:
-          ASPNETCORE_ENVIRONMENT: CI
-          DOTNET_ENVIRONMENT: CI
-          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
         run: >
           dotnet test
           "${{ github.workspace }}/backend/Aegis.Tests/Aegis.Tests.csproj"
