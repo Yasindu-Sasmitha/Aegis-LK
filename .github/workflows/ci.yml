@@ -33,34 +33,30 @@ jobs:
           --health-retries 10
 
     env:
-      ConnectionStrings__DefaultConnection: >-
-        Host=localhost;
-        Port=5432;
-        Database=aegis_lk_ci;
-        Username=postgres;
-        Password=postgres
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Verify repository layout
-        run: |
-          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Tests/Aegis.Tests.csproj"
-          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Api/Aegis.Api.csproj"
-          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Weather/Aegis.Weather.csproj"
-          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Incident/Aegis.Incident.csproj"
-          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Recovery/Aegis.Recovery.csproj"
-          test -f "${GITHUB_WORKSPACE}/backend/Aegis.Shared/Aegis.Shared.csproj"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
 
-      - name: Restore dependencies
-        working-directory: ${{ github.workspace }}
+      - name: Restore backend dependencies
         run: dotnet restore "${{ github.workspace }}/backend/Aegis.Tests/Aegis.Tests.csproj"
+
+      - name: Build API startup project
+        run: dotnet build "${{ github.workspace }}/backend/Aegis.Api/Aegis.Api.csproj" --configuration Debug --no-restore
+
+      - name: Build test project
+        run: dotnet build "${{ github.workspace }}/backend/Aegis.Tests/Aegis.Tests.csproj" --configuration Debug --no-restore
+
+      - name: Verify API build output
+        run: |
+          test -f "${{ github.workspace }}/backend/Aegis.Api/bin/Debug/net10.0/Aegis.Api.deps.json"
+          test -f "${{ github.workspace }}/backend/Aegis.Api/bin/Debug/net10.0/Aegis.Api.dll"
 
       - name: Install EF Core CLI
         run: |
@@ -68,7 +64,6 @@ jobs:
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
       - name: Apply Auth database migrations
-        working-directory: ${{ github.workspace }}
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Shared/Aegis.Shared.csproj"
@@ -77,7 +72,6 @@ jobs:
           --no-build
 
       - name: Apply Weather database migrations
-        working-directory: ${{ github.workspace }}
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Weather/Aegis.Weather.csproj"
@@ -86,7 +80,6 @@ jobs:
           --no-build
 
       - name: Apply Incident database migrations
-        working-directory: ${{ github.workspace }}
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Incident/Aegis.Incident.csproj"
@@ -95,7 +88,6 @@ jobs:
           --no-build
 
       - name: Apply Recovery database migrations
-        working-directory: ${{ github.workspace }}
         run: >
           dotnet ef database update
           --project "${{ github.workspace }}/backend/Aegis.Recovery/Aegis.Recovery.csproj"
@@ -104,10 +96,10 @@ jobs:
           --no-build
 
       - name: Run xUnit tests
-        working-directory: ${{ github.workspace }}
         run: >
           dotnet test
           "${{ github.workspace }}/backend/Aegis.Tests/Aegis.Tests.csproj"
+          --configuration Debug
           --verbosity normal
           --no-restore
           --no-build
@@ -127,9 +119,9 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        working-directory: ${{ github.workspace }}/flutter
+        working-directory: "${{ github.workspace }}/flutter"
         run: flutter pub get
 
       - name: Run Flutter Analyze
-        working-directory: ${{ github.workspace }}/flutter
+        working-directory: "${{ github.workspace }}/flutter"
         run: flutter analyze --no-fatal-infos
