@@ -10,6 +10,19 @@ jobs:
   backend-tests:
     name: Backend Build & Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aegis_lk_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,6 +37,8 @@ jobs:
 
       - name: Run xUnit Tests
         run: dotnet test backend/Aegis.Tests/Aegis.Tests.csproj --verbosity normal --no-restore
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
 
   flutter-analyze:
     name: Flutter Lint & Analyze
