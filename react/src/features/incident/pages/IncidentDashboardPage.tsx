@@ -111,6 +111,21 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
   });
   const [trendEnd, setTrendEnd] = useState<string>(() => formatDateInput(new Date()));
 
+  const [visibleStatuses, setVisibleStatuses] = useState<Set<string>>(new Set(STATUS_ORDER));
+
+  const toggleStatus = (status: string) => {
+    setVisibleStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) {
+        // keep at least one line visible
+        if (next.size > 1) next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
+  };
+
   const setQuickRange = (daysBack: number) => {
     const end = new Date();
     const start = new Date();
@@ -243,6 +258,9 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
   const start = new Date(trendStart);
   const end = new Date(trendEnd);
   const trend = buildDailyTrendByStatus(incidents, start, end);
+  // Note: axis scale intentionally stays based on ALL statuses, not just visible
+  // ones, so toggling lines on/off doesn't rescale the chart and shift remaining
+  // lines around — makes comparisons stable as you toggle.
   const maxCountAcrossAll = Math.max(1, ...trend.flatMap((t) => STATUS_ORDER.map((s) => t.counts[s])));
   const chartWidth = 700;
   const chartHeight = 220;
@@ -462,14 +480,37 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Legend */}
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-            {STATUS_ORDER.map((s) => (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#64748b' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: STATUS_LINE_COLORS[s], display: 'inline-block' }} />
-                {s}
-              </div>
-            ))}
+          {/* Legend — click a status to toggle its line on/off */}
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            {STATUS_ORDER.map((s) => {
+              const active = visibleStatuses.has(s);
+              return (
+                <button
+                  key={s}
+                  onClick={() => toggleStatus(s)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    fontSize: '0.75rem',
+                    color: active ? '#334155' : '#cbd5e1',
+                    background: active ? '#f8fafc' : 'transparent',
+                    border: '1px solid ' + (active ? '#e2e8f0' : '#f1f5f9'),
+                    borderRadius: 20,
+                    padding: '0.25rem 0.65rem',
+                    cursor: 'pointer',
+                    fontWeight: active ? 600 : 500,
+                  }}
+                >
+                  <span style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    backgroundColor: active ? STATUS_LINE_COLORS[s] : '#e2e8f0',
+                    display: 'inline-block',
+                  }} />
+                  {s}
+                </button>
+              );
+            })}
           </div>
 
           <svg width="100%" height={chartHeight + 20} viewBox={`0 0 ${chartWidth} ${chartHeight + 20}`} style={{ overflow: 'visible' }}>
@@ -496,8 +537,8 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
               Incidents Reported
             </text>
 
-            {/* One smooth line per status */}
-            {STATUS_ORDER.map((status) => {
+            {/* One smooth line per status — only for toggled-on statuses */}
+            {STATUS_ORDER.filter((s) => visibleStatuses.has(s)).map((status) => {
               const points = trend.map((t, i) => ({
                 x: paddingLeft + i * stepX,
                 y: paddingTop + plotHeight - (t.counts[status] / maxCountAcrossAll) * plotHeight,
