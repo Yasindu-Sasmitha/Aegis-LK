@@ -130,7 +130,7 @@ builder.Services.AddSingleton<Aegis.Incident.Services.CloudinaryService>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
@@ -177,3 +177,5 @@ app.MapIncidentEndpoints();
 app.MapResourceEndpoints();
 
 app.Run();
+
+public partial class Program { }

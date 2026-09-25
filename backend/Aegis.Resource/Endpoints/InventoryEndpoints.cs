@@ -69,7 +69,6 @@ namespace Aegis.Resource.Endpoints
                 return deleted ? Results.NoContent() : Results.NotFound();
             }).RequireAuthorization(policy => policy.RequireRole("Admin"));
 
-            // Business-specific operation beyond basic CRUD
             group.MapPatch("/{id:guid}/adjust", async (
                 Guid id, AdjustInventoryQuantityDto dto, IInventoryService inventoryService) =>
             {
