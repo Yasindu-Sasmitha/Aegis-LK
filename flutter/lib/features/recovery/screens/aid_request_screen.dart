@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../shared/auth/auth_provider.dart';
 import '../../../shared/theme/aegis_theme.dart';
 import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
@@ -15,17 +17,18 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final RecoveryService _service = RecoveryService();
 
-  String _victimName = '';
-  String _contactPhone = '';
+  final _victimNameController = TextEditingController();
+  final _contactPhoneController = TextEditingController();
   String _district = 'Kalutara';
-  String _aidType = 'Shelter';
-  int _familySize = 3;
+  String _aidType = 'Food Rations';
+  final _familySizeController = TextEditingController(text: '4');
   String _urgency = 'High';
-  String _notes = '';
+  final _notesController = TextEditingController();
   String? _selectedShelterId;
   List<ShelterModel> _availableShelters = [];
   bool _loadingShelters = false;
   bool _submitting = false;
+  bool _initializedUser = false;
 
   final List<String> _districts = [
     'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 'Galle',
@@ -36,8 +39,13 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
   ];
 
   final List<String> _aidTypes = [
-    'Shelter', 'Food & Ration Packs', 'Medical Assistance', 'Financial Subsistence',
-    'Clean Water & Sanitation', 'Clothing & Bedding'
+    'Food Rations',
+    'Clean Drinking Water',
+    'Emergency Medical Kit',
+    'Baby Care & Infant Formula',
+    'Temporary Shelter & Bedding',
+    'Cash Living Stipend',
+    'Clothing & Blankets',
   ];
 
   final List<String> _urgencyLevels = ['Critical', 'High', 'Medium', 'Low'];
@@ -46,6 +54,35 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
   void initState() {
     super.initState();
     _loadSheltersForDistrict(_district);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedUser) {
+      _initializedUser = true;
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.user != null) {
+        if (_victimNameController.text.isEmpty) {
+          _victimNameController.text = auth.user!.fullName;
+        }
+        if (_contactPhoneController.text.isEmpty && auth.user!.phoneNumber != null) {
+          _contactPhoneController.text = auth.user!.phoneNumber!;
+        }
+        if (auth.user!.district != null && _districts.contains(auth.user!.district)) {
+          _district = auth.user!.district!;
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _victimNameController.dispose();
+    _contactPhoneController.dispose();
+    _familySizeController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSheltersForDistrict(String district) async {
@@ -66,53 +103,56 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
     }
   }
 
+  void _resetForm() {
+    _notesController.clear();
+    _familySizeController.text = '4';
+    _selectedShelterId = null;
+    setState(() {});
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
+    final fSize = int.tryParse(_familySizeController.text.trim()) ?? 1;
+
     setState(() => _submitting = true);
 
     try {
-      final req = await _service.submitAidRequest(
-        victimName: _victimName.trim(),
-        contactPhone: _contactPhone.trim(),
+      await _service.submitAidRequest(
+        victimName: _victimNameController.text.trim(),
+        contactPhone: _contactPhoneController.text.trim(),
         district: _district,
         aidType: _aidType,
-        familySize: _familySize,
+        familySize: fSize,
         urgency: _urgency,
         shelterId: _selectedShelterId,
-        notes: _notes.trim(),
+        notes: _notesController.text.trim(),
       );
 
       if (mounted) {
+        _resetForm();
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            title: Row(
-              children: const [
+            title: const Row(
+              children: [
                 Icon(Icons.check_circle, color: kSuccess, size: 24),
                 SizedBox(width: 8),
-                Text('Request Submitted!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
+                Text('Request Submitted!',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
               ],
             ),
-            content: Text(
-              'Your emergency aid request (#${req.id}) for $_familySize family member(s) in $_district has been forwarded to the DMC field coordinators.',
-              style: const TextStyle(fontSize: 13, color: kTextSecondary),
+            content: const Text(
+              'Your emergency humanitarian aid request has been received by the Disaster Management Centre desk for immediate triage and dispatch.',
+              style: TextStyle(fontSize: 13, color: kTextSecondary),
             ),
             actions: [
               ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F2B48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  if (widget.showAppBar) {
-                    Navigator.pop(context);
-                  }
-                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                onPressed: () => Navigator.pop(ctx),
                 child: const Text('OK', style: TextStyle(color: Colors.white)),
               ),
             ],
@@ -122,10 +162,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Submission failed: $e'),
-            backgroundColor: kDanger,
-          ),
+          SnackBar(content: Text('Failed: $e'), backgroundColor: kDanger),
         );
       }
     } finally {
@@ -141,223 +178,184 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
           ? AppBar(
               backgroundColor: kNavBg,
               iconTheme: const IconThemeData(color: Colors.white),
-              title: const Text('Apply for Emergency Aid', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: const Text('Request Emergency Relief Aid',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
           : null,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header Card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+                    colors: [Color(0xFF07162C), Color(0xFF1E3A8A)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
-                  ],
                 ),
-                child: Row(
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.handshake_outlined, color: Colors.white, size: 28),
+                    Text('Humanitarian Relief Intake Portal',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    SizedBox(height: 4),
+                    Text('Direct intake for flood, cyclone and landslide victims to receive rations, medical kits, and shelter assistance.',
+                        style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Applicant Details Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: kBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Applicant Information',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary)),
+                    const SizedBox(height: 2),
+                    const Text('Primary contact for verification and relief dispatch',
+                        style: TextStyle(fontSize: 11, color: kTextSecondary)),
+                    const Divider(height: 20, color: kBorder),
+                    TextFormField(
+                      controller: _victimNameController,
+                      decoration: const InputDecoration(labelText: 'Applicant / Victim Name *', border: OutlineInputBorder()),
+                      validator: (v) => v?.trim().isEmpty == true ? 'Applicant name required' : null,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Emergency Relief Application',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Request essential shelter, rations, medical care or monetary relief.',
-                            style: TextStyle(color: Color(0xFFBFDBFE), fontSize: 12),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _contactPhoneController,
+                      decoration: const InputDecoration(labelText: 'Contact Phone Number *', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.phone,
+                      validator: (v) => (v?.trim().length ?? 0) < 9 ? 'Valid phone number required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _district,
+                      decoration: const InputDecoration(labelText: 'District *', border: OutlineInputBorder()),
+                      items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      onChanged: (v) {
+                        setState(() => _district = v!);
+                        _loadSheltersForDistrict(v!);
+                      },
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
 
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Applicant Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
-                      const Divider(height: 20),
-                      TextFormField(
-                        initialValue: 'Kamal Perera',
-                        decoration: const InputDecoration(
-                          labelText: 'Head of Household / Applicant Name',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                        onSaved: (val) => _victimName = val ?? '',
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        initialValue: '+94 71 890 1234',
-                        decoration: const InputDecoration(
-                          labelText: 'Contact Phone Number',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        keyboardType: TextInputType.phone,
-                        validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                        onSaved: (val) => _contactPhone = val ?? '',
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _district,
-                        decoration: const InputDecoration(
-                          labelText: 'District',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() => _district = val);
-                            _loadSheltersForDistrict(val);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+              // Relief Requirements Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: kBorder),
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Aid Requirement Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
-                      const Divider(height: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Relief Requirements',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary)),
+                    const SizedBox(height: 2),
+                    const Text('Specify category and urgency level',
+                        style: TextStyle(fontSize: 11, color: kTextSecondary)),
+                    const Divider(height: 20, color: kBorder),
+                    DropdownButtonFormField<String>(
+                      value: _aidType,
+                      decoration: const InputDecoration(labelText: 'Primary Aid Category *', border: OutlineInputBorder()),
+                      items: _aidTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                      onChanged: (v) => setState(() => _aidType = v!),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _familySizeController,
+                            decoration: const InputDecoration(labelText: 'Family Size (Members) *', border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                            validator: (v) => (int.tryParse(v ?? '') ?? 0) < 1 ? 'Minimum 1' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _urgency,
+                            decoration: const InputDecoration(labelText: 'Urgency Level *', border: OutlineInputBorder()),
+                            items: _urgencyLevels.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                            onChanged: (v) => setState(() => _urgency = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_aidType.contains('Shelter') || _aidType.contains('Bedding')) ...[
                       DropdownButtonFormField<String>(
-                        value: _aidType,
-                        decoration: const InputDecoration(
-                          labelText: 'Primary Aid Category',
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                        value: _selectedShelterId,
+                        decoration: InputDecoration(
+                          labelText: 'Requested Evacuation Shelter',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: _loadingShelters
+                              ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                              : null,
                         ),
-                        items: _aidTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                        onChanged: (val) => setState(() => _aidType = val ?? 'Shelter'),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: '3',
-                              decoration: const InputDecoration(
-                                labelText: 'Family Members Count',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              keyboardType: TextInputType.number,
-                              validator: (val) => (int.tryParse(val ?? '') ?? 0) < 1 ? 'Min 1' : null,
-                              onSaved: (val) => _familySize = int.tryParse(val ?? '1') ?? 1,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _urgency,
-                              decoration: const InputDecoration(
-                                labelText: 'Urgency Level',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              items: _urgencyLevels.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                              onChanged: (val) => setState(() => _urgency = val ?? 'High'),
-                            ),
-                          ),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('Assign nearest open shelter')),
+                          ..._availableShelters.map((s) => DropdownMenuItem(value: s.id, child: Text('${s.name} (${s.remainingBeds} beds)'))),
                         ],
+                        onChanged: (v) => setState(() => _selectedShelterId = v),
                       ),
                       const SizedBox(height: 12),
-
-                      // Optional Shelter Assignment Dropdown
-                      if (_loadingShelters)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Center(child: LinearProgressIndicator()),
-                        )
-                      else if (_availableShelters.isNotEmpty)
-                        DropdownButtonFormField<String>(
-                          value: _selectedShelterId,
-                          decoration: const InputDecoration(
-                            labelText: 'Preferred Target Shelter (Optional)',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('No specific shelter preference')),
-                            ..._availableShelters.map((s) => DropdownMenuItem(
-                              value: s.id,
-                              child: Text('${s.name} (${s.remainingBeds} beds available)'),
-                            )),
-                          ],
-                          onChanged: (val) => setState(() => _selectedShelterId = val),
-                        ),
-                      const SizedBox(height: 12),
-
-                      TextFormField(
-                        initialValue: 'Elderly parents and one infant needing dry ration packs and baby formula.',
-                        decoration: const InputDecoration(
-                          labelText: 'Additional Notes & Specific Medical / Dietary Needs',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 3,
-                        onSaved: (val) => _notes = val ?? '',
-                      ),
                     ],
-                  ),
+                    TextFormField(
+                      controller: _notesController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Situation Notes & Specific Requirements',
+                        hintText: 'e.g. Infant dry milk required, elderly member needing insulin',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
 
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _submitting ? null : _submit,
-                  icon: _submitting
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.send, color: Colors.white),
-                  label: Text(
-                    _submitting ? 'Submitting Application...' : 'Submit Emergency Aid Application',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E3A8A),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 2,
                 ),
+                onPressed: _submitting ? null : _submit,
+                child: _submitting
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                          SizedBox(width: 10),
+                          Text('Submitting Request...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ],
+                      )
+                    : const Text('Submit Relief Aid Application',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
               ),
+              const SizedBox(height: 30),
             ],
           ),
         ),

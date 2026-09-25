@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../shared/auth/auth_provider.dart';
 import '../../../shared/theme/aegis_theme.dart';
 import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
@@ -11,21 +13,23 @@ class CompensationClaimScreen extends StatefulWidget {
   State<CompensationClaimScreen> createState() => _CompensationClaimScreenState();
 }
 
-class _CompensationClaimScreenState extends State<CompensationClaimScreen> with SingleTickerProviderStateMixin {
+class _CompensationClaimScreenState extends State<CompensationClaimScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
   final RecoveryService _service = RecoveryService();
 
-  String _applicantName = 'Sunil Shantha';
-  String _applicantNIC = '198512345678';
-  String _contactPhone = '+94 77 456 7890';
+  final _applicantNameController = TextEditingController();
+  final _applicantNICController = TextEditingController();
+  final _contactPhoneController = TextEditingController();
   String _district = 'Kalutara';
   String _damageCategory = 'Major Structural Damage';
-  final _claimAmountController = TextEditingController(text: '450000');
-  final _bankDetailsController = TextEditingController(text: 'Bank of Ceylon - Kalutara Branch, A/C: 00123456789');
-  final _descriptionController = TextEditingController(text: 'Flood waters entered house causing foundation subsidence and collapse of rear kitchen wall.');
+  final _claimAmountController = TextEditingController();
+  final _bankDetailsController = TextEditingController();
+  final _descriptionController = TextEditingController();
 
   bool _submitting = false;
+  bool _initializedUser = false;
   late Future<List<CompensationModel>> _claimsFuture;
 
   final List<String> _districts = [
@@ -52,8 +56,31 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedUser) {
+      _initializedUser = true;
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.user != null) {
+        if (_applicantNameController.text.isEmpty) {
+          _applicantNameController.text = auth.user!.fullName;
+        }
+        if (_contactPhoneController.text.isEmpty && auth.user!.phoneNumber != null) {
+          _contactPhoneController.text = auth.user!.phoneNumber!;
+        }
+        if (auth.user!.district != null && _districts.contains(auth.user!.district)) {
+          _district = auth.user!.district!;
+        }
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
+    _applicantNameController.dispose();
+    _applicantNICController.dispose();
+    _contactPhoneController.dispose();
     _claimAmountController.dispose();
     _bankDetailsController.dispose();
     _descriptionController.dispose();
@@ -64,6 +91,14 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
     setState(() {
       _claimsFuture = _service.fetchCompensations();
     });
+  }
+
+  void _resetForm() {
+    _applicantNICController.clear();
+    _claimAmountController.clear();
+    _bankDetailsController.clear();
+    _descriptionController.clear();
+    setState(() {});
   }
 
   Future<void> _submitClaim() async {
@@ -81,10 +116,10 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
     setState(() => _submitting = true);
 
     try {
-      final claim = await _service.submitCompensationClaim(
-        applicantName: _applicantName.trim(),
-        applicantNIC: _applicantNIC.trim(),
-        contactPhone: _contactPhone.trim(),
+      await _service.submitCompensationClaim(
+        applicantName: _applicantNameController.text.trim(),
+        applicantNIC: _applicantNICController.text.trim(),
+        contactPhone: _contactPhoneController.text.trim(),
         district: _district,
         damageCategory: _damageCategory,
         claimAmount: claimAmt,
@@ -93,34 +128,30 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
       );
 
       if (mounted) {
+        _resetForm();
         _loadClaims();
+        _tabController.animateTo(1);
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            title: Row(
-              children: const [
+            title: const Row(
+              children: [
                 Icon(Icons.check_circle, color: kSuccess, size: 24),
                 SizedBox(width: 8),
-                Text('Claim Registered!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
+                Text('Claim Filed!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
               ],
             ),
             content: Text(
-              'Your disaster housing compensation claim (#${claim.id}) for LKR ${claimAmt.toStringAsFixed(0)} has been queued for verification by the Divisional Secretariat and DMC.',
+              'Your property damage compensation claim of LKR ${claimAmt.toStringAsFixed(0)} has been registered. An official field verification officer will review your documents.',
               style: const TextStyle(fontSize: 13, color: kTextSecondary),
             ),
             actions: [
               ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F2B48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _tabController.animateTo(1);
-                },
-                child: const Text('View Claims', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('View Claims Ledger', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -129,7 +160,7 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Claim submission failed: $e'), backgroundColor: kDanger),
+          SnackBar(content: Text('Submission failed: $e'), backgroundColor: kDanger),
         );
       }
     } finally {
@@ -137,39 +168,29 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'approved':
-      case 'disbursed':
-        return kSuccess;
-      case 'underreview':
-      case 'under review':
-      case 'pending':
-        return kWarning;
-      case 'rejected':
-        return kDanger;
-      default:
-        return const Color(0xFF2563EB);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final isOfficer = auth.isOfficerOrAdmin;
+    final userName = (auth.user?.fullName ?? '').trim().toLowerCase();
+    final userPhone = (auth.user?.phoneNumber ?? '').trim().replaceAll(RegExp(r'[^0-9]'), '');
+
     return Scaffold(
       backgroundColor: kSurface,
       appBar: widget.showAppBar
           ? AppBar(
               backgroundColor: kNavBg,
               iconTheme: const IconThemeData(color: Colors.white),
-              title: const Text('Housing Compensation Claims', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: const Text('Property Damage Compensation',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               bottom: TabBar(
                 controller: _tabController,
                 indicatorColor: kAccent,
                 labelColor: Colors.white,
                 unselectedLabelColor: const Color(0xFF94A3B8),
-                tabs: const [
-                  Tab(icon: Icon(Icons.note_add_outlined, size: 18), text: 'File Claim'),
-                  Tab(icon: Icon(Icons.history_outlined, size: 18), text: 'Claims Ledger'),
+                tabs: [
+                  const Tab(icon: Icon(Icons.note_add), text: 'File Claim'),
+                  Tab(icon: const Icon(Icons.history_edu), text: isOfficer ? 'All Claims' : 'My Claims'),
                 ],
               ),
             )
@@ -177,339 +198,259 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen> with 
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildFileClaimTab(),
-          _buildClaimsLedgerTab(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFileClaimTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Banner
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF831843), Color(0xFF9D174D)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.home_work_outlined, color: Colors.white, size: 28),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'National Property Relief Scheme',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 3),
-                        Text(
-                          'Government & humanitarian grant allocation for damaged residential properties.',
-                          style: TextStyle(color: Color(0xFFFBCFE8), fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Applicant Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Applicant Identification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
-                    const Divider(height: 20),
-                    TextFormField(
-                      initialValue: _applicantName,
-                      decoration: const InputDecoration(labelText: 'Applicant Full Name', border: OutlineInputBorder(), isDense: true),
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                      onSaved: (val) => _applicantName = val ?? '',
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: _applicantNIC,
-                            decoration: const InputDecoration(labelText: 'National Identity Card (NIC)', border: OutlineInputBorder(), isDense: true),
-                            validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                            onSaved: (val) => _applicantNIC = val ?? '',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: _contactPhone,
-                            decoration: const InputDecoration(labelText: 'Contact Phone', border: OutlineInputBorder(), isDense: true),
-                            keyboardType: TextInputType.phone,
-                            validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                            onSaved: (val) => _contactPhone = val ?? '',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _district,
-                      decoration: const InputDecoration(labelText: 'District of Damaged Property', border: OutlineInputBorder(), isDense: true),
-                      items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                      onChanged: (val) => setState(() => _district = val ?? 'Kalutara'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Claim Details Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Damage Category & Bank Transfer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
-                    const Divider(height: 20),
-                    DropdownButtonFormField<String>(
-                      value: _damageCategory,
-                      decoration: const InputDecoration(labelText: 'Damage Assessment Category', border: OutlineInputBorder(), isDense: true),
-                      items: _damageCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (val) => setState(() => _damageCategory = val ?? _damageCategories.first),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _claimAmountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Claim Compensation Amount (LKR)',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        prefixText: 'LKR ',
-                      ),
-                      validator: (val) => (double.tryParse(val ?? '') ?? 0) <= 0 ? 'Enter valid amount' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _bankDetailsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Bank Name, Branch & Account Number',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Bank details required for direct transfer' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _descriptionController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Specific Damage Description & Evidence Notes',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _submitting ? null : _submitClaim,
-                icon: _submitting
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.send, color: Colors.white),
-                label: Text(
-                  _submitting ? 'Submitting Claim...' : 'Submit Compensation Claim',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9D174D),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClaimsLedgerTab() {
-    return FutureBuilder<List<CompensationModel>>(
-      future: _claimsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline, color: kDanger, size: 40),
-                  const SizedBox(height: 10),
-                  Text('Failed to load compensation records: ${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary)),
-                  const SizedBox(height: 14),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F2B48)),
-                    onPressed: _loadClaims,
-                    child: const Text('Reload', style: TextStyle(color: Colors.white)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final claims = snapshot.data ?? [];
-        if (claims.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.home_repair_service_outlined, size: 50, color: Colors.grey[400]),
-                const SizedBox(height: 10),
-                const Text('No compensation claims filed yet.', style: TextStyle(color: kTextSecondary, fontSize: 14)),
-              ],
-            ),
-          );
-        }
-
-        final totalClaimed = claims.fold<double>(0, (sum, c) => sum + c.claimAmount);
-
-        return RefreshIndicator(
-          onRefresh: () async => _loadClaims(),
-          child: ListView(
+          // ── TAB 1: FILE CLAIM FORM ──
+          SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F2B48),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Total Housing Claims Filed', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Text('LKR ${totalClaimed.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      ],
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Applicant Info Card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: kBorder),
                     ),
-                    Text('${claims.length} Claims', style: const TextStyle(color: kAccent, fontWeight: FontWeight.w600, fontSize: 13)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              ...claims.map((c) {
-                final statusColor = _getStatusColor(c.status);
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const Text('Claimant Identification',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary)),
+                        const SizedBox(height: 2),
+                        const Text('Official legal name and NIC for fund disbursement',
+                            style: TextStyle(fontSize: 11, color: kTextSecondary)),
+                        const Divider(height: 20, color: kBorder),
+                        TextFormField(
+                          controller: _applicantNameController,
+                          decoration: const InputDecoration(labelText: 'Applicant Full Name *', border: OutlineInputBorder()),
+                          validator: (v) => v?.trim().isEmpty == true ? 'Applicant name required' : null,
+                        ),
+                        const SizedBox(height: 12),
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF9D174D).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.roofing_outlined, color: Color(0xFF9D174D), size: 22),
-                            ),
-                            const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(c.applicantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary)),
-                                  const SizedBox(height: 2),
-                                  Text('NIC: ${c.applicantNIC}  •  📍 ${c.district}', style: const TextStyle(color: kTextSecondary, fontSize: 12)),
-                                ],
+                              child: TextFormField(
+                                controller: _applicantNICController,
+                                decoration: const InputDecoration(labelText: 'National Identity Card (NIC) *', border: OutlineInputBorder()),
+                                validator: (v) => v?.trim().isEmpty == true ? 'NIC required' : null,
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: statusColor.withValues(alpha: 0.4)),
-                              ),
-                              child: Text(
-                                c.status.toUpperCase(),
-                                style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _contactPhoneController,
+                                decoration: const InputDecoration(labelText: 'Phone Number *', border: OutlineInputBorder()),
+                                keyboardType: TextInputType.phone,
+                                validator: (v) => (v?.trim().length ?? 0) < 9 ? 'Valid phone required' : null,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(6),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _district,
+                          decoration: const InputDecoration(labelText: 'Disaster Affected District *', border: OutlineInputBorder()),
+                          items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                          onChanged: (v) => setState(() => _district = v!),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Claim Assessment Card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Damage Assessment & Banking',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary)),
+                        const SizedBox(height: 2),
+                        const Text('Category, amount claimed, and verified account details',
+                            style: TextStyle(fontSize: 11, color: kTextSecondary)),
+                        const Divider(height: 20, color: kBorder),
+                        DropdownButtonFormField<String>(
+                          value: _damageCategory,
+                          decoration: const InputDecoration(labelText: 'Damage Classification *', border: OutlineInputBorder()),
+                          items: _damageCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                          onChanged: (v) => setState(() => _damageCategory = v!),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _claimAmountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Estimated Repair / Replacement Claim (LKR) *',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.payments_outlined, color: Color(0xFF2563EB)),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Category: ${c.damageCategory}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: kTextPrimary)),
-                              const SizedBox(height: 2),
-                              Text('Claim Amount: LKR ${c.claimAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF047857), fontSize: 13)),
-                              if (c.bankDetails.isNotEmpty)
-                                Text('Bank Account: ${c.bankDetails}', style: const TextStyle(fontSize: 11, color: kTextSecondary)),
-                            ],
+                          keyboardType: TextInputType.number,
+                          validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0 ? 'Enter valid claim amount' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _bankDetailsController,
+                          decoration: const InputDecoration(
+                            labelText: 'Disbursement Bank, Branch & Account No. *',
+                            hintText: 'e.g. Bank of Ceylon, Kalutara Branch, A/C: 0012345678',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) => v?.trim().isEmpty == true ? 'Bank details required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _descriptionController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Damage Narrative & Evidence Details',
+                            hintText: 'Describe physical structure loss, flood inundation level, collapse...',
+                            border: OutlineInputBorder(),
                           ),
                         ),
-                        if (c.description.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(c.description, style: const TextStyle(fontSize: 11, color: kTextMuted, fontStyle: FontStyle.italic)),
-                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 2,
+                    ),
+                    onPressed: _submitting ? null : _submitClaim,
+                    child: _submitting
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                              SizedBox(width: 10),
+                              Text('Submitting Claim...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ],
+                          )
+                        : const Text('File Compensation Claim',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
+            ),
+          ),
+
+          // ── TAB 2: CLAIMS LEDGER ──
+          FutureBuilder<List<CompensationModel>>(
+            future: _claimsFuture,
+            builder: (ctx, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final rawList = snap.data ?? [];
+
+              // Privacy filter for citizens
+              final list = rawList.where((c) {
+                if (isOfficer) return true;
+                if (auth.user == null) return false;
+                final cName = c.applicantName.trim().toLowerCase();
+                final cPhone = c.contactPhone.trim().replaceAll(RegExp(r'[^0-9]'), '');
+                if (userName.isNotEmpty && (cName == userName || cName.contains(userName) || userName.contains(cName))) return true;
+                if (userPhone.isNotEmpty && cPhone.isNotEmpty && (userPhone.endsWith(cPhone) || cPhone.endsWith(userPhone))) return true;
+                return false;
+              }).toList();
+
+              if (list.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_edu, size: 56, color: Colors.grey[400]),
+                        const SizedBox(height: 12),
+                        Text(
+                          isOfficer ? 'No compensation claims registered.' : 'You have no submitted compensation claims.',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text('Submit your structural damage claim from the File Claim tab.', style: TextStyle(color: kTextSecondary, fontSize: 13)),
                       ],
                     ),
                   ),
                 );
-              }),
-            ],
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async => _loadClaims(),
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: list.length,
+                  itemBuilder: (ctx, i) {
+                    final c = list[i];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: kBorder)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(c.applicantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: c.status == 'Approved'
+                                        ? const Color(0xFFDCFCE7)
+                                        : c.status == 'Rejected'
+                                            ? const Color(0xFFFEE2E2)
+                                            : const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    c.status,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: c.status == 'Approved'
+                                          ? const Color(0xFF16A34A)
+                                          : c.status == 'Rejected'
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Claimed: LKR ${c.claimAmount.toStringAsFixed(0)} • ${c.damageCategory}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))),
+                            const SizedBox(height: 4),
+                            Text('District: ${c.district} • NIC: ${c.applicantNIC}', style: const TextStyle(fontSize: 12, color: kTextSecondary)),
+                            if (c.verificationNotes != null && c.verificationNotes!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text('Officer Verification: ${c.verificationNotes}', style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

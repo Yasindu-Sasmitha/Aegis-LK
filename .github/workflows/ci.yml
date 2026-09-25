@@ -95,6 +95,14 @@ jobs:
           --context RecoveryDbContext
           --no-build
 
+      - name: Apply Resource database migrations
+        run: >
+          dotnet ef database update
+          --project "${{ github.workspace }}/backend/Aegis.Resource/Aegis.Resource.csproj"
+          --startup-project "${{ github.workspace }}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context ResourceDbContext
+          --no-build
+
       - name: Run xUnit tests
         run: >
           dotnet test

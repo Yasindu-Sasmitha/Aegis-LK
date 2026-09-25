@@ -45,8 +45,8 @@ class _ShelterFinderScreenState extends State<ShelterFinderScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.contact_phone_outlined, color: kAccent, size: 22),
             SizedBox(width: 8),
             Text('Shelter Contact', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),

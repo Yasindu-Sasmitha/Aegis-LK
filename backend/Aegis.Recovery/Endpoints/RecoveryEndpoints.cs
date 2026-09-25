@@ -775,8 +775,9 @@ public static class RecoveryEndpoints
             var fulfilledAid = await db.AidRequests.CountAsync(a => a.Status == "Fulfilled");
             var totalAidRequests = await db.AidRequests.CountAsync();
             var totalNgos = await db.NGOs.CountAsync();
-            var budgetSpent = await db.RecoveryTasks
-                .SumAsync(t => t.EstimatedCost);
+            var planBudget = await db.RecoveryPlans.SumAsync(p => p.EstimatedTotalBudget);
+            var taskBudget = await db.RecoveryTasks.SumAsync(t => t.EstimatedCost);
+            var budgetSpent = planBudget > 0 ? planBudget : taskBudget;
 
             var incidentRef = request.IncidentId != Guid.Empty
                 ? $"Incident #{request.IncidentId.ToString()[..8].ToUpper()}"
@@ -790,7 +791,7 @@ public static class RecoveryEndpoints
                 TotalAidRequestsFulfilled = fulfilledAid,
                 TotalCompensationDisbursed = 0,
                 TotalBudgetSpent = budgetSpent,
-                ReportSummary = $"Official recovery audit for {incidentRef}: {shelteredCount} citizens accommodated across {activeShelters} emergency shelters, {fulfilledAid} of {totalAidRequests} humanitarian aid packages fulfilled, and LKR {budgetSpent:N0} allocated across active recovery operations with {totalNgos} accredited NGO partners.",
+                ReportSummary = $"Official recovery audit for {incidentRef}: {shelteredCount} citizens accommodated across {activeShelters} emergency shelters, {fulfilledAid} of {totalAidRequests} humanitarian aid packages fulfilled, and LKR {budgetSpent:N0} allocated across active master recovery plans with {totalNgos} accredited partner NGOs.",
                 GeneratedAt = DateTime.UtcNow
             };
 
