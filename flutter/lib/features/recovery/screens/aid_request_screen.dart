@@ -244,7 +244,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _district,
+                      initialValue: _district,
                       decoration: const InputDecoration(labelText: 'District *', border: OutlineInputBorder()),
                       items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                       onChanged: (v) {
@@ -275,7 +275,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                         style: TextStyle(fontSize: 11, color: kTextSecondary)),
                     const Divider(height: 20, color: kBorder),
                     DropdownButtonFormField<String>(
-                      value: _aidType,
+                      initialValue: _aidType,
                       decoration: const InputDecoration(labelText: 'Primary Aid Category *', border: OutlineInputBorder()),
                       items: _aidTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                       onChanged: (v) => setState(() => _aidType = v!),
@@ -294,7 +294,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _urgency,
+                            initialValue: _urgency,
                             decoration: const InputDecoration(labelText: 'Urgency Level *', border: OutlineInputBorder()),
                             items: _urgencyLevels.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                             onChanged: (v) => setState(() => _urgency = v!),
@@ -305,7 +305,7 @@ class _AidRequestScreenState extends State<AidRequestScreen> {
                     const SizedBox(height: 12),
                     if (_aidType.contains('Shelter') || _aidType.contains('Bedding')) ...[
                       DropdownButtonFormField<String>(
-                        value: _selectedShelterId,
+                        initialValue: _selectedShelterId,
                         decoration: InputDecoration(
                           labelText: 'Requested Evacuation Shelter',
                           border: const OutlineInputBorder(),

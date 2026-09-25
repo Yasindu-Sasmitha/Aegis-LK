@@ -65,13 +65,13 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
   ];
 
   // ── SECTION 6: SAFETY & UTILITIES ──
-  String _overallSeverity = 'Moderate';
+  final String _overallSeverity = 'Moderate';
   String _safetyRisk = 'Potential Risk';
   String _electricityAvailable = 'Yes';
   String _waterAvailable = 'Yes';
   String _roadAccessAvailable = 'Yes';
-  String _networkAvailable = 'Yes';
-  String _medicalAccessAvailable = 'Yes';
+  final String _networkAvailable = 'Yes';
+  final String _medicalAccessAvailable = 'Yes';
 
   // ── SECTION 7: OBSERVATION NOTES ──
   final _notesController = TextEditingController();
@@ -261,7 +261,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: type,
+                      initialValue: type,
                       decoration: const InputDecoration(labelText: 'Asset Type', border: OutlineInputBorder(), isDense: true),
                       items: ['Bridge', 'Road', 'Water', 'Hospital', 'School', 'Power', 'Sanitation', 'Other']
                           .map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
@@ -269,7 +269,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: severity,
+                      initialValue: severity,
                       decoration: const InputDecoration(labelText: 'Damage Level', border: OutlineInputBorder(), isDense: true),
                       items: ['Destroyed', 'Severe', 'Moderate', 'Minor']
                           .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -468,7 +468,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                     subtitle: 'Disaster origin, timing, and administrative divisions',
                     children: [
                       DropdownButtonFormField<String>(
-                        value: _disasterType,
+                        initialValue: _disasterType,
                         decoration: const InputDecoration(labelText: 'Disaster Type *', border: OutlineInputBorder()),
                         items: _disasterTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                         onChanged: (v) => setState(() => _disasterType = v!),
@@ -483,7 +483,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                       ],
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _district,
+                        initialValue: _district,
                         decoration: const InputDecoration(labelText: 'District *', border: OutlineInputBorder()),
                         items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                         onChanged: (v) => setState(() => _district = v!),
@@ -711,7 +711,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                     subtitle: 'Critical infrastructure status and hazards',
                     children: [
                       DropdownButtonFormField<String>(
-                        value: _safetyRisk,
+                        initialValue: _safetyRisk,
                         decoration: const InputDecoration(labelText: 'Risk Level', border: OutlineInputBorder()),
                         items: ['No Immediate Risk', 'Potential Risk', 'High Risk', 'Life Threatening']
                             .map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
@@ -722,7 +722,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _electricityAvailable,
+                              initialValue: _electricityAvailable,
                               decoration: const InputDecoration(labelText: 'Power', border: OutlineInputBorder()),
                               items: ['Yes', 'No', 'Partial'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
                               onChanged: (v) => setState(() => _electricityAvailable = v!),
@@ -731,7 +731,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                           const SizedBox(width: 8),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _waterAvailable,
+                              initialValue: _waterAvailable,
                               decoration: const InputDecoration(labelText: 'Clean Water', border: OutlineInputBorder()),
                               items: ['Yes', 'No', 'Partial'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
                               onChanged: (v) => setState(() => _waterAvailable = v!),
@@ -740,7 +740,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                           const SizedBox(width: 8),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _roadAccessAvailable,
+                              initialValue: _roadAccessAvailable,
                               decoration: const InputDecoration(labelText: 'Road Access', border: OutlineInputBorder()),
                               items: ['Yes', 'No', 'Partial'].map((x) => DropdownMenuItem(value: x, child: Text(x))).toList(),
                               onChanged: (v) => setState(() => _roadAccessAvailable = v!),
