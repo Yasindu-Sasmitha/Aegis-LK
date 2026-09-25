@@ -2,9 +2,15 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ "**" ]
+    branches:
+      - "**"
   pull_request:
-    branches: [ dev, main ]
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   backend-tests:
@@ -15,16 +21,16 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: aegis_lk_ci
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aegis_lk_ci
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d aegis_lk_ci"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -33,13 +39,74 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
-      - name: Restore dependencies
-        run: dotnet restore backend/Aegis.Tests/Aegis.Tests.csproj
+      - name: Restore backend dependencies
+        run: dotnet restore "${{ github.workspace }}/backend/Aegis.Tests/Aegis.Tests.csproj"
 
-      - name: Build
-        run: dotnet build backend/Aegis.Tests/Aegis.Tests.csproj --configuration Debug --no-restore
+      - name: Build API startup project
+        run: dotnet build "${{ github.workspace }}/backend/Aegis.Api/Aegis.Api.csproj" --configuration Debug --no-restore
+
+      - name: Build test project
+        run: dotnet build "${{ github.workspace }}/backend/Aegis.Tests/Aegis.Tests.csproj" --configuration Debug --no-restore
+
+      - name: Verify API build output
+        run: |
+          test -f "${{ github.workspace }}/backend/Aegis.Api/bin/Debug/net10.0/Aegis.Api.deps.json"
+          test -f "${{ github.workspace }}/backend/Aegis.Api/bin/Debug/net10.0/Aegis.Api.dll"
+
+      - name: Install EF Core CLI
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.*
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Apply Auth database migrations
+        env:
+          ASPNETCORE_ENVIRONMENT: CI
+          DOTNET_ENVIRONMENT: CI
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
+        run: >
+          dotnet ef database update
+          --project "${{ github.workspace }}/backend/Aegis.Shared/Aegis.Shared.csproj"
+          --startup-project "${{ github.workspace }}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context AuthDbContext
+          --no-build
+
+      - name: Apply Weather database migrations
+        env:
+          ASPNETCORE_ENVIRONMENT: CI
+          DOTNET_ENVIRONMENT: CI
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
+        run: >
+          dotnet ef database update
+          --project "${{ github.workspace }}/backend/Aegis.Weather/Aegis.Weather.csproj"
+          --startup-project "${{ github.workspace }}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context WeatherDbContext
+          --no-build
+
+      - name: Apply Incident database migrations
+        env:
+          ASPNETCORE_ENVIRONMENT: CI
+          DOTNET_ENVIRONMENT: CI
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
+        run: >
+          dotnet ef database update
+          --project "${{ github.workspace }}/backend/Aegis.Incident/Aegis.Incident.csproj"
+          --startup-project "${{ github.workspace }}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context IncidentDbContext
+          --no-build
+
+      - name: Apply Recovery database migrations
+        env:
+          ASPNETCORE_ENVIRONMENT: CI
+          DOTNET_ENVIRONMENT: CI
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=aegis_lk_ci;Username=postgres;Password=postgres"
+        run: >
+          dotnet ef database update
+          --project "${{ github.workspace }}/backend/Aegis.Recovery/Aegis.Recovery.csproj"
+          --startup-project "${{ github.workspace }}/backend/Aegis.Api/Aegis.Api.csproj"
+          --context RecoveryDbContext
+          --no-build
 
       - name: Run xUnit tests
         env:
@@ -57,6 +124,7 @@ jobs:
   flutter-analyze:
     name: Flutter Lint & Analyze
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -64,13 +132,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Install dependencies
-        working-directory: ./flutter
+        working-directory: "${{ github.workspace }}/flutter"
         run: flutter pub get
 
       - name: Run Flutter Analyze
-        working-directory: ./flutter
+        working-directory: "${{ github.workspace }}/flutter"
         run: flutter analyze --no-fatal-infos
