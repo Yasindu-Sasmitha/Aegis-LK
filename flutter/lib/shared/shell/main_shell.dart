@@ -119,10 +119,10 @@ class _MainShellState extends State<MainShell> {
                     child: const Icon(Icons.shield_outlined, color: kAccent, size: 22),
                   ),
                   const SizedBox(width: 10),
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Text(
                         'AEGIS-LK',
                         style: TextStyle(
