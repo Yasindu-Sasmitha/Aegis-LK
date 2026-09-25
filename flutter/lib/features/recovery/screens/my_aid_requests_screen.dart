@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../shared/auth/auth_provider.dart';
 import '../../../shared/theme/aegis_theme.dart';
 import '../models/recovery_models.dart';
 import '../services/recovery_service.dart';
@@ -32,9 +34,9 @@ class _MyAidRequestsScreenState extends State<MyAidRequestsScreen> {
     switch (status.toLowerCase()) {
       case 'approved':
       case 'fulfilled':
-        return kSuccess;
+        return const Color(0xFF16A34A);
       case 'pending':
-        return kWarning;
+        return const Color(0xFFB45309);
       case 'rejected':
       case 'cancelled':
         return kDanger;
@@ -50,21 +52,27 @@ class _MyAidRequestsScreenState extends State<MyAidRequestsScreen> {
       case 'high':
         return const Color(0xFFEA580C);
       case 'medium':
-        return kWarning;
+        return const Color(0xFFD97706);
       default:
-        return const Color(0xFF10B981);
+        return const Color(0xFF16A34A);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final isOfficer = auth.isOfficerOrAdmin;
+    final userName = (auth.user?.fullName ?? '').trim().toLowerCase();
+    final userPhone = (auth.user?.phoneNumber ?? '').trim().replaceAll(RegExp(r'[^0-9]'), '');
+
     return Scaffold(
       backgroundColor: kSurface,
       appBar: widget.showAppBar
           ? AppBar(
               backgroundColor: kNavBg,
               iconTheme: const IconThemeData(color: Colors.white),
-              title: const Text('My Aid Applications', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: Text(isOfficer ? 'Citizen Relief Aid Applications' : 'My Aid Applications',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
           : null,
       body: Column(
@@ -74,10 +82,6 @@ class _MyAidRequestsScreenState extends State<MyAidRequestsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
               color: kNavBg,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -106,56 +110,67 @@ class _MyAidRequestsScreenState extends State<MyAidRequestsScreen> {
             ),
           ),
 
-          // Content List
+          // List View
           Expanded(
             child: FutureBuilder<List<AidRequestModel>>(
               future: _requestsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+              builder: (ctx, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError) {
+                if (snap.hasError) {
                   return Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(24),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(Icons.error_outline, color: kDanger, size: 40),
-                          const SizedBox(height: 10),
-                          Text('Failed to load aid applications: ${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary)),
-                          const SizedBox(height: 14),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F2B48)),
-                            onPressed: _loadRequests,
-                            child: const Text('Try Again', style: TextStyle(color: Colors.white)),
-                          ),
+                          const SizedBox(height: 8),
+                          Text('Error loading requests: ${snap.error}', textAlign: TextAlign.center, style: const TextStyle(color: kDanger)),
+                          const SizedBox(height: 12),
+                          ElevatedButton(onPressed: _loadRequests, child: const Text('Try Again')),
                         ],
                       ),
                     ),
                   );
                 }
 
-                final all = snapshot.data ?? [];
-                final filtered = all.where((r) {
+                final rawList = snap.data ?? [];
+
+                // Filter by citizen ownership (privacy guard)
+                final ownedList = rawList.where((r) {
+                  if (isOfficer) return true; // Officers see all aid applications
+                  if (auth.user == null) return false;
+                  final rName = r.victimName.trim().toLowerCase();
+                  final rPhone = r.contactPhone.trim().replaceAll(RegExp(r'[^0-9]'), '');
+                  if (userName.isNotEmpty && (rName == userName || rName.contains(userName) || userName.contains(rName))) return true;
+                  if (userPhone.isNotEmpty && rPhone.isNotEmpty && (userPhone.endsWith(rPhone) || rPhone.endsWith(userPhone))) return true;
+                  return false;
+                }).toList();
+
+                final filteredList = ownedList.where((r) {
                   if (_selectedStatus == 'All') return true;
                   return r.status.toLowerCase() == _selectedStatus.toLowerCase();
                 }).toList();
 
-                if (filtered.isEmpty) {
+                if (filteredList.isEmpty) {
                   return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.assignment_outlined, size: 50, color: Colors.grey[400]),
-                        const SizedBox(height: 10),
-                        Text(
-                          _selectedStatus == 'All'
-                              ? 'No aid applications submitted yet.'
-                              : 'No applications found with status $_selectedStatus.',
-                          style: const TextStyle(color: kTextSecondary, fontSize: 14),
-                        ),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inbox_outlined, size: 56, color: Colors.grey[400]),
+                          const SizedBox(height: 12),
+                          Text(
+                            isOfficer ? 'No aid applications match this status.' : 'You have no active relief applications.',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text('Apply for food, shelter or medical supplies from the Request Aid screen.', style: TextStyle(color: kTextSecondary, fontSize: 13)),
+                        ],
+                      ),
                     ),
                   );
                 }
@@ -164,118 +179,61 @@ class _MyAidRequestsScreenState extends State<MyAidRequestsScreen> {
                   onRefresh: () async => _loadRequests(),
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final r = filtered[index];
-                      final statusColor = _getStatusColor(r.status);
-                      final urgencyColor = _getUrgencyColor(r.urgency);
+                    itemCount: filteredList.length,
+                    itemBuilder: (ctx, i) {
+                      final item = filteredList[i];
+                      final statusColor = _getStatusColor(item.status);
+                      final urgencyColor = _getUrgencyColor(item.urgency);
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: kBorder)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0F2B48).withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.handshake_outlined, color: Color(0xFF0F2B48), size: 24),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '${r.aidType} Aid',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Applicant: ${r.victimName}  •  ${r.familySize} Family Member(s)',
-                                          style: const TextStyle(color: kTextSecondary, fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
+                                  Text(
+                                    item.aidType,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: statusColor.withValues(alpha: 0.15),
+                                      color: statusColor.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                                     ),
                                     child: Text(
-                                      r.status.toUpperCase(),
-                                      style: TextStyle(
-                                        color: statusColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11,
-                                      ),
+                                      item.status,
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
-                              const Divider(height: 1),
-                              const SizedBox(height: 10),
-
+                              const SizedBox(height: 6),
+                              Text('Applicant: ${item.victimName} • District: ${item.district}', style: const TextStyle(fontSize: 12, color: kTextSecondary)),
+                              const SizedBox(height: 8),
                               Row(
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: urgencyColor.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '${r.urgency} Urgency',
-                                      style: TextStyle(color: urgencyColor, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
+                                    decoration: BoxDecoration(color: urgencyColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
+                                    child: Text('${item.urgency} Urgency', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: urgencyColor)),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    '📍 ${r.district} District',
-                                    style: const TextStyle(fontSize: 12, color: kTextSecondary),
-                                  ),
+                                  Text('Family Size: ${item.familySize}', style: const TextStyle(fontSize: 12, color: kTextSecondary)),
                                 ],
                               ),
-
-                              if (r.shelterName != null && r.shelterName!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.night_shelter_outlined, size: 14, color: kAccent),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Assigned Shelter: ${r.shelterName}',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F2B48)),
-                                    ),
-                                  ],
-                                ),
+                              if (item.shelterName != null) ...[
+                                const SizedBox(height: 6),
+                                Text('Allocated Center: ${item.shelterName}', style: const TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600)),
                               ],
-
-                              if (r.notes.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    r.notes,
-                                    style: const TextStyle(fontSize: 12, color: kTextSecondary, fontStyle: FontStyle.italic),
-                                  ),
-                                ),
+                              if (item.notes.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text('Notes: ${item.notes}', style: const TextStyle(fontSize: 11, color: kTextMuted)),
                               ],
                             ],
                           ),
