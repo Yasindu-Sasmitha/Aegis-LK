@@ -251,7 +251,7 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen>
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          value: _district,
+                          initialValue: _district,
                           decoration: const InputDecoration(labelText: 'Disaster Affected District *', border: OutlineInputBorder()),
                           items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                           onChanged: (v) => setState(() => _district = v!),
@@ -279,7 +279,7 @@ class _CompensationClaimScreenState extends State<CompensationClaimScreen>
                             style: TextStyle(fontSize: 11, color: kTextSecondary)),
                         const Divider(height: 20, color: kBorder),
                         DropdownButtonFormField<String>(
-                          value: _damageCategory,
+                          initialValue: _damageCategory,
                           decoration: const InputDecoration(labelText: 'Damage Classification *', border: OutlineInputBorder()),
                           items: _damageCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                           onChanged: (v) => setState(() => _damageCategory = v!),

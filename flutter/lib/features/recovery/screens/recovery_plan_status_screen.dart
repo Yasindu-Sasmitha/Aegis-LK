@@ -122,9 +122,11 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen>
         _selectedTrace = trace;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load trace: $e'), backgroundColor: kDanger),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load trace: $e'), backgroundColor: kDanger),
+        );
+      }
     } finally {
       setState(() => _isLoadingDetail = false);
     }
@@ -391,11 +393,11 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen>
                       ),
                     ],
                   ),
-                  Row(
+                  const Row(
                     children: [
-                      const Text('Inspect Trace', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF2563EB)),
+                      Text('Inspect Trace', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF2563EB)),
                     ],
                   ),
                 ],

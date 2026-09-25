@@ -323,7 +323,7 @@ class _DonateScreenState extends State<DonateScreen> with SingleTickerProviderSt
                         const SizedBox(height: 12),
 
                         DropdownButtonFormField<String>(
-                          value: _selectedShelterId,
+                          initialValue: _selectedShelterId,
                           decoration: const InputDecoration(labelText: 'Target Evacuation Center (Optional)', border: OutlineInputBorder()),
                           items: [
                             const DropdownMenuItem(value: null, child: Text('General Community Relief (Unallocated)')),
