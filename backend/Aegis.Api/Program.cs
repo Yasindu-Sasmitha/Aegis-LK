@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Aegis.Incident.Data;
 using Aegis.Incident.Endpoints;
 using Aegis.Recovery.Data;
@@ -15,6 +16,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using Aegis.Resource.Data;
+using Aegis.Resource.Endpoints;
+using Aegis.Resource.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +54,12 @@ builder.Services.AddDbContext<WeatherDbContext>(options =>
 
 builder.Services.AddDbContext<RecoveryDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddDbContext<ResourceDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<IWarehouseService, WarehouseService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 // ── Authentication & Authorization ──────────────────────────────────────────
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -104,6 +114,11 @@ builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentDedupAgentClient>
     client.BaseAddress = new Uri("http://127.0.0.1:8002");
 });
 
+builder.Services.AddHttpClient<Aegis.Resource.Services.ResourceAgentClient>(client =>
+{
+    client.BaseAddress = new Uri("http://127.0.0.1:8003");
+});
+
 var cloudinarySettings = new Aegis.Incident.Services.CloudinarySettings
 {
     CloudName = builder.Configuration["Cloudinary:CloudName"] ?? "",
@@ -116,6 +131,7 @@ builder.Services.AddSingleton<Aegis.Incident.Services.CloudinaryService>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 var app = builder.Build();
@@ -133,6 +149,9 @@ if (app.Environment.IsDevelopment())
 
     var recoveryDb = scope.ServiceProvider.GetRequiredService<RecoveryDbContext>();
     await RecoveryDataSeeder.SeedAsync(recoveryDb);
+
+    var resourceDb = scope.ServiceProvider.GetRequiredService<ResourceDbContext>();
+    await ResourceDataSeeder.SeedAsync(resourceDb);
 }
 
 if (app.Environment.IsDevelopment())
@@ -155,7 +174,6 @@ app.MapAuthEndpoints();
 app.MapWeatherEndpoints();
 app.MapRecoveryEndpoints();
 app.MapIncidentEndpoints();
+app.MapResourceEndpoints();
 
 app.Run();
-
-public partial class Program { }
