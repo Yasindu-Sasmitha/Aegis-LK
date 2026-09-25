@@ -21,7 +21,7 @@ jobs:
         ports:
           - 5433:5432
         options: >-
-          --health-cmd="pg_isready -U postgres -d aegis"
+          --health-cmd="pg_isready -U postgres -d aegis_lk"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -39,6 +39,8 @@ jobs:
         run: dotnet restore backend/Aegis.Tests/Aegis.Tests.csproj
 
       - name: Run xUnit Tests
+        env:
+            ConnectionStrings__DefaultConnection: "Host=localhost;Port=5433;Database=aegis_lk;Username=postgres;Password=postgres"
         run: dotnet test backend/Aegis.Tests/Aegis.Tests.csproj --verbosity normal --no-restore
 
   flutter-analyze:
