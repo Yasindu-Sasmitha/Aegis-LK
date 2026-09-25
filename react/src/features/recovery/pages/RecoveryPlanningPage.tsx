@@ -260,6 +260,43 @@ export const RecoveryPlanningPage: React.FC = () => {
     loadDamageReports();
   }, [loadDamageReports]);
 
+  // ── Role Ownership Filtering (Citizens see only their own reports/plans; Officers/Admins see all) ──
+  const userFullName = (user?.fullName || '').trim().toLowerCase();
+  const userPhone = (user?.phoneNumber || '').trim().replace(/[^0-9]/g, '');
+  const userEmail = (user?.email || '').trim().toLowerCase();
+
+  const isUserDamageReport = (report: DamageReportItem): boolean => {
+    if (isOfficer) return true; // Officers and Admins can view all submissions
+    if (!user) return false;
+    const rName = (report.reporterName || '').trim().toLowerCase();
+    const rContact = (report.reporterContact || '').trim().replace(/[^0-9]/g, '');
+    const rNotes = (report.additionalNotes || '').toLowerCase();
+
+    if (userFullName && (rName === userFullName || rName.includes(userFullName) || userFullName.includes(rName))) return true;
+    if (userPhone && rContact && (userPhone.endsWith(rContact.slice(-9)) || rContact.endsWith(userPhone.slice(-9)))) return true;
+    if (userEmail && rNotes.includes(userEmail)) return true;
+    return false;
+  };
+
+  const displayedDamageReports = damageReports.filter(isUserDamageReport);
+
+  const userIncidentIds = new Set(
+    displayedDamageReports.map((r) => r.incidentId).filter(Boolean)
+  );
+  const userPlanIds = new Set(
+    displayedDamageReports.map((r) => r.recoveryPlanId).filter(Boolean)
+  );
+
+  const isUserWorkflowPlan = (workflow: WorkflowListItem): boolean => {
+    if (isOfficer) return true; // Officers and Admins can view all plans
+    if (!user) return false;
+    if (workflow.incidentId && userIncidentIds.has(workflow.incidentId)) return true;
+    if (workflow.id && userPlanIds.has(workflow.id)) return true;
+    return false;
+  };
+
+  const displayedWorkflowList = workflowList.filter(isUserWorkflowPlan);
+
   // Validate Intake Form
   const validateForm = (): boolean => {
     setErrorMessage(null);
@@ -1226,7 +1263,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              Citizen Submissions ({totalReportsCount || damageReports.length})
+              {isOfficer ? `Citizen Submissions (${totalReportsCount || damageReports.length})` : `My Submissions (${displayedDamageReports.length})`}
             </button>
             <button
               onClick={() => {
@@ -1245,7 +1282,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              Past Plans &amp; Audit ({totalWorkflowCount || workflowList.length})
+              {isOfficer ? `Past Plans & Audit (${totalWorkflowCount || workflowList.length})` : `My Recovery Plans (${displayedWorkflowList.length})`}
             </button>
           </div>
         </div>
@@ -2052,18 +2089,18 @@ export const RecoveryPlanningPage: React.FC = () => {
 
           {/* Submissions List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {damageReports.length === 0 ? (
+            {displayedDamageReports.length === 0 ? (
               <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#94a3b8' }}>—</div>
                 <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Damage Submissions Found</h3>
                 <p style={{ margin: 0, fontSize: '0.9rem' }}>
                   {isOfficer
                     ? 'No citizen damage reports match your filter criteria.'
-                    : 'Submit your first disaster impact assessment from the Disaster Damage Intake tab.'}
+                    : 'You have not submitted any disaster impact assessments yet. Submit your report from the Field Damage Assessment tab.'}
                 </p>
               </div>
             ) : (
-              damageReports.map((report) => (
+              displayedDamageReports.map((report) => (
                 <div
                   key={report.id}
                   style={{
@@ -2308,14 +2345,18 @@ export const RecoveryPlanningPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {workflowList.length === 0 ? (
+                {displayedWorkflowList.length === 0 ? (
                   <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
                     <div style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#94a3b8' }}>—</div>
                     <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Recovery Plans Found</h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>Generate your first recovery plan from the Disaster Damage Intake tab.</p>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                      {isOfficer
+                        ? 'No recovery master plans match your filter criteria.'
+                        : 'No AI recovery master plans have been generated for your damage submissions yet.'}
+                    </p>
                   </div>
                 ) : (
-                  workflowList.map((plan) => (
+                  displayedWorkflowList.map((plan) => (
                     <div
                       key={plan.id}
                       onClick={() => handleSelectWorkflow(plan.id)}

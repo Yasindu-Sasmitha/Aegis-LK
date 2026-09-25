@@ -114,7 +114,17 @@ export const AidRequestsPage: React.FC = () => {
     }
   };
 
+  const userFullName = (user?.fullName || '').trim().toLowerCase();
+  const userPhone = (user?.phoneNumber || '').trim().replace(/[^0-9]/g, '');
+
   const filteredRequests = requests.filter((r) => {
+    if (isCitizen && !isOfficer) {
+      const rName = (r.victimName || '').trim().toLowerCase();
+      const rPhone = (r.contactPhone || '').trim().replace(/[^0-9]/g, '');
+      const isOwner = (userFullName && (rName === userFullName || rName.includes(userFullName))) ||
+                      (userPhone && rPhone && (userPhone.endsWith(rPhone.slice(-9)) || rPhone.endsWith(userPhone.slice(-9))));
+      if (!isOwner) return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -125,8 +135,8 @@ export const AidRequestsPage: React.FC = () => {
     );
   });
 
-  const pendingCount = requests.filter((r) => r.status === 'Pending').length;
-  const fulfilledCount = requests.filter((r) => r.status === 'Fulfilled').length;
+  const pendingCount = filteredRequests.filter((r) => r.status === 'Pending').length;
+  const fulfilledCount = filteredRequests.filter((r) => r.status === 'Fulfilled').length;
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
@@ -135,7 +145,6 @@ export const AidRequestsPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>🤝</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Citizen Emergency Aid &amp; Relief Portal
             </h1>
