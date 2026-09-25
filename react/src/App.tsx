@@ -26,10 +26,15 @@ import {
   IncidentQueuePage,
   IncidentDashboardPage,
   IncidentFullDetailPage,
-  IncidentLogPage,
 } from './features/incident';
+import {
+  ResourceDashboardPage,
+  WarehouseManagementPage,
+  InventoryManagementPage,
+  DispatchManagementPage,
+} from './features/resource';
 
-type NavView = 'home' | 'weather' | 'recovery' | 'incident';
+type NavView = 'home' | 'weather' | 'recovery' | 'resource' | 'incident';
 
 const ROLE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
   Admin: { label: '⚙️ Admin', color: '#c084fc', bg: 'rgba(192,132,252,0.15)' },
@@ -43,7 +48,14 @@ const MainPlatform: React.FC = () => {
   const [currentView, setCurrentView] = useState<NavView>('home');
   const [weatherTab, setWeatherTab] = useState<string>('dashboard');
   const [recoveryTab, setRecoveryTab] = useState<string>('dashboard');
+  const [resourceTab, setResourceTab] = useState<string>('dashboard');
+  const [resourceRefreshKey, setResourceRefreshKey] = useState<number>(0);
   const [incidentTab, setIncidentTab] = useState<string>('dashboard');
+
+  const refreshResourceDashboard = () => {
+    setResourceRefreshKey((value) => value + 1);
+    setResourceTab('dashboard');
+  };
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [latestAlerts, setLatestAlerts] = useState<WeatherAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
@@ -77,26 +89,35 @@ const MainPlatform: React.FC = () => {
     ...(isOfficerOrAdmin ? [{ id: 'analytics', label: '📊 Accuracy Analytics' }] : []),
   ];
 
-   const INCIDENT_TABS = [
+  // Navigation tabs for Incident module
+  const INCIDENT_TABS = [
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'all', label: '📋 All Incidents' },
     { id: 'Reported', label: '📥 Reported' },
+    { id: 'Assessed', label: '🔍 Assessed' },
     { id: 'OnHold', label: '⏸️ On Hold' },
     { id: 'Rejected', label: '🚫 Rejected' },
     { id: 'MissionApproved', label: '✅ Approved' },
     { id: 'Closed', label: '📁 Closed' },
-    { id: 'log', label: '📋 Activity Log' },
   ];
 
   // Navigation tabs for Recovery module (available across roles)
   const RECOVERY_TABS = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'shelters', label: 'Emergency Shelters' },
-    { id: 'aid', label: 'Aid Applications' },
-    { id: 'donations', label: 'Donations' },
-    { id: 'ngos', label: 'Partner NGOs' },
-    { id: 'planning', label: 'Agentic AI Planning' },
-    { id: 'reports', label: 'Audit Reports' },
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'shelters', label: '⛺ Emergency Shelters' },
+    { id: 'aid', label: '🤝 Aid Applications' },
+    { id: 'donations', label: '📦 Donations' },
+    { id: 'compensation', label: '💳 Compensation' },
+    { id: 'ngos', label: '🏢 Partner NGOs' },
+    { id: 'planning', label: '🤖 Agentic AI Planning' },
+    { id: 'reports', label: '📜 Audit Reports' },
+  ];
+
+  const RESOURCE_TABS = [
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'warehouses', label: '🏬 Warehouses' },
+    { id: 'inventory', label: '📦 Inventory' },
+    { id: 'dispatch', label: '🚚 Dispatch & Allocation' },
   ];
 
   const roleBadge = ROLE_BADGES[user?.role ?? 'Citizen'] ?? ROLE_BADGES.Citizen;
@@ -110,6 +131,12 @@ const MainPlatform: React.FC = () => {
   const navigateToRecovery = (tab = 'dashboard') => {
     setCurrentView('recovery');
     setRecoveryTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateToResource = (tab = 'dashboard') => {
+    setCurrentView('resource');
+    setResourceTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -215,6 +242,28 @@ const MainPlatform: React.FC = () => {
           </button>
 
           <button
+            onClick={() => navigateToResource('dashboard')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 8,
+              border: 'none',
+              background: currentView === 'resource' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              color: currentView === 'resource' ? '#38bdf8' : '#cbd5e1',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>📦</span>
+            <span>Resources</span>
+          </button>
+
+          <button
             onClick={() => setCurrentView('incident')}
             style={{
               display: 'flex',
@@ -315,12 +364,12 @@ const MainPlatform: React.FC = () => {
           overflowX: 'auto',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
-          {(currentView === 'weather' ? WEATHER_TABS : currentView === 'incident' ? INCIDENT_TABS : RECOVERY_TABS).map((tab) => {
-            const active = (currentView === 'weather' ? weatherTab : currentView === 'incident' ? incidentTab : recoveryTab) === tab.id;
+          {(currentView === 'weather' ? WEATHER_TABS : currentView === 'incident' ? INCIDENT_TABS : currentView === 'resource' ? RESOURCE_TABS : RECOVERY_TABS).map((tab) => {
+            const active = (currentView === 'weather' ? weatherTab : currentView === 'incident' ? incidentTab : currentView === 'resource' ? resourceTab : recoveryTab) === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => currentView === 'weather' ? setWeatherTab(tab.id) : currentView === 'incident' ? setIncidentTab(tab.id) : setRecoveryTab(tab.id)}
+                onClick={() => currentView === 'weather' ? setWeatherTab(tab.id) : currentView === 'incident' ? setIncidentTab(tab.id) : currentView === 'resource' ? setResourceTab(tab.id) : setRecoveryTab(tab.id)}
                 style={{
                   padding: '0.85rem 1.15rem',
                   background: 'transparent',
@@ -739,6 +788,32 @@ const MainPlatform: React.FC = () => {
           </main>
         )}
 
+        {currentView === 'resource' && (
+          <main>
+            {resourceTab === 'dashboard' && (
+              <ResourceDashboardPage
+                key={resourceRefreshKey}
+                refreshKey={resourceRefreshKey}
+                onNavigate={(tab) => setResourceTab(tab)}
+              />
+            )}
+            {resourceTab === 'warehouses' && (
+              <WarehouseManagementPage
+                refreshKey={resourceRefreshKey}
+                onDataChange={refreshResourceDashboard}
+              />
+            )}
+            {resourceTab === 'inventory' && (
+              <InventoryManagementPage
+                refreshKey={resourceRefreshKey}
+                onDataChange={refreshResourceDashboard}
+                onNavigate={(tab) => setResourceTab(tab)}
+              />
+            )}
+            {resourceTab === 'dispatch' && <DispatchManagementPage />}
+          </main>
+        )}
+
         {currentView === 'incident' && (
           <main>
             {incidentTab === 'detail' && selectedIncidentId ? (
@@ -777,7 +852,6 @@ const MainPlatform: React.FC = () => {
                     }}
                   />
                 )}
-                {incidentTab === 'log' && <IncidentLogPage />}
               </>
             )}
           </main>
