@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Literal
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -18,17 +18,19 @@ assert API_KEY and "XXXX" not in API_KEY, (
 
 
 class HazardAssessment(BaseModel):
-    hazard_type: str = Field(description="One of: Flood, Landslide, StrongWind")
+    hazard_type: Literal["Flood", "Landslide", "StrongWind"] = Field(description="One of: Flood, Landslide, StrongWind")
     risk_probability_pct: float = Field(ge=0, le=100)
     confidence_pct: float = Field(ge=0, le=100)
     reasoning_summary: str = Field(max_length=250)
-    recommended_action: str = Field(description="One of: publish_alert, flag_for_review, no_action")
+    recommended_action: Literal["publish_alert", "flag_for_review", "no_action"] = Field(
+        description="One of: publish_alert, flag_for_review, no_action"
+    )
 
 class WeatherAgentOutput(BaseModel):
     hazards: list[HazardAssessment]
 
 class HazardConcern(BaseModel):
-    hazard_type: str
+    hazard_type: Literal["Flood", "Landslide", "StrongWind"] = Field(description="One of: Flood, Landslide, StrongWind")
     issue: str = Field(max_length=200)
 
 class CritiqueOutput(BaseModel):

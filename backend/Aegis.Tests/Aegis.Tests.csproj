@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Aegis.Recovery\Aegis.Recovery.csproj" />
     <ProjectReference Include="..\Aegis.Weather\Aegis.Weather.csproj" />
     <ProjectReference Include="..\Aegis.Api\Aegis.Api.csproj" />
+    <ProjectReference Include="..\Aegis.Shared\Aegis.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

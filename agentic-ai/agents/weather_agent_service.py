@@ -31,7 +31,7 @@ def assess(req: AssessRequest):
         "flood_threshold_mm": req.flood_threshold_mm,
         "landslide_threshold_mm": req.landslide_threshold_mm,
         "wind_threshold_kmh": req.wind_threshold_kmh,
-        "llm_output": None, "hazards": [], "steps": [],
+        "llm_output": None, "critique": None, "hazards": [], "steps": [],
         "overall_status": "Success", "error": None,
     }
     result = weather_agent.invoke(initial_state)
