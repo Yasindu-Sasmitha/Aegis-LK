@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/auth/auth_service.dart';
 import '../models/weather_models.dart';
 import '../services/weather_service.dart';
 
@@ -412,8 +413,8 @@ class _WeatherAlertsScreenState extends State<WeatherAlertsScreen> {
               ],
             ),
 
-            // Officer Review Actions (if PendingReview)
-            if (isPending) ...[
+            // Officer Review Actions (if PendingReview and user is DisasterOfficer or Admin)
+            if (isPending && (AuthService.currentUser?.isOfficerOrAdmin ?? false)) ...[
               const Divider(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,

@@ -12,6 +12,7 @@ class AppRouter {
   static const String weatherHome = '/weather';
   static const String weatherAlerts = '/weather/alerts';
   static const String alertReviewQueue = '/weather/review-queue';
+  static const String weatherPredictions = '/weather/predictions';
   static const String recoveryHome = '/recovery';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -37,6 +38,10 @@ class AppRouter {
       case alertReviewQueue:
         return MaterialPageRoute(
           builder: (_) => const MainShell(initialPrimaryIndex: 1, initialSubIndex: 2),
+        );
+      case weatherPredictions:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 1, initialSubIndex: 3),
         );
       case recoveryHome:
         return MaterialPageRoute(

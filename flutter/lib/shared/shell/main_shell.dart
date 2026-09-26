@@ -5,6 +5,7 @@ import '../theme/aegis_theme.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/weather/screens/weather_home_screen.dart';
 import '../../features/weather/screens/alerts_screen.dart';
+import '../../features/weather/screens/prediction_history_screen.dart';
 import '../../features/recovery/screens/recovery_home_screen.dart';
 import '../../features/recovery/screens/shelter_finder_screen.dart';
 import '../../features/recovery/screens/aid_request_screen.dart';
@@ -55,6 +56,9 @@ class _MainShellState extends State<MainShell> {
       } else if (section == 'weather_alerts') {
         _primaryIndex = 1;
         _weatherSubIndex = subIndex ?? 1;
+      } else if (section == 'weather_predictions') {
+        _primaryIndex = 1;
+        _weatherSubIndex = subIndex ?? 3;
       } else if (section == 'recovery') {
         _primaryIndex = 2;
         _recoverySubIndex = subIndex ?? 0;
@@ -335,6 +339,13 @@ class _MainShellState extends State<MainShell> {
               onTap: () => setState(() => _weatherSubIndex = 2),
             ),
           ],
+          const SizedBox(width: 6),
+          _buildSubNavItem(
+            label: 'Predictions & Outcomes',
+            icon: Icons.history_edu_outlined,
+            isActive: _weatherSubIndex == 3,
+            onTap: () => setState(() => _weatherSubIndex = 3),
+          ),
         ],
       ),
     );
@@ -489,6 +500,8 @@ class _MainShellState extends State<MainShell> {
             showAppBar: false,
             initialStatus: 'PendingReview',
           );
+        case 3:
+          return const PredictionHistoryScreen(showAppBar: false);
         default:
           return const WeatherHomeScreen(showAppBar: false);
       }

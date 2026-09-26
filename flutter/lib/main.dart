@@ -5,12 +5,7 @@ import 'shared/router/app_router.dart';
 import 'shared/theme/aegis_theme.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
-      child: const AegisApp(),
-    ),
-  );
+  runApp(const AegisApp());
 }
 
 class AegisApp extends StatelessWidget {
@@ -18,12 +13,15 @@ class AegisApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Aegis-LK Disaster Management',
-      debugShowCheckedModeBanner: false,
-      theme: buildAegisTheme(),
-      onGenerateRoute: AppRouter.generateRoute,
-      initialRoute: AppRouter.initialRoute,
+    return ChangeNotifierProvider(
+      create: (_) => AuthProvider(),
+      child: MaterialApp(
+        title: 'Aegis-LK Disaster Management',
+        debugShowCheckedModeBanner: false,
+        theme: buildAegisTheme(),
+        onGenerateRoute: AppRouter.generateRoute,
+        initialRoute: AppRouter.initialRoute,
+      ),
     );
   }
 }

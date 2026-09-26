@@ -49,8 +49,19 @@ public static class WeatherEndpoints
             });
         });
 
-        group.MapPost("/predict/{districtId:guid}", async (Guid districtId, WeatherDbContext db, OpenMeteoService openMeteo, WeatherAgentClient agentClient) =>
+        group.MapPost("/predict/{districtId:guid}", async (
+            Guid districtId,
+            WeatherDbContext db,
+            OpenMeteoService openMeteo,
+            WeatherAgentClient agentClient,
+            ClaimsPrincipal principal) =>
         {
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdClaim, out var triggeredById))
+            {
+                return Results.Unauthorized();
+            }
+
             var runStarted = DateTime.UtcNow;
             var district = await db.Districts.FindAsync(districtId);
             if (district is null) return Results.NotFound();
@@ -86,7 +97,8 @@ public static class WeatherEndpoints
                 {
                     Id = agentRunId, DistrictId = districtId, TriggerType = "Manual",
                     OverallStatus = "Failed", ErrorMessage = agentResult?.Error ?? "Agent service unreachable",
-                    StartedAt = runStarted, CompletedAt = completedAt, StepsJson = "[]"
+                    StartedAt = runStarted, CompletedAt = completedAt, StepsJson = "[]",
+                    TriggeredByUserId = triggeredById
                 });
                 await db.SaveChangesAsync();
                 return Results.Problem("Agent assessment failed — logged for review.", statusCode: 502);
@@ -96,7 +108,8 @@ public static class WeatherEndpoints
             {
                 Id = agentRunId, DistrictId = districtId, TriggerType = "Manual", OverallStatus = "Success",
                 StartedAt = runStarted, CompletedAt = completedAt,
-                StepsJson = System.Text.Json.JsonSerializer.Serialize(agentResult.Steps)
+                StepsJson = System.Text.Json.JsonSerializer.Serialize(agentResult.Steps),
+                TriggeredByUserId = triggeredById
             });
 
             var results = new List<object>();
@@ -154,7 +167,7 @@ public static class WeatherEndpoints
             if (log is null) return Results.NotFound();
             return Results.Ok(new {
                 log.Id, log.DistrictId, log.OverallStatus, log.ErrorMessage,
-                log.StartedAt, log.CompletedAt,
+                log.StartedAt, log.CompletedAt, log.TriggeredByUserId,
                 Steps = System.Text.Json.JsonSerializer.Deserialize<object>(log.StepsJson)
             });
         }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
