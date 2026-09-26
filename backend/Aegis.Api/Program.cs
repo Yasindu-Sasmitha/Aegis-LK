@@ -1,10 +1,15 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using Aegis.Incident;
 using Aegis.Incident.Data;
 using Aegis.Incident.Endpoints;
+using Aegis.Incident.Services;
 using Aegis.Recovery.Data;
 using Aegis.Recovery.Endpoints;
 using Aegis.Recovery.Services;
+using Aegis.Resource.Data;
+using Aegis.Resource.Endpoints;
+using Aegis.Resource.Services;
 using Aegis.Shared.Auth.Data;
 using Aegis.Shared.Auth.Endpoints;
 using Aegis.Shared.Auth.Entities;
@@ -16,16 +21,12 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using Aegis.Resource.Data;
-using Aegis.Resource.Endpoints;
-using Aegis.Resource.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 
 // ── CORS ────────────────────────────────────────────────────────────────────
-// Allow Flutter web (and React frontend) running on any localhost port during development
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalDev", policy =>
@@ -58,8 +59,10 @@ builder.Services.AddDbContext<RecoveryDbContext>(options =>
 builder.Services.AddDbContext<ResourceDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// ── Resource Module Services ────────────────────────────────────────────────
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IDispatchService, DispatchService>();
 
 // ── Authentication & Authorization ──────────────────────────────────────────
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -114,9 +117,11 @@ builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentDedupAgentClient>
     client.BaseAddress = new Uri("http://127.0.0.1:8002");
 });
 
+// Resource Agent Client — SINGLE registration (duplicate removed)
 builder.Services.AddHttpClient<Aegis.Resource.Services.ResourceAgentClient>(client =>
 {
     client.BaseAddress = new Uri("http://127.0.0.1:8003");
+    client.Timeout = TimeSpan.FromSeconds(45);
 });
 
 var cloudinarySettings = new Aegis.Incident.Services.CloudinarySettings
@@ -162,14 +167,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ── CORS Middleware ─────────────────────────────────────────────────────────
 app.UseCors("AllowLocalDev");
 
-// ── Auth Pipeline ───────────────────────────────────────────────────────────
 app.UseAuthentication();
 app.UseAuthorization();
 
-// ── Endpoint Modules ────────────────────────────────────────────────────────
 app.MapAuthEndpoints();
 app.MapWeatherEndpoints();
 app.MapRecoveryEndpoints();
