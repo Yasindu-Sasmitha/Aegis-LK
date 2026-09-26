@@ -60,7 +60,6 @@ builder.Services.AddDbContext<ResourceDbContext>(options =>
 
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
-builder.Services.AddScoped<IDispatchService, DispatchService>();
 
 // ── Authentication & Authorization ──────────────────────────────────────────
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -118,12 +117,6 @@ builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentDedupAgentClient>
 builder.Services.AddHttpClient<Aegis.Resource.Services.ResourceAgentClient>(client =>
 {
     client.BaseAddress = new Uri("http://127.0.0.1:8003");
-});
-
-builder.Services.AddHttpClient<ResourceAgentClient>(c =>
-{
-    c.BaseAddress = new Uri("http://127.0.0.1:8003");
-    c.Timeout = TimeSpan.FromSeconds(45);
 });
 
 var cloudinarySettings = new Aegis.Incident.Services.CloudinarySettings
