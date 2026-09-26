@@ -1,5 +1,15 @@
+using System.Text;
+using System.Text.Json.Serialization;
+using Aegis.Incident;
+using Aegis.Incident.Data;
+using Aegis.Incident.Endpoints;
+using Aegis.Incident.Services;
+using Aegis.Recovery.Data;
 using Aegis.Recovery.Endpoints;
 using Aegis.Recovery.Services;
+using Aegis.Resource.Data;
+using Aegis.Resource.Endpoints;
+using Aegis.Resource.Services;
 using Aegis.Shared.Auth.Data;
 using Aegis.Shared.Auth.Endpoints;
 using Aegis.Shared.Auth.Entities;
@@ -11,13 +21,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using Aegis.Resource.Data;
-using Aegis.Resource.Endpoints;
-using Aegis.Resource.Services;
-using Aegis.Incident;
-using Aegis.Incident.Data;
-using Aegis.Incident.Endpoints;
-using Aegis.Incident.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
