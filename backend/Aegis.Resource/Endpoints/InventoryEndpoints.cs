@@ -15,19 +15,27 @@ namespace Aegis.Resource.Endpoints
                 .WithTags("Resource - Inventory");
 
             group.MapGet("/", async (
-                Guid? warehouseId,
-                ItemType? itemType,
-                bool? lowStockOnly,
-                string? sortBy,
-                bool descending,
-                int page,
-                int pageSize,
-                IInventoryService inventoryService) =>
+                IInventoryService inventoryService,
+                Guid? warehouseId = null,
+                ItemType? itemType = null,
+                bool? lowStockOnly = null,
+                string? sortBy = null,
+                bool descending = false,
+                int page = 1,
+                int pageSize = 20) =>
             {
                 var result = await inventoryService.GetAllAsync(
                     warehouseId, itemType, lowStockOnly, sortBy, descending,
                     page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize);
-                return Results.Ok(result);
+                var items = result.ToList();
+
+                return Results.Ok(new
+                {
+                    total = items.Count,
+                    page = page == 0 ? 1 : page,
+                    pageSize = pageSize == 0 ? 20 : pageSize,
+                    items
+                });
             });
 
             group.MapGet("/{id:guid}", async (Guid id, IInventoryService inventoryService) =>

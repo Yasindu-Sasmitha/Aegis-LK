@@ -17,6 +17,7 @@ public class RecoveryDbContext : DbContext
     public DbSet<RecoveryTask> RecoveryTasks => Set<RecoveryTask>();
     public DbSet<RecoveryReport> RecoveryReports => Set<RecoveryReport>();
     public DbSet<RecoveryWorkflowLog> RecoveryWorkflowLogs => Set<RecoveryWorkflowLog>();
+    public DbSet<DamageReport> DamageReports => Set<DamageReport>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -121,5 +122,11 @@ public class RecoveryDbContext : DbContext
         builder.Entity<RecoveryReport>()
             .Property(r => r.TotalBudgetSpent)
             .HasPrecision(18, 2);
+
+        // DamageReport
+        builder.Entity<DamageReport>()
+            .HasIndex(d => d.District);
+        builder.Entity<DamageReport>()
+            .HasIndex(d => d.Status);
     }
 }

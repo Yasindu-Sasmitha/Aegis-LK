@@ -145,7 +145,18 @@ public static class WeatherEndpoints
             }
 
             await db.SaveChangesAsync();
-            return Results.Ok(new { district.Name, AgentRunId = agentRunId, Results = results });
+            return Results.Ok(new { district.Name, AgentRunId = agentRunId, Results = results, Trace = agentResult.Steps });
+        }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
+
+        group.MapGet("/agent-runs/{agentRunId:guid}", async (Guid agentRunId, WeatherDbContext db) =>
+        {
+            var log = await db.AgentExecutionLogs.FindAsync(agentRunId);
+            if (log is null) return Results.NotFound();
+            return Results.Ok(new {
+                log.Id, log.DistrictId, log.OverallStatus, log.ErrorMessage,
+                log.StartedAt, log.CompletedAt,
+                Steps = System.Text.Json.JsonSerializer.Deserialize<object>(log.StepsJson)
+            });
         }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
 
         group.MapPost("/alerts/{id:guid}/review", async (
@@ -164,15 +175,12 @@ public static class WeatherEndpoints
 
             // Extract reviewer GUID from authenticated JWT claims
             var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (Guid.TryParse(userIdClaim, out var officerId))
+            if (!Guid.TryParse(userIdClaim, out var officerId))
             {
-                alert.ReviewedByUserId = officerId;
-            }
-            else
-            {
-                alert.ReviewedByUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+                return Results.Unauthorized();
             }
 
+            alert.ReviewedByUserId = officerId;
             alert.ReviewedAt = DateTime.UtcNow;
 
             if (body.Decision == "Approved")

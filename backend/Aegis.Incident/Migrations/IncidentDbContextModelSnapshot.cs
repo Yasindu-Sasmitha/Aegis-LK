@@ -62,6 +62,12 @@ namespace Aegis.Incident.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("DedupConfidence")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DedupReasoning")
+                        .HasColumnType("text");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");
@@ -87,6 +93,9 @@ namespace Aegis.Incident.Migrations
 
                     b.Property<int?>("PlausibilityScore")
                         .HasColumnType("integer");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("ReportedByUserId")
                         .HasColumnType("uuid");

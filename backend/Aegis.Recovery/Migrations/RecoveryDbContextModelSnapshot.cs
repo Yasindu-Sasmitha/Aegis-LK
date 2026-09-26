@@ -132,6 +132,71 @@ namespace Aegis.Recovery.Migrations
                     b.ToTable("Compensations", "recovery");
                 });
 
+            modelBuilder.Entity("Aegis.Recovery.Models.DamageReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AdditionalNotes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisasterType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("DisplacedFamilies")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("District")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("HousesDamaged")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("IncidentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InfrastructureJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RecoveryPlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReporterContact")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReporterName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("District");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("DamageReports", "recovery");
+                });
+
             modelBuilder.Entity("Aegis.Recovery.Models.Donation", b =>
                 {
                     b.Property<Guid>("Id")

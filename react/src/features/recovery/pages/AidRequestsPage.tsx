@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchAidRequests, createAidRequest, updateAidRequestStatus } from '../api/recoveryApi';
 import { AidRequestTable } from '../components/AidRequestTable';
 import { AidRequest } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
 const SRI_LANKA_DISTRICTS = [
   'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 'Galle',
@@ -22,9 +23,12 @@ const AID_TYPES = [
 ];
 
 export const AidRequestsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isOfficer = user?.role === 'DisasterOfficer' || user?.role === 'Admin' || user?.role === 'Responder';
+  const isCitizen = user?.role === 'Citizen';
+
   const [requests, setRequests] = useState<AidRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOfficer, setIsOfficer] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -32,9 +36,9 @@ export const AidRequestsPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newRequest, setNewRequest] = useState({
-    victimName: '',
-    contactPhone: '',
-    district: 'Kalutara',
+    victimName: user?.fullName || '',
+    contactPhone: user?.phoneNumber || '',
+    district: user?.district || 'Kalutara',
     aidType: 'Food Rations',
     familySize: 4,
     urgency: 'High',
@@ -68,8 +72,19 @@ export const AidRequestsPage: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRequest.victimName.trim() || !newRequest.contactPhone.trim()) {
-      alert('Please provide your name and contact phone number.');
+    if (!newRequest.victimName.trim()) {
+      alert('Please provide the applicant/victim full name.');
+      return;
+    }
+
+    const cleanPhone = newRequest.contactPhone.trim();
+    if (!cleanPhone || cleanPhone.replace(/[^0-9+]/g, '').length < 9) {
+      alert('Please provide a valid contact phone number with at least 9-10 digits (e.g. 0771234567 or +94112345670).');
+      return;
+    }
+
+    if (!newRequest.familySize || newRequest.familySize < 1 || newRequest.familySize > 50) {
+      alert('Family size must be between 1 and 50 members.');
       return;
     }
 
@@ -77,13 +92,14 @@ export const AidRequestsPage: React.FC = () => {
     try {
       await createAidRequest({
         ...newRequest,
+        contactPhone: cleanPhone,
         status: 'Pending',
       });
       setShowModal(false);
       setNewRequest({
-        victimName: '',
-        contactPhone: '',
-        district: 'Kalutara',
+        victimName: user?.fullName || '',
+        contactPhone: user?.phoneNumber || '',
+        district: user?.district || 'Kalutara',
         aidType: 'Food Rations',
         familySize: 4,
         urgency: 'High',
@@ -98,7 +114,17 @@ export const AidRequestsPage: React.FC = () => {
     }
   };
 
+  const userFullName = (user?.fullName || '').trim().toLowerCase();
+  const userPhone = (user?.phoneNumber || '').trim().replace(/[^0-9]/g, '');
+
   const filteredRequests = requests.filter((r) => {
+    if (isCitizen && !isOfficer) {
+      const rName = (r.victimName || '').trim().toLowerCase();
+      const rPhone = (r.contactPhone || '').trim().replace(/[^0-9]/g, '');
+      const isOwner = (userFullName && (rName === userFullName || rName.includes(userFullName))) ||
+                      (userPhone && rPhone && (userPhone.endsWith(rPhone.slice(-9)) || rPhone.endsWith(userPhone.slice(-9))));
+      if (!isOwner) return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -109,19 +135,18 @@ export const AidRequestsPage: React.FC = () => {
     );
   });
 
-  const pendingCount = requests.filter((r) => r.status === 'Pending').length;
-  const fulfilledCount = requests.filter((r) => r.status === 'Fulfilled').length;
+  const pendingCount = filteredRequests.filter((r) => r.status === 'Pending').length;
+  const fulfilledCount = filteredRequests.filter((r) => r.status === 'Fulfilled').length;
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* ── HEADER & ROLE SWITCHER ── */}
+      {/* ── HEADER & AUTH ROLE BADGE ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>🤝</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
-              Citizen Emergency Aid & Relief Portal
+              Citizen Emergency Aid &amp; Relief Portal
             </h1>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
@@ -129,33 +154,51 @@ export const AidRequestsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* User Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.4rem 0.75rem', borderRadius: '10px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Active Mode:</span>
-          <button
-            onClick={() => setIsOfficer(!isOfficer)}
-            style={{
-              padding: '0.35rem 0.75rem',
+        {/* Action Button & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
               borderRadius: '6px',
-              border: 'none',
-              background: isOfficer ? '#1e3a8a' : '#16a34a',
+              background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
+              color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
+              border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
               color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
               fontWeight: 700,
-              fontSize: '0.8rem',
+              fontSize: '0.9rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.35rem',
+              gap: '0.5rem',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
             }}
           >
-            <span>{isOfficer ? '🛡️ DMC Officer View' : '👤 Citizen View'}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>(Click to switch)</span>
+            <span>➕</span>
+            <span>Apply for Emergency Relief</span>
           </button>
         </div>
       </div>
 
       {/* ── CITIZEN INFO BANNER ── */}
-      {!isOfficer && (
+      {isCitizen ? (
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -167,59 +210,79 @@ export const AidRequestsPage: React.FC = () => {
           padding: '1rem 1.25rem',
           marginBottom: '1.25rem',
           fontSize: '0.9rem',
-          color: '#15803d',
+          color: '#166534',
         }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>✋</span>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>ℹ️</span>
           <div>
-            <strong>Citizen / Victim Portal</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#166534', fontWeight: 400 }}>
-              You can <strong>submit a new aid request</strong> and track the status of your existing applications below. Approvals, rejections, and dispatch confirmations are handled by your assigned DMC Relief Officer.
+            <strong>Citizen Relief Request Service</strong>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#15803d', fontWeight: 400 }}>
+              Need emergency rations, potable drinking water, medical kits, or temporary bedding? Click <strong>"+ Apply for Emergency Relief"</strong>. Your request will be prioritized and assigned to field response teams.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          background: '#eff6ff',
+          border: '1px solid #dbeafe',
+          borderLeft: '4px solid #2563eb',
+          borderRadius: '10px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.25rem',
+          fontSize: '0.9rem',
+          color: '#1e40af',
+        }}>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
+          <div>
+            <strong>Officer Relief Dispatch &amp; Fulfillment Portal</strong>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
+              Manage intake volume, filter by critical urgency, assign victims to emergency shelters, and advance request fulfillment status.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── ACTION BAR & METRICS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Applications</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0' }}>{requests.length}</div>
+      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Applications</span>
+            <span style={{ fontSize: '1.25rem' }}>📋</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
+            {requests.length} Requests
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+            Submitted across all affected districts
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>Pending Review</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', margin: '0.2rem 0' }}>{pendingCount}</div>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Pending Review</span>
+            <span style={{ fontSize: '1.25rem' }}>⏳</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
+            {pendingCount} Pending
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#b45309', marginTop: '0.25rem' }}>
+            Awaiting officer verification &amp; triage
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>Fulfilled / Dispatched</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', margin: '0.2rem 0' }}>{fulfilledCount}</div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              width: '100%',
-              height: '100%',
-              padding: '0.85rem 1.25rem',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-            }}
-          >
-            <span>➕</span>
-            <span>Apply for Emergency Relief</span>
-          </button>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Fulfilled / Dispatched</span>
+            <span style={{ fontSize: '1.25rem' }}>✅</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
+            {fulfilledCount} Completed
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.25rem' }}>
+            Relief supplies successfully delivered
+          </div>
         </div>
       </div>
 
@@ -414,13 +477,15 @@ export const AidRequestsPage: React.FC = () => {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    padding: '0.65rem 1.5rem',
-                    background: '#2563eb',
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
                   {submitting ? 'Submitting...' : '✓ Submit Aid Request'}

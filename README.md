@@ -17,6 +17,13 @@ without merge conflicts, while the final product ships as one integrated applica
 - [Shared files — edit with care](#shared-files--edit-with-care)
 - [Branching & PR workflow](#branching--pr-workflow)
 - [Running the project locally](#running-the-project-locally)
+- [Team Member Implementation Guide & Upcoming Tasks](#team-member-implementation-guide--upcoming-tasks)
+  - [Current System Status & Completed Foundation](#current-system-status--completed-foundation)
+  - [Member 2 — Incident & Rescue Operations Roadmap](#member-2--incident--rescue-operations-roadmap)
+  - [Member 3 — Resource & Logistics Roadmap](#member-3--resource--logistics-roadmap)
+  - [Member 4 — Recovery & Community Support Roadmap](#member-4--recovery--community-support-roadmap)
+  - [Cross-Module Integration Contracts & Data Flows](#cross-module-integration-contracts--data-flows)
+  - [Flutter Development Guide for Team Members](#flutter-development-guide-for-team-members)
 
 ---
 
@@ -89,10 +96,7 @@ long-term trend data, not a 3-day forecast) and Tsunami (a seismic phenomenon, n
 **Database entities:** District, HistoricalWeather, WeatherStation, WeatherObservation,
 Prediction, WeatherAlert, ForecastHistory, AgentExecutionLog.
 
-**Agent — Weather Prediction Agent:** given a district's forecast and historical thresholds,
-returns a risk assessment per relevant hazard (probability, confidence, recommended action).
-Built with LangGraph + Gemini (`gemini-2.5-flash-lite`, free tier). Code — not the LLM — makes
-the final publish/review decision.
+**Agent — Weather Prediction Agent (Assessor / Critic split):** given a district's forecast and historical thresholds, runs a **3-node LangGraph pipeline**: (1) Assessor LLM proposes risk probability, confidence, and recommended action per hazard; (2) Critic LLM independently checks for internal inconsistencies in the Assessor's output; (3) deterministic code gate applies confidence, anomaly, and critic-override rules before any alert is published. Critic disagreements produce auditable `flag_for_review` overrides, not silent failures. Every run emits a full `steps` trace (per-node timing, status, plain-English summary) returned in the API response, persisted to `AgentExecutionLogs`, and rendered in the React UI via `AgentTraceTimeline`. Built with LangGraph + Gemini (`gemini-2.5-flash-lite`, free tier).
 
 **Third-party integration:** Open-Meteo API (free, no key required) for live weather forecasts.
 
@@ -284,11 +288,11 @@ git push origin --delete feature/<your-IT-ID>-<task>
 
 **Owns, full stop:**
 - Entities: `District`, `HistoricalWeather`, `WeatherStation`, `WeatherObservation`, `Prediction`, `WeatherAlert`, `ForecastHistory`, `AgentExecutionLog`
-- Endpoints: `GET /api/weather/districts`, `GET /api/weather/districts/{id}/historical`, `GET /api/weather/forecast/{districtId}`, `POST /api/weather/predict/{districtId}`, `POST /api/weather/alerts/{id}/review` (in progress), `GET /api/weather/alerts` (in progress), `GET /api/weather/analytics/accuracy` (in progress)
+- Endpoints: `GET /api/weather/districts`, `GET /api/weather/districts/{id}/historical`, `GET /api/weather/forecast/{districtId}`, `POST /api/weather/predict/{districtId}`, `POST /api/weather/alerts/{id}/review` (✅ completed), `GET /api/weather/alerts` (✅ completed), `GET /api/weather/analytics/accuracy` (✅ completed), `GET /api/weather/agent-runs/{agentRunId}` (✅ completed)
 - Agent: Weather Prediction Agent — input `{ districtName, isLandslideProne, forecastRainfallMm[], forecastWindKmh[], floodThresholdMm, landslideThresholdMm, windThresholdKmh }`, output `{ hazards: [{ hazardType, riskProbabilityPct, confidencePct, reasoningSummary, recommendedAction }] }` — one entry per relevant hazard (Flood + StrongWind always; Landslide only if the district is landslide-prone)
 - Third-party call: Open-Meteo API — this integration lives entirely inside this module, nobody else touches it
-- React: forecast dashboard, prediction graphs, alert review queue (not started)
-- Flutter: current weather screen, rain/wind alerts, district search (not started)
+- React: forecast dashboard, prediction graphs, alert review queue, prediction history, analytics dashboard (✅ completed)
+- Flutter: current weather screen, rain/wind/landslide alerts, district search & forecast, review queue (✅ completed)
 
 **Explicitly NOT this module's job:**
 - Deciding what a citizen does with a warning (that's Incident's UI choice, not Weather's)
@@ -408,14 +412,243 @@ PostgreSQL locally themselves. This is the current, actually-working setup:
 ```
 6. **If your module has a Python agent** (FastAPI + LangGraph), run it as its own loopback-only
    process, called internally by `Aegis.Api` — never by React/Flutter directly. Port convention so
-   we don't collide: **Weather = 8001** (already running). Pick the next free port (8002, 8003…)
-   for your own agent service and add it to this list once it's live:
-```powershell
-   cd agentic-ai/agents
-   uvicorn <your>_agent_service:app --host 127.0.0.1 --port 800X
-```
-   Free-tier Gemini (`gemini-2.5-flash-lite` or `models/gemini-3.1-flash-lite-preview` via `langchain-google-genai`) is the recommended model
-   for any agent — same setup used in the SE3090 labs, well-documented free-tier limits, no local
-   GPU or Ollama installation needed.
+   we don't collide:
+   - **Weather Agent:** `http://127.0.0.1:8001` (Member 1 — active)
+   - **Incident Agent:** `http://127.0.0.1:8002` (Member 2 — upcoming)
+   - **Resource Agent:** `http://127.0.0.1:8003` (Member 3 — upcoming)
+   - **Recovery Agent:** `http://127.0.0.1:8004` (Member 4 — upcoming)
 
-React: `http://localhost:3000` (once scaffolded). Flutter: run via your emulator/device of choice.
+   To run an agent service:
+```powershell
+cd agentic-ai/agents
+uvicorn <your>_agent_service:app --host 127.0.0.1 --port 800X
+```
+   Free-tier Gemini (`gemini-2.5-flash-lite` via `langchain-google-genai`) is the recommended model
+   for any agent.
+
+7. **React Web Frontend:**
+```powershell
+cd react
+npm install
+npm run dev
+```
+   Runs at `http://localhost:3000`. Quick demo login buttons are available on the login page.
+
+8. **Flutter Mobile & Web Client:**
+```powershell
+cd flutter
+flutter pub get
+flutter run -d chrome            # Run in Chrome Web
+# or
+flutter run -d emulator-5554     # Run on Android Emulator
+```
+   See `flutter/README.md` for full mobile architecture and emulator network configuration.
+
+---
+
+## Team Member Implementation Guide & Upcoming Tasks
+
+This section outlines what has been completed and provides a step-by-step roadmap for **Member 2**, **Member 3**, and **Member 4** to build out their respective modules.
+
+### Current System Status & Completed Foundation
+
+1. **Backend & Architecture:**
+   - Modular monolith setup with shared JWT authentication (`AuthDbContext`, `Aegis.Shared`).
+   - Role-Based Access Control (`Admin`, `DisasterOfficer`, `Responder`, `Citizen`) with pre-seeded demo accounts.
+   - Swagger replacement with interactive OpenAPI documentation at `http://localhost:5012/scalar/v1`.
+
+2. **Weather Intelligence Module (Member 1 — Complete):**
+   - Live Open-Meteo weather forecast integration across all 25 Sri Lanka districts.
+   - 3-node LangGraph Agentic AI pipeline: Assessor LLM (`assess_hazards`), Critic LLM (`critique_assessment`), and deterministic code gate (`validate_and_decide`).
+   - Per-node execution audit traces saved in `AgentExecutionLogs` and rendered in React via `AgentTraceTimeline`.
+   - Officer Alert Review Queue, Accuracy Analytics dashboard, and real published alerts broadcast to both React and Flutter homepages.
+
+3. **Client Applications (React & Flutter):**
+   - **React Frontend:** Full Weather dashboard, prediction history, alert review queue, accuracy analytics, dark mode UI with high-contrast styling.
+   - **Flutter Mobile/Web:** Complete application shell (`MainShell`), shared theme (`AegisTheme`), centralized auth (`AuthProvider`), and a comprehensive Homepage featuring Sri Lanka emergency hotlines (117 / 119 / 110), live alert carousel, 25-district risk matrix, and capability routing.
+
+---
+
+### Member 2 — Incident & Rescue Operations Roadmap
+
+**Goal:** Citizens report incidents (with camera photo & GPS coordinates); AI assesses severity and required teams; Disaster Officers review and dispatch rescue missions; missions trigger Resource dispatch.
+
+#### 1. Backend (`backend/Aegis.Incident/`)
+- [ ] Implement EF Core entities: `Incident`, `Victim`, `Volunteer`, `RescueTeam`, `RescueMission`, `MissionLog`, `DamageReport`.
+- [ ] Implement endpoints:
+  - `POST /api/incidents`: Citizen submits incident report (type, description, lat/lng, photo URL).
+  - `GET /api/incidents`: List active incidents (filter by status: `Reported`, `Assessed`, `Dispatched`, `Resolved`).
+  - `POST /api/incidents/{id}/assess`: Calls `incident_agent.py` to assess severity and calculate `teamsRequired`.
+  - `POST /api/incidents/{id}/approve`: Officer approves mission, changes status to `Dispatched`, and invokes the outbound call to Resource module:
+    ```http
+    POST /api/resource/dispatch-requests
+    { "missionId": "...", "teamsRequired": 3, "location": { "lat": 6.9271, "lng": 79.8612 } }
+    ```
+  - `GET /api/incident/{id}/damage-report`: Read endpoint exposed for Member 4 (Recovery) after incident closure.
+
+#### 2. Agentic AI (`agentic-ai/agents/incident_agent.py`)
+- [ ] Create `incident_agent.py` and `incident_agent_service.py` running on **port 8002**.
+- [ ] Input schema: `{ disasterType, severityReported, description, location }`.
+- [ ] Output schema: `{ severityAssessed: "Low"|"Medium"|"High"|"Critical", teamsRequired: int, recommendedEquipment: string[], reasoning: string }`.
+- [ ] Use LangGraph with validation guardrails (ensure teams required is positive and bounded).
+
+#### 3. React Frontend (`react/src/features/incident/`)
+- [ ] Incident management dashboard: table of incoming reports with severity badges.
+- [ ] Incident detail view with map location, citizen description, and AI recommended response.
+- [ ] Officer approval/rejection buttons to trigger rescue missions.
+
+#### 4. Flutter Mobile App (`flutter/lib/features/incident/`)
+- [ ] Implement `screens/report_incident_screen.dart`:
+  - Camera/Photo capture via `image_picker`.
+  - GPS coordinate capture via `geolocator`.
+  - Form validation and submission to `POST /api/incidents`.
+- [ ] Implement `screens/sos_emergency_screen.dart`: 1-tap emergency SOS broadcast with current GPS coordinates.
+- [ ] Implement `screens/incident_list_screen.dart` and `screens/incident_assessment_screen.dart`.
+
+---
+
+### Member 3 — Resource & Logistics Roadmap
+
+**Goal:** Receive dispatch requests from Incident missions, allocate warehouse inventory and response vehicles, calculate delivery routes, and track fulfillment.
+
+#### 1. Backend (`backend/Aegis.Resource/`)
+- [ ] Implement EF Core entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`.
+- [ ] Implement endpoints:
+  - `POST /api/resource/dispatch-requests`: Inbound receiver contract from Member 2's Incident module.
+  - `GET /api/resource/dispatch/{id}`: Fetch dispatch plan details.
+  - `POST /api/resource/dispatch/{id}/approve`: Logistics manager approves dispatch plan and reserves inventory/vehicle.
+  - `GET /api/resource/inventory`: Current stock levels across Sri Lanka warehouses.
+  - `POST /api/resource/delivery/{id}/confirm`: Confirm arrival of resources at mission site.
+
+#### 2. Agentic AI (`agentic-ai/agents/resource_agent.py`)
+- [ ] Create `resource_agent.py` and `resource_agent_service.py` running on **port 8003**.
+- [ ] Input schema: `{ missionId, teamsRequired, location: { lat, lng } }`.
+- [ ] Output schema: `{ warehouseId, allocatedItems: [{ itemName, quantity }], vehicleId, routeSummary, estimatedArrivalMinutes }`.
+- [ ] Check stock availability before recommending allocation.
+
+#### 3. React Frontend (`react/src/features/resource/`)
+- [ ] Warehouse & Inventory Dashboard: visual bars showing stock of food rations, medical kits, water, and boats.
+- [ ] Dispatch Plan Review: map showing origin warehouse, destination mission, and allocated resources.
+- [ ] Vehicle Fleet tracking table with status tags (`Available`, `EnRoute`, `Maintenance`).
+
+#### 4. Flutter Mobile App (`flutter/lib/features/resource/`)
+- [ ] Implement `screens/warehouse_inventory_screen.dart`: Stock browser for field officers.
+- [ ] Implement `screens/dispatch_plan_screen.dart`: Review and confirm outbound dispatches.
+- [ ] Implement `screens/delivery_qr_screen.dart`: QR code scanner or confirmation code entry for field responders verifying delivery.
+
+---
+
+### Member 4 — Recovery & Community Support Roadmap
+
+**Goal:** Citizens find emergency shelters and submit aid requests; Recovery Officers coordinate post-disaster infrastructure repair, donations, and long-term aid using damage reports from closed incidents.
+
+#### 1. Backend (`backend/Aegis.Recovery/`)
+- [ ] Implement EF Core entities: `Shelter`, `AidRequest`, `Donation`, `Compensation`, `RecoveryTask`, `InfrastructureDamage`, `NGO`, `RecoveryReport`.
+- [ ] Implement endpoints:
+  - `POST /api/recovery/shelters` & `GET /api/recovery/shelters`: Shelter locations, capacity, and current occupancy.
+  - `POST /api/recovery/aid-requests` & `GET /api/recovery/aid-requests`: Citizens request emergency aid (food, medicine, shelter).
+  - `POST /api/recovery/donations`: Public donations recording.
+  - `GET /api/recovery/plan/{incidentId}`: Ingests damage report from Incident module (`GET /api/incident/{id}/damage-report`) and generates recovery plan.
+- [ ] Connect `RecoveryAgentClientService.cs` to real Python service instead of simulated placeholders.
+
+#### 2. Agentic AI (`agentic-ai/agents/recovery_agent.py`)
+- [ ] Create `recovery_agent.py` and `recovery_agent_service.py` running on **port 8004**.
+- [ ] Input schema: `{ incidentId, damageReport: { housesDamaged, displacedFamilies, infrastructureDamage } }`.
+- [ ] Output schema: `{ recoveryPlanSummary, shelterAllocations, estimatedBudgetLkr, prioritizedTasks: string[] }`.
+
+#### 3. React Frontend (`react/src/features/recovery/`)
+- [ ] Shelter Capacity Dashboard: real-time occupancy meters.
+- [ ] Aid Request review queue with status toggles (`Pending`, `Approved`, `Dispatched`).
+- [ ] Recovery plan visualization showing damage metrics and allocated budgets.
+
+#### 4. Flutter Mobile App (`flutter/lib/features/recovery/`)
+- [ ] Wire existing scaffolded screens in `flutter/lib/features/recovery/screens/`:
+  - `shelter_finder_screen.dart`: Display real shelters from `GET /api/recovery/shelters`.
+  - `aid_request_screen.dart`: Connect form to `POST /api/recovery/aid-requests`.
+  - `donate_screen.dart`: Public donation intake.
+  - `citizen_damage_report_screen.dart`: Citizen post-disaster damage filing.
+
+---
+
+### Cross-Module Integration Contracts & Data Flows
+
+The platform's end-to-end workflow connects the 4 modules in a clean sequence:
+
+```
+[1. Weather Warning] (Member 1)
+        ↓ (Optional read context: GET /api/weather/alerts)
+[2. Incident Occurs & Reported] (Member 2)
+        ↓ Officer approves mission
+        → POST /api/resource/dispatch-requests (Hard contract to Member 3)
+[3. Resource Allocation & Dispatch] (Member 3)
+        ↓ Rescue completed & incident closed
+        → GET /api/incident/{id}/damage-report (Hard contract from Member 4)
+[4. Recovery & Shelter Management] (Member 4)
+```
+
+**Key API Contracts to adhere to:**
+1. **Incident → Resource:**
+   ```json
+   POST /api/resource/dispatch-requests
+   {
+     "missionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+     "teamsRequired": 3,
+     "location": { "latitude": 6.9271, "longitude": 79.8612 }
+   }
+   ```
+2. **Incident → Recovery:**
+   ```json
+   GET /api/incident/{id}/damage-report
+   {
+     "incidentId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+     "housesDamaged": 24,
+     "displacedFamilies": 85,
+     "infrastructureDamage": ["Bridge collapsed", "Road submerged"]
+   }
+   ```
+
+---
+
+### Flutter Development Guide for Team Members
+
+When adding your screens and features to Flutter:
+
+1. **Follow the Folder Structure:**
+   Create your code in `flutter/lib/features/<your-module>/`:
+   - `models/`: Dart data classes with `fromJson` and `toJson`.
+   - `services/`: HTTP client methods calling `http://localhost:5012/api/<your-module>`.
+   - `screens/`: UI pages using Flutter `StatelessWidget` / `StatefulWidget`.
+
+2. **Use Shared Design Tokens (`AegisTheme`):**
+   ```dart
+   import 'package:aegis_lk/shared/theme/aegis_theme.dart';
+
+   // Backgrounds & Cards
+   color: kCardBg,
+   border: Border.all(color: kBorder),
+
+   // Accent Colors
+   kPrimary      // Cyan accent (0xFF06B6D4)
+   kIndigo       // Indigo accent (0xFF6366F1)
+   kStatusRed    // Critical/Emergency (0xFFEF4444)
+   kStatusGreen  // Operational/Safe (0xFF10B981)
+   ```
+
+3. **Access User Role & JWT Token:**
+   ```dart
+   import 'package:provider/provider.dart';
+   import 'package:aegis_lk/shared/auth/auth_provider.dart';
+
+   final auth = Provider.of<AuthProvider>(context, listen: false);
+   final token = auth.token;          // Pass in 'Authorization': 'Bearer $token'
+   final isOfficer = auth.isOfficerOrAdmin;
+   ```
+
+4. **Register Routes:**
+   - Add your route constants to `flutter/lib/shared/router/app_router.dart`.
+   - Add your module tab to `flutter/lib/shared/shell/main_shell.dart`.
+
+5. **Running Locally:**
+   - Web: `flutter run -d chrome` (connects to `localhost:5012`).
+   - Android Emulator: `flutter run -d emulator-5554` (use `10.0.2.2:5012`).
+   - Quick Demo Login: Use the pre-seeded buttons on the login screen (`officer@aegis.lk`, `citizen@aegis.lk`, etc.).

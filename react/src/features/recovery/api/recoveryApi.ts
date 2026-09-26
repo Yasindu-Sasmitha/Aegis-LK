@@ -96,6 +96,16 @@ export async function createDonation(data: Partial<Donation>): Promise<Donation>
   return res.json();
 }
 
+export async function updateDonationAllocation(id: string, allocationStatus: string, targetShelterId?: string): Promise<Donation> {
+  const res = await fetch(`${API_BASE}/donations/${id}/allocation`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ allocationStatus, targetShelterId }),
+  });
+  if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update donation allocation'); }
+  return res.json();
+}
+
 // ── Compensations ─────────────────────────────────────────────────────────────
 
 export async function fetchCompensations(status?: string): Promise<{ total: number; items: Compensation[] }> {
@@ -133,6 +143,16 @@ export async function fetchNGOs(status?: string): Promise<NGO[]> {
   if (status) params.append('status', status);
   const res = await fetch(`${API_BASE}/ngos?${params.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch NGOs');
+  return res.json();
+}
+
+export async function createNGO(data: Partial<NGO>): Promise<NGO> {
+  const res = await fetch(`${API_BASE}/ngos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to register NGO'); }
   return res.json();
 }
 
@@ -174,11 +194,11 @@ export async function approveRecoveryPlan(planId: string, action: 'Approve' | 'R
 // ── Multi-Agent Workflow Endpoints (NEW) ──────────────────────────────────────
 
 /** Start the full 4-agent recovery workflow with a direct damage intake form */
-export async function startWorkflowFromIntake(intake: DamageIntakeFormData): Promise<RecoveryPlan> {
+export async function startWorkflowFromIntake(intake: DamageIntakeFormData, damageReportId?: string): Promise<RecoveryPlan> {
   const res = await fetch(`${API_BASE}/workflows/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ directDamageIntake: intake }),
+    body: JSON.stringify({ directDamageIntake: intake, damageReportId }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -199,6 +219,12 @@ export async function startWorkflowFromIncident(incidentId: string): Promise<Rec
 }
 
 /** Get the agent execution trace for a plan */
+export async function fetchWorkflowDetail(planId: string): Promise<RecoveryPlan> {
+  const res = await fetch(`${API_BASE}/workflows/${planId}`);
+  if (!res.ok) throw new Error('Failed to fetch plan detail');
+  return res.json();
+}
+
 export async function fetchWorkflowTrace(planId: string): Promise<WorkflowTrace> {
   const res = await fetch(`${API_BASE}/workflows/${planId}/trace`);
   if (!res.ok) throw new Error('No workflow trace found for this plan');
@@ -247,3 +273,55 @@ export async function generateReport(incidentId: string, title: string): Promise
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed to generate report'); }
   return res.json();
 }
+
+export async function deleteReport(reportId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/reports/${reportId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed to delete report'); }
+}
+
+// ── Citizen Disaster Damage Intake ──────────────────────────────────────────
+
+export async function fetchDamageReports(status?: string, district?: string): Promise<{ total: number; items: import('../types/recoveryTypes').DamageReportItem[] }> {
+  const params = new URLSearchParams();
+  if (status) params.append('status', status);
+  if (district) params.append('district', district);
+  const res = await fetch(`${API_BASE}/damage-reports?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to fetch citizen damage reports');
+  return res.json();
+}
+
+export async function submitCitizenDamageReport(data: {
+  district: string;
+  location: string;
+  disasterType: string;
+  housesDamaged: number;
+  displacedFamilies: number;
+  reporterName: string;
+  reporterContact: string;
+  additionalNotes: string;
+  infrastructureDamage?: import('../types/recoveryTypes').DamageIntakeInfrastructureItem[];
+}): Promise<import('../types/recoveryTypes').DamageReportItem> {
+  const res = await fetch(`${API_BASE}/damage-reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to submit damage report');
+  }
+  return res.json();
+}
+
+export async function deleteDamageReport(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/damage-reports/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to delete damage report');
+  }
+}
+

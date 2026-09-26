@@ -5,7 +5,7 @@ import '../services/weather_service.dart';
 class DistrictForecastScreen extends StatefulWidget {
   final District district;
 
-  const DistrictForecastScreen({Key? key, required this.district}) : super(key: key);
+  const DistrictForecastScreen({super.key, required this.district});
 
   @override
   State<DistrictForecastScreen> createState() => _DistrictForecastScreenState();
@@ -111,75 +111,78 @@ class _DistrictForecastScreenState extends State<DistrictForecastScreen> {
                 )
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16.0),
-                  children: [
-                    // District Info Card
-                    _buildDistrictHeader(),
-                    const SizedBox(height: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // District Info Card
+                      _buildDistrictHeader(),
+                      const SizedBox(height: 16),
 
-                    // Live 3-Day Forecast Section
-                    _buildForecastSection(),
-                    const SizedBox(height: 16),
+                      // Live 3-Day Forecast Section
+                      _buildForecastSection(),
+                      const SizedBox(height: 16),
 
-                    // Historical Thresholds Section
-                    _buildThresholdsSection(),
-                    const SizedBox(height: 20),
-
-                    // Run AI Prediction Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo[700],
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 2,
-                        ),
-                        onPressed: _isRunningPrediction ? null : _runAgentPrediction,
-                        icon: _isRunningPrediction
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.psychology_outlined, size: 24),
-                        label: Text(
-                          _isRunningPrediction ? 'Agent Reasoning...' : 'Run Agentic AI Hazard Assessment',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-
-                    if (_predictionError != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.red[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red[200]!),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _predictionError!,
-                                style: TextStyle(color: Colors.red[800], fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Prediction Results Display
-                    if (_prediction != null) ...[
+                      // Historical Thresholds Section
+                      _buildThresholdsSection(),
                       const SizedBox(height: 20),
-                      _buildPredictionResultsCard(),
+
+                      // Run AI Prediction Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.indigo[700],
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 2,
+                          ),
+                          onPressed: _isRunningPrediction ? null : _runAgentPrediction,
+                          icon: _isRunningPrediction
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Icon(Icons.psychology_outlined, size: 24),
+                          label: Text(
+                            _isRunningPrediction ? 'Agent Reasoning...' : 'Run Agentic AI Hazard Assessment',
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+
+                      if (_predictionError != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red[200]!),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _predictionError!,
+                                  style: TextStyle(color: Colors.red[800], fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // Prediction Results Display
+                      if (_prediction != null) ...[
+                        const SizedBox(height: 20),
+                        _buildPredictionResultsCard(),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
     );
   }
@@ -191,7 +194,7 @@ class _DistrictForecastScreenState extends State<DistrictForecastScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -235,7 +238,7 @@ class _DistrictForecastScreenState extends State<DistrictForecastScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -263,7 +266,7 @@ class _DistrictForecastScreenState extends State<DistrictForecastScreen> {
                     margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue[50]?.withOpacity(0.5),
+                      color: Colors.blue[50]?.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.blue[100]!),
                     ),
@@ -312,7 +315,7 @@ class _DistrictForecastScreenState extends State<DistrictForecastScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -372,7 +375,7 @@ class _DistrictForecastScreenState extends State<DistrictForecastScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.indigo[100]!),
         boxShadow: [
-          BoxShadow(color: Colors.indigo.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.indigo.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -455,7 +458,7 @@ class _DistrictForecastScreenState extends State<DistrictForecastScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.12),
+              color: statusColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
+import { AegisLogo } from '../components/AegisLogo';
 
 interface RegisterPageProps {
   onSwitchToLogin: () => void;
@@ -17,6 +18,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [district, setDistrict] = useState('Colombo');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,237 +35,288 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
         phoneNumber: phoneNumber.trim() || undefined,
       });
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setError(err.message || 'Registration failed. Please try again.');
     }
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#0f172a',
-      fontFamily: "'Inter', system-ui, sans-serif",
-      padding: '1.5rem',
-    }}>
-      <div style={{
-        maxWidth: 480,
-        width: '100%',
-        backgroundColor: '#1e293b',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 16,
-        padding: '2.5rem',
-        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5)',
-      }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>👥</div>
-          <h1 style={{ color: '#f8fafc', fontSize: '1.75rem', fontWeight: 700, margin: 0 }}>Create Citizen Account</h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.35rem' }}>
-            Register to view live disaster alerts and access community relief
-          </p>
+    <div className="ae-auth-wrapper">
+      {/* Top Header Strip */}
+      <header className="ae-auth-topbar">
+        <AegisLogo size={36} lightText={true} />
+        <div className="ae-auth-topbar-tagline">
+          Prepared Today &nbsp;•&nbsp; Safer Tomorrow
         </div>
+      </header>
 
-        {/* Info Note on Citizen Scope */}
-        <div style={{
-          backgroundColor: 'rgba(59,130,246,0.1)',
-          border: '1px solid rgba(59,130,246,0.3)',
-          borderRadius: 8,
-          padding: '0.75rem 1rem',
-          color: '#93c5fd',
-          fontSize: '0.8rem',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          gap: '0.5rem',
-          alignItems: 'center',
-        }}>
-          <span>ℹ️</span>
-          <span>Public registration is for <strong>Citizens</strong>. Staff accounts are provisioned directly by the System Administrator.</span>
-        </div>
+      {/* Main Split Body */}
+      <div className="ae-auth-body">
+        {/* Left Brand Panel */}
+        <section className="ae-auth-left">
+          <div className="ae-auth-left-content">
+            <AegisLogo size={54} lightText={true} />
 
-        {/* Error Alert */}
-        {error && (
-          <div style={{
-            backgroundColor: 'rgba(239,68,68,0.15)',
-            border: '1px solid #ef4444',
-            borderRadius: 8,
-            padding: '0.75rem 1rem',
-            color: '#fca5a5',
-            fontSize: '0.85rem',
-            marginBottom: '1.25rem',
-          }}>
-            {error}
+            <h1 className="ae-auth-headline">
+              Join the<br />
+              <span>Aegis-LK Community</span>
+            </h1>
+
+            <p className="ae-auth-description">
+              Create your citizen account to receive verified hazard alerts, apply for relief assistance, and safeguard your loved ones during severe weather events.
+            </p>
+
+            {/* Feature Bullets */}
+            <div className="ae-feature-bullets">
+              <div className="ae-feature-bullet">
+                <div className="ae-bullet-icon red">🔔</div>
+                <div>
+                  <div className="ae-bullet-title">Localized Early Warnings</div>
+                  <div className="ae-bullet-desc">
+                    Receive urgent rainfall and flood risk notifications mapped specifically to your home district.
+                  </div>
+                </div>
+              </div>
+
+              <div className="ae-feature-bullet">
+                <div className="ae-bullet-icon blue">⛺</div>
+                <div>
+                  <div className="ae-bullet-title">Shelter & Emergency Relief</div>
+                  <div className="ae-bullet-desc">
+                    Locate active safe shelters, submit aid assistance requests, and track disaster relief support.
+                  </div>
+                </div>
+              </div>
+
+              <div className="ae-feature-bullet">
+                <div className="ae-bullet-icon green">🤝</div>
+                <div>
+                  <div className="ae-bullet-title">Community Resilience</div>
+                  <div className="ae-bullet-desc">
+                    Connect with community volunteers and field response units when unexpected crises strike.
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Registration Form */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              Full Name
-            </label>
-            <input
-              type="text"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="e.g. Kasun Perera"
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
+          {/* Bottom Left Watermark / Skyline Art */}
+          <div className="ae-auth-left-bottom">
+            <svg width="220" height="40" viewBox="0 0 220 40" fill="none" opacity="0.45">
+              <path d="M10 38 L30 18 L50 38 M60 38 L75 10 L90 38 M95 38 L110 25 L125 38 M130 38 L145 15 L160 38 M170 38 L185 20 L200 38" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="0" y1="38" x2="220" y2="38" stroke="#64748b" strokeWidth="1.5" />
+            </svg>
+            <div className="ae-slogan-badge">
+              <span>Sri Lanka Stronger Together</span>
+              <span className="ae-slogan-flag" />
+            </div>
+          </div>
+        </section>
+
+        {/* Right Form Panel */}
+        <section className="ae-auth-right">
+          <div className="ae-auth-card" style={{ maxWidth: 510 }}>
+            <div className="ae-auth-card-header" style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+                <AegisLogo size={42} showText={false} />
+              </div>
+              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: '1.2rem', color: '#0b2b52' }}>
+                Aegis-LK
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
+                Sri Lanka Disaster Management System
+              </div>
+
+              <h2 className="ae-auth-card-title" style={{ fontSize: '1.5rem', marginTop: '0.5rem' }}>
+                Create Citizen Account
+              </h2>
+              <p className="ae-auth-card-sub">
+                Register to view live disaster alerts and access community relief
+              </p>
+            </div>
+
+            {/* Scope Note */}
+            <div style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: 10,
+              padding: '0.65rem 0.85rem',
+              color: '#1e40af',
+              fontSize: '0.8rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              gap: '0.5rem',
+              alignItems: 'center',
+              lineHeight: 1.4
+            }}>
+              <span style={{ fontSize: '1.1rem' }}>ℹ️</span>
+              <span>
+                Public registration is for <strong>Citizens</strong>. Staff and responder accounts are provisioned directly by the System Administrator.
+              </span>
+            </div>
+
+            {/* Error Banner */}
+            {error && (
+              <div style={{
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 10,
                 padding: '0.75rem 1rem',
-                backgroundColor: 'rgba(15,23,42,0.8)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 8,
-                color: '#f8fafc',
-                fontSize: '0.9rem',
-                outline: 'none',
-              }}
-            />
-          </div>
+                color: '#b91c1c',
+                fontSize: '0.85rem',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. kasun@example.com"
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '0.75rem 1rem',
-                backgroundColor: 'rgba(15,23,42,0.8)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 8,
-                color: '#f8fafc',
-                fontSize: '0.9rem',
-                outline: 'none',
-              }}
-            />
-          </div>
+            {/* Form */}
+            <form onSubmit={handleSubmit}>
+              <div className="ae-form-group">
+                <label className="ae-form-label">Full Name</label>
+                <div className="ae-input-wrapper">
+                  <span className="ae-input-icon">👤</span>
+                  <input
+                    type="text"
+                    required
+                    className="ae-auth-input"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="e.g. Kasun Perera"
+                  />
+                </div>
+              </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-              Password (min 6 characters)
-            </label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a strong password"
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '0.75rem 1rem',
-                backgroundColor: 'rgba(15,23,42,0.8)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 8,
-                color: '#f8fafc',
-                fontSize: '0.9rem',
-                outline: 'none',
-              }}
-            />
-          </div>
+              <div className="ae-form-group">
+                <label className="ae-form-label">Email Address</label>
+                <div className="ae-input-wrapper">
+                  <span className="ae-input-icon">✉️</span>
+                  <input
+                    type="email"
+                    required
+                    className="ae-auth-input"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. kasun@example.com"
+                  />
+                </div>
+              </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <div>
-              <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-                District
-              </label>
-              <select
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
+              <div className="ae-form-group">
+                <label className="ae-form-label">Password (min 6 characters)</label>
+                <div className="ae-input-wrapper">
+                  <span className="ae-input-icon">🔒</span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    className="ae-auth-input"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Create a strong password"
+                    style={{ paddingRight: '2.5rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.85rem',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      color: '#94a3b8',
+                      padding: 0
+                    }}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <label className="ae-form-label">District</label>
+                  <div className="ae-input-wrapper">
+                    <span className="ae-input-icon">📍</span>
+                    <select
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      className="ae-auth-input"
+                      style={{ appearance: 'none', cursor: 'pointer' }}
+                    >
+                      {DISTRICTS.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="ae-form-label">Phone (Optional)</label>
+                  <div className="ae-input-wrapper">
+                    <span className="ae-input-icon">📞</span>
+                    <input
+                      type="tel"
+                      className="ae-auth-input"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="+94 77 ..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="ae-auth-btn-primary"
+                style={{ background: '#059669' }}
+              >
+                <span>{isLoading ? 'Creating Account...' : 'Complete Citizen Registration'}</span>
+                <span>→</span>
+              </button>
+            </form>
+
+            {/* Link back to Login */}
+            <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: '#64748b' }}>
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={onSwitchToLogin}
                 style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '0.75rem 1rem',
-                  backgroundColor: 'rgba(15,23,42,0.8)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 8,
-                  color: '#f8fafc',
-                  fontSize: '0.9rem',
-                  outline: 'none',
+                  background: 'none',
+                  border: 'none',
+                  color: '#0284c7',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: 0
                 }}
               >
-                {DISTRICTS.map((d) => (
-                  <option key={d} value={d} style={{ backgroundColor: '#1e293b' }}>{d}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem' }}>
-                Phone (Optional)
-              </label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+94 77 ..."
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '0.75rem 1rem',
-                  backgroundColor: 'rgba(15,23,42,0.8)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 8,
-                  color: '#f8fafc',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                }}
-              />
+                Sign In here
+              </button>
             </div>
           </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '0.85rem',
-              backgroundColor: '#10b981',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.95rem',
-              border: 'none',
-              borderRadius: 8,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.7 : 1,
-              transition: 'background 0.2s',
-            }}
-          >
-            {isLoading ? 'Registering...' : 'Complete Citizen Registration'}
-          </button>
-        </form>
-
-        {/* Link back to Login */}
-        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-          <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Already have an account? </span>
-          <button
-            type="button"
-            onClick={onSwitchToLogin}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#38bdf8',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              padding: 0,
-            }}
-          >
-            Sign In here
-          </button>
-        </div>
+        </section>
       </div>
+
+      {/* Footer Strip */}
+      <footer className="ae-auth-footer">
+        <div>
+          <strong>Aegis-LK</strong> &nbsp;|&nbsp; Sri Lanka Disaster Management System
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <span>🛡️</span>
+          <span>Preparedness &nbsp;•&nbsp; Response &nbsp;•&nbsp; Recovery &nbsp;•&nbsp; Resilience</span>
+        </div>
+      </footer>
     </div>
   );
 };
+
+export default RegisterPage;

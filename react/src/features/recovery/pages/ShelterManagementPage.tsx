@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchShelters, createShelter, updateShelterOccupancy } from '../api/recoveryApi';
 import { ShelterList } from '../components/ShelterList';
 import { Shelter } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
 const SRI_LANKA_DISTRICTS = [
   'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 'Galle',
@@ -12,9 +13,12 @@ const SRI_LANKA_DISTRICTS = [
 ];
 
 export const ShelterManagementPage: React.FC = () => {
+  const { user } = useAuth();
+  const isOfficer = user?.role === 'DisasterOfficer' || user?.role === 'Admin' || user?.role === 'Responder';
+  const isCitizen = user?.role === 'Citizen';
+
   const [shelters, setShelters] = useState<Shelter[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOfficer, setIsOfficer] = useState(true);
   const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -24,12 +28,12 @@ export const ShelterManagementPage: React.FC = () => {
   const [form, setForm] = useState({
     name: '',
     location: '',
-    district: 'Kalutara',
+    district: user?.district || 'Kalutara',
     latitude: 6.5854,
     longitude: 79.9607,
     capacity: 150,
-    contactPerson: '',
-    contactPhone: '',
+    contactPerson: user?.fullName || '',
+    contactPhone: user?.phoneNumber || '',
     facilities: 'Clean Water, Sanitation, Hot Meals, Emergency Medical Post, Generator',
   });
 
@@ -60,24 +64,41 @@ export const ShelterManagementPage: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.location.trim()) {
-      alert('Please fill in the shelter name and location.');
+    if (!form.name.trim()) {
+      alert('Please enter a valid shelter name.');
+      return;
+    }
+    if (!form.location.trim()) {
+      alert('Please enter the shelter address or location description.');
+      return;
+    }
+    if (!form.capacity || form.capacity <= 0 || form.capacity > 100000) {
+      alert('Shelter capacity must be a positive number between 1 and 100,000 beds.');
+      return;
+    }
+
+    const cleanPhone = form.contactPhone.trim();
+    if (cleanPhone && cleanPhone.replace(/[^0-9+]/g, '').length < 9) {
+      alert('Please provide a valid contact phone number with at least 9-10 digits.');
       return;
     }
 
     setSubmitting(true);
     try {
-      await createShelter(form);
+      await createShelter({
+        ...form,
+        contactPhone: cleanPhone,
+      });
       setShowModal(false);
       setForm({
         name: '',
         location: '',
-        district: 'Kalutara',
+        district: user?.district || 'Kalutara',
         latitude: 6.5854,
         longitude: 79.9607,
         capacity: 150,
-        contactPerson: '',
-        contactPhone: '',
+        contactPerson: user?.fullName || '',
+        contactPhone: user?.phoneNumber || '',
         facilities: 'Clean Water, Sanitation, Hot Meals, Emergency Medical Post, Generator',
       });
       loadData();
@@ -107,13 +128,13 @@ export const ShelterManagementPage: React.FC = () => {
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* ── HEADER & ROLE SWITCHER ── */}
+      {/* ── HEADER & AUTH ROLE BADGE ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <span style={{ fontSize: '1.85rem' }}>⛺</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
-              Emergency Shelter & Evacuation Network
+              Emergency Shelter &amp; Evacuation Network
             </h1>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
@@ -121,75 +142,116 @@ export const ShelterManagementPage: React.FC = () => {
           </p>
         </div>
 
-        {/* User Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.4rem 0.75rem', borderRadius: '10px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Active Mode:</span>
-          <button
-            onClick={() => setIsOfficer(!isOfficer)}
-            style={{
-              padding: '0.35rem 0.75rem',
+        {/* Action Button & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
               borderRadius: '6px',
-              border: 'none',
-              background: isOfficer ? '#1e3a8a' : '#16a34a',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-            }}
-          >
-            <span>{isOfficer ? '🛡️ Camp Officer View' : '👤 Citizen / Evacuee View'}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>(Click to switch)</span>
-          </button>
-        </div>
-      </div>
+              background: user?.role === 'Admin' ? '#faf5ff' : user?.role === 'DisasterOfficer' ? '#eff6ff' : user?.role === 'Responder' ? '#fffbeb' : '#f0fdf4',
+              color: user?.role === 'Admin' ? '#7e22ce' : user?.role === 'DisasterOfficer' ? '#1e40af' : user?.role === 'Responder' ? '#b45309' : '#15803d',
+              border: `1px solid ${user?.role === 'Admin' ? '#e9d5ff' : user?.role === 'DisasterOfficer' ? '#bfdbfe' : user?.role === 'Responder' ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Camp Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen Evacuee'}
+            </span>
+          </div>
 
-      {/* ── METRICS & ACTION BUTTON ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Active Relief Centers</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0' }}>{shelters.length} Shelters</div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Available Bed Capacity</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a', margin: '0.2rem 0' }}>{totalAvailableBeds} Beds Open</div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>Current Sheltered Population</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb', margin: '0.2rem 0' }}>{totalOcc} / {totalCap}</div>
-        </div>
-
-        {isOfficer && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+          {isOfficer && (
             <button
               onClick={() => setShowModal(true)}
               style={{
-                width: '100%',
-                height: '100%',
-                padding: '0.85rem 1.25rem',
-                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                padding: '0.75rem 1.25rem',
+                background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '10px',
                 fontWeight: 700,
-                fontSize: '0.95rem',
+                fontSize: '0.9rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
                 gap: '0.5rem',
                 boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                transition: 'all 0.15s ease',
               }}
             >
               <span>➕</span>
               <span>Register Emergency Shelter</span>
             </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── CITIZEN INFORMATIONAL BANNER ── */}
+      {isCitizen && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          background: '#eff6ff',
+          border: '1px solid #dbeafe',
+          borderLeft: '4px solid #2563eb',
+          borderRadius: '10px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.25rem',
+          fontSize: '0.9rem',
+          color: '#1e40af',
+        }}>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>ℹ️</span>
+          <div>
+            <strong>Safe Evacuation Shelter Guide</strong>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
+              Find operational disaster shelters with open beds in your district. Each center provides clean drinking water, sanitation facilities, warm meals, and an emergency medical station.
+            </p>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Active Relief Centers</span>
+            <span style={{ fontSize: '1.25rem' }}>⛺</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
+            {shelters.length} Shelters
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+            Registered evacuation safe-havens
+          </div>
+        </div>
+
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Available Bed Capacity</span>
+            <span style={{ fontSize: '1.25rem' }}>🛏️</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
+            {totalAvailableBeds} Beds Open
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.25rem' }}>
+            Ready for incoming evacuees
+          </div>
+        </div>
+
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#1e40af', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Current Sheltered Population</span>
+            <span style={{ fontSize: '1.25rem' }}>👥</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8' }}>
+            {totalOcc} / {totalCap}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+            Total capacity utilization
+          </div>
+        </div>
       </div>
 
       {/* ── FILTER & SEARCH BAR ── */}
@@ -352,13 +414,15 @@ export const ShelterManagementPage: React.FC = () => {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    padding: '0.65rem 1.5rem',
-                    background: '#2563eb',
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
                   {submitting ? 'Registering...' : '✓ Register Shelter'}

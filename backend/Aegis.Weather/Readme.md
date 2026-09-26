@@ -64,8 +64,9 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | `GET /api/weather/districts` | ✅ done | List all 25 districts |
 | `GET /api/weather/districts/{id}/historical` | ✅ done | Historical baseline for a district |
 | `GET /api/weather/forecast/{districtId}` | ✅ done | Live Open-Meteo pull + baseline, no AI |
-| `POST /api/weather/predict/{districtId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Full agent workflow — forecast → agent → validate → persist |
-| `POST /api/weather/alerts/{id}/review` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Officer approve/reject a `PendingReview` alert — human audit with real JWT `ReviewedByUserId` |
+| `POST /api/weather/predict/{districtId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Full 3-node agent pipeline — forecast → Assessor → Critic → validate → persist. Response now includes a `trace` array of agent reasoning steps. |
+| `GET /api/weather/agent-runs/{agentRunId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Fetch the full reasoning trace for a past prediction run from `AgentExecutionLogs`. |
+| `POST /api/weather/alerts/{id}/review` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Officer approve/reject a `PendingReview` alert — human audit with authentic JWT `ReviewedByUserId` (rejects missing/invalid identity, no fallback identity). |
 | `GET /api/weather/alerts` | ✅ done | Paginated & filterable list (status, district, hazardType) |
 | `GET /api/weather/analytics/accuracy` | ✅ done | Reporting requirement — compares `Predictions` vs `ForecastHistory` |
 | CRUD `/api/weather/stations` | ❌ not built | Admin management, low priority |
@@ -74,48 +75,88 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 
 ## 5. The agent — `weather_agent.py`
 
-**LangGraph, 2 nodes:**
-1. `compute_risk` — calls Gemini via `with_structured_output()`, **tries once, retries once** on
-   any failure (parse error, transient network issue) before giving up — a self-correction pattern
-   mirroring Lab 06's grade/rewrite loop. Every attempt (success or failure) is logged to `steps`.
-2. `validate_and_decide` — **code-side gate, not the LLM's own claim:**
-   - `confidence_pct < 70` → forces `flag_for_review` regardless of what the model said
-   - Anomaly override: if forecast value ≥ 1.3× the historical threshold but the model said
-     `no_action`, force `flag_for_review` anyway
-   - **Flood and Landslide compare against SUMMED 3-day rainfall** (cumulative risk); **StrongWind
-     compares against MAX single-day wind** (a single bad day is what matters for wind, unlike rain)
+### Architecture: Assessor / Critic split (3-node LangGraph)
 
-**Hazards assessed conditionally:** Flood + StrongWind always; Landslide only if
-`district.IsLandslideProne == true`.
+The pipeline was upgraded from a single "compute + validate" node into a proper **two-LLM, three-node graph** where each node has a well-defined and separate responsibility:
 
-**Model:** `gemini-2.5-flash-lite` via `langchain-google-genai` — free-tier Gemini.
+```
+assess_hazards  →  critique_assessment  →  validate_and_decide
+  (Assessor LLM)      (Critic LLM)           (deterministic code gate)
+```
 
-**Service wrapper:** `weather_agent_service.py` — FastAPI, `POST /assess`, `GET /health`, run via:
+**Node 1 — `assess_hazards` (Assessor LLM)**  
+Roles: domain expert. Receives raw forecast values and historical thresholds, reasons over them, and proposes a `{ risk_probability_pct, confidence_pct, reasoning_summary, recommended_action }` per relevant hazard. Retries once on any structured-output failure before giving up. Logs attempt details and a plain-English summary to `steps` whether it succeeds or fails.
+
+**Node 2 — `critique_assessment` (Critic LLM)**  
+Roles: independent quality control. Receives the Assessor's full output but **not the Assessor's prompt** — it cannot just repeat the same reasoning. It checks three things:
+- Is `recommended_action` logically consistent with the reported `risk_probability_pct` and `confidence_pct`?
+- Does `reasoning_summary` actually support the numbers?
+- Are any values implausible given the raw forecast data?
+
+Outputs `CritiqueOutput { agrees: bool, concerns: [{ hazard_type, issue }] }`. Designed to be fault-tolerant — if the Critic itself fails or times out, the pipeline continues on the Assessor's output alone and logs the failure honestly. The Critic never silently succeeds.
+
+**Node 3 — `validate_and_decide` (deterministic code gate)**  
+The LLM does not make the final publish/review decision. Code does, using three ordered rules:
+1. **Confidence gate:** `confidence_pct < 70` → forces `flag_for_review`
+2. **Anomaly gate:** forecast ≥ 1.3× threshold but model said `no_action` → forces `flag_for_review`
+3. **Critic override:** if the Critic flagged a specific hazard as inconsistent, forces `flag_for_review` and appends `[auto-flagged: critic agent flagged an inconsistency]` to `reasoning_summary`
+
+This means the Critic's disagreement has a real, auditable consequence — it is not decorative.
+
+**Hazard scope:** Flood + StrongWind always assessed; Landslide only if `district.IsLandslideProne == true`.  
+**Rainfall aggregation:** Flood and Landslide compare against **summed 3-day rainfall** (cumulative risk); StrongWind compares against **max single-day wind** (one bad day is what matters).
+
+**Model:** `gemini-2.5-flash-lite` (free-tier) via `langchain-google-genai`. Both Assessor and Critic use the same underlying model via `with_structured_output()` with different Pydantic schemas (`WeatherAgentOutput` and `CritiqueOutput`).
+
+**Step logging helper — `_log_step()`**  
+Every node calls a shared helper that records `{ step, tool, duration_ms, status, summary, error? }`. This is the contract the UI and backend consume — any new node added to the graph must call `_log_step()` and append its entry to `state["steps"]`.
+
+**Service wrapper:** `weather_agent_service.py` — FastAPI, `POST /assess`, `GET /health`.
 ```powershell
 cd agentic-ai/agents
 ..\venv\Scripts\activate
 uvicorn weather_agent_service:app --host 127.0.0.1 --port 8001
 ```
 
-**Guardrail tests:** `test_weather_agent_guardrails.py` — tests deterministic overrides.  
+**Sample trace output (Kandy test run):**
+```json
+[
+  { "step": "assess_hazards",      "tool": "gemini:...", "duration_ms": 4811, "status": "success", "summary": "Assessed 3 hazard(s): Flood 95%, Landslide 85%, StrongWind 15%" },
+  { "step": "critique_assessment", "tool": "gemini:...", "duration_ms": 3659, "status": "success", "summary": "Agrees with assessment" },
+  { "step": "validate_and_decide", "tool": "code",      "duration_ms": 0,    "status": "success", "summary": "Applied confidence/anomaly/critique gates" }
+]
+```
+
+**Guardrail tests:** `test_weather_agent_guardrails.py` — tests all three deterministic overrides (confidence gate, anomaly gate, critic override).  
 **Golden-case evaluation:** `eval_weather_agent.py` — runs real Gemini calls against 4 scenarios (4/4 passing).
 
 ---
 
 ## 6. React Web Application (`react/src/features/weather/`)
 
-A rich dark-mode React interface integrated into the main `App.tsx` via a top-level module switcher:
+A rich light/dark React interface integrated into the main `App.tsx` via a top-level module switcher:
 
 | File / Component | Purpose |
 |---|---|
-| `types/weatherTypes.ts` | TypeScript interfaces mirroring backend DTOs and API responses |
+| `types/weatherTypes.ts` | TypeScript interfaces mirroring backend DTOs and API responses. Includes `AgentStep` interface and the `trace: AgentStep[]` field on `PredictResponse`. |
 | `api/weatherApi.ts` | REST fetch clients with typing for all `/api/weather` endpoints |
-| `pages/WeatherDashboardPage.tsx` | District selector with search & landslide badges; interactive 3-day rainfall and wind charts with threshold baselines; trigger button for Agentic AI prediction; live risk cards |
+| `pages/WeatherDashboardPage.tsx` | District selector with search & landslide badges; interactive 3-day rainfall and wind charts with threshold baselines; trigger button for Agentic AI prediction; live risk cards; **Agent Reasoning Trace panel** rendered after each prediction |
 | `pages/AlertReviewQueuePage.tsx` | Human-in-the-loop review queue for `PendingReview` alerts with one-click **Approve & Publish** or **Reject** dialogs and officer audit notes |
 | `pages/PredictionHistoryPage.tsx` | Historical predictions/alerts table with status, district, and hazard filters |
 | `pages/AnalyticsPage.tsx` | AI model accuracy KPIs and per-hazard accuracy visualizations vs ground truth |
 | `index.ts` | Barrel export of the weather feature module |
-| `App.tsx` | Seamless top-level module switcher between **🌦️ Weather Intelligence** and **🏥 Recovery & Community Support** |
+
+### Agent Reasoning Trace Timeline (`react/src/shared/components/AgentTraceTimeline.tsx`)
+
+A shared React component that renders the agent pipeline's execution trace visually — a vertical timeline showing each step with icon, label, latency, status chip, and plain-English summary. Placed in `shared/components/` because it is re-usable by any future module that exposes LangGraph traces.
+
+| Step displayed | Icon | Tool logged |
+|---|---|---|
+| `assess_hazards` | 🔍 Assessor Agent | `gemini:<model>` |
+| `critique_assessment` | 🛡️ Critic Agent | `gemini:<model>` |
+| `validate_and_decide` | ⚖️ Validation Gate | `code` |
+
+The trace is conditionally rendered in `WeatherDashboardPage.tsx` immediately after the hazard risk cards. If the trace array is empty or absent (e.g., old cached prediction), the panel is hidden. If the Critic step shows status `failed`, the chip turns red — making error visibility automatic and requiring no custom error-handling code in the page.
 
 ---
 
@@ -212,5 +253,8 @@ flutter run
 - [x] Flutter: weather home screen, district forecast, alert review queue
 - [x] Agent evaluation suite (`eval_weather_agent.py` + `test_weather_agent_guardrails.py`)
 - [x] Shared Role-Based Authentication & Authorization (JWT) in `Aegis.Shared` & `Aegis.Api`
+- [x] **Assessor / Critic multi-agent split** — `weather_agent.py` refactored from 2-node to 3-node LangGraph graph: `assess_hazards` (Assessor LLM) → `critique_assessment` (Critic LLM) → `validate_and_decide` (code gate). Critic disagreements produce deterministic `flag_for_review` overrides with annotated reasoning.
+- [x] **Agent Reasoning Trace** — every pipeline run emits a `steps` array with per-node timing, status, and plain-English summary. Persisted to `AgentExecutionLogs.StepsJson`, returned in `POST /predict` response as `trace`, retrievable independently via protected `GET /api/weather/agent-runs/{agentRunId}` (`DisasterOfficer`, `Admin`). Visualized in React via `AgentTraceTimeline.tsx`.
+- [x] **Audit Security & Deterministic Guardrails** — Alert review strictly extracts and records authentic officer GUID from JWT (rejects missing/invalid claims, eliminates default GUID fallback). Guardrail test suite deterministically verifies Confidence Gate, Anomaly Gate, and Critic Override Gate.
 - [ ] CRUD `/api/weather/stations` (optional future enhancement)
 - [ ] Group-level shared blockers: `docker-compose.yml`, CI workflow (Section 13 requirement)

@@ -40,7 +40,8 @@ public record InfrastructureItemRequest(
 public record StartWorkflowRequest(
     Guid? IncidentId,                           // Optional — uses IncidentIntegrationService if provided
     DamageIntakeRequest? DirectDamageIntake,    // Required if IncidentId is null
-    string? RevisionGuidance                    // Populated when re-running after a revision request
+    string? RevisionGuidance,                   // Populated when re-running after a revision request
+    Guid? DamageReportId = null                 // Optional — links to an existing citizen damage report
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,8 +53,9 @@ public record AgentStepDto(
     string Role,
     string InputSummary,
     string OutputSummary,
-    int DurationMs,
+    long DurationMs,
     string Status,              // success | failed | skipped
+    string? ExecutionType,      // llm | deterministic | fallback
     string? ErrorMessage
 );
 
@@ -69,7 +71,8 @@ public record ToolCallDto(
 public record ValidationResultDto(
     string RuleName,
     bool Passed,
-    string Detail
+    string Detail,
+    string? Source           // "Code" | "AI" — origin of the check
 );
 
 public record WorkflowTraceDto(
@@ -108,7 +111,8 @@ public record RecoveryPlanDetailDto(
     DateTime? ReviewedAt,
     int RevisionCount,
     List<TaskDto> Tasks,
-    WorkflowTraceDto? WorkflowTrace    // null if no agentic workflow was run
+    WorkflowTraceDto? WorkflowTrace,    // null if no agentic workflow was run
+    OriginatingIntakeDto? OriginatingIntake = null
 );
 
 public record CreateRecoveryReportRequest(

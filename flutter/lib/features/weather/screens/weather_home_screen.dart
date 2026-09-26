@@ -5,7 +5,8 @@ import 'district_forecast_screen.dart';
 import 'alerts_screen.dart';
 
 class WeatherHomeScreen extends StatefulWidget {
-  const WeatherHomeScreen({Key? key}) : super(key: key);
+  final bool showAppBar;
+  const WeatherHomeScreen({super.key, this.showAppBar = true});
 
   @override
   State<WeatherHomeScreen> createState() => _WeatherHomeScreenState();
@@ -63,28 +64,30 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
     final provinces = ['All', ...{..._districts.map((d) => d.province)}];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Weather Intelligence', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.blue[800],
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_active_outlined),
-            tooltip: 'Weather Alerts',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const WeatherAlertsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: _loadDistricts,
-          ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Weather Intelligence', style: TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.blue[800],
+              foregroundColor: Colors.white,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_active_outlined),
+                  tooltip: 'Weather Alerts',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WeatherAlertsScreen()),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                  onPressed: _loadDistricts,
+                ),
+              ],
+            )
+          : null,
       body: Column(
         children: [
           // Banner Card
@@ -153,7 +156,7 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                     hintStyle: const TextStyle(color: Colors.white54),
                     prefixIcon: const Icon(Icons.search, color: Colors.white70),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.12),
+                    fillColor: Colors.white.withValues(alpha: 0.12),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),

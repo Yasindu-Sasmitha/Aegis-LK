@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'auth_service.dart';
+import 'package:provider/provider.dart';
+import 'auth_provider.dart';
 import '../router/app_router.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  const RegisterScreen({super.key});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final AuthService _authService = AuthService();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -34,7 +34,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      await _authService.register(
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      await auth.register(
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -42,13 +43,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phoneNumber: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
       );
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRouter.weatherHome);
+        Navigator.pushNamedAndRemoveUntil(context, AppRouter.initialRoute, (r) => false);
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -72,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[900]!.withOpacity(0.3),
+                  color: Colors.blue[900]!.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.blue[700]!),
                 ),
@@ -95,7 +98,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red[900]!.withOpacity(0.3),
+                    color: Colors.red[900]!.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.red[700]!),
                   ),

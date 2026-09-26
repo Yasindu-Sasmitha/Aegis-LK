@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchCompensations, createCompensation, approveCompensation } from '../api/recoveryApi';
 import { CompensationTable } from '../components/CompensationTable';
 import { Compensation } from '../types/recoveryTypes';
+import { useAuth } from '../../../shared/auth/AuthContext';
 
 const DAMAGE_CATEGORIES = [
   'Total House Loss',
@@ -13,9 +14,15 @@ const DAMAGE_CATEGORIES = [
 ];
 
 export const CompensationPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  const isDisasterOfficer = user?.role === 'DisasterOfficer';
+  const isOfficer = isAdmin || isDisasterOfficer;
+  const isCitizen = user?.role === 'Citizen';
+  const isResponder = user?.role === 'Responder';
+
   const [claims, setClaims] = useState<Compensation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOfficer, setIsOfficer] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -23,7 +30,7 @@ export const CompensationPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newClaim, setNewClaim] = useState({
-    applicantName: '',
+    applicantName: user?.fullName || '',
     nic: '',
     damageCategory: 'Total House Loss',
     claimAmount: 500000,
@@ -48,7 +55,7 @@ export const CompensationPage: React.FC = () => {
 
   const handleApprove = async (id: string, approvedAmount: number, status: string, notes: string) => {
     try {
-      await approveCompensation(id, approvedAmount, status, notes, 'DMC Recovery Officer');
+      await approveCompensation(id, approvedAmount, status, notes, user?.fullName || 'DMC Recovery Officer');
       loadClaims();
     } catch (err: any) {
       alert(err.message);
@@ -57,17 +64,33 @@ export const CompensationPage: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClaim.applicantName.trim() || !newClaim.nic.trim()) {
-      alert('Please enter your full name and National Identity Card (NIC) number.');
+    if (!newClaim.applicantName.trim()) {
+      alert('Please enter your full name as printed on your National Identity Card.');
+      return;
+    }
+
+    const cleanNic = newClaim.nic.trim().toUpperCase();
+    const oldNicRegex = /^[0-9]{9}[VX]$/;
+    const newNicRegex = /^[0-9]{12}$/;
+    if (!oldNicRegex.test(cleanNic) && !newNicRegex.test(cleanNic)) {
+      alert('Please enter a valid Sri Lankan NIC number (e.g. 9 digits + V/X like 123456789V, or modern 12 digits like 199012345678).');
+      return;
+    }
+
+    if (!newClaim.claimAmount || newClaim.claimAmount <= 0) {
+      alert('Please enter a valid compensation claim amount greater than LKR 0.');
       return;
     }
 
     setSubmitting(true);
     try {
-      await createCompensation(newClaim);
+      await createCompensation({
+        ...newClaim,
+        nic: cleanNic,
+      });
       setShowModal(false);
       setNewClaim({
-        applicantName: '',
+        applicantName: user?.fullName || '',
         nic: '',
         damageCategory: 'Total House Loss',
         claimAmount: 500000,
@@ -99,13 +122,13 @@ export const CompensationPage: React.FC = () => {
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* ── HEADER & ROLE SWITCHER ── */}
+      {/* ── HEADER & AUTH ROLE BADGE ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <span style={{ fontSize: '1.85rem' }}>💳</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
-              Disaster Damage Compensation & Loss Grants
+              Disaster Damage Compensation &amp; Loss Grants
             </h1>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
@@ -113,33 +136,51 @@ export const CompensationPage: React.FC = () => {
           </p>
         </div>
 
-        {/* User Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.4rem 0.75rem', borderRadius: '10px' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Active Mode:</span>
-          <button
-            onClick={() => setIsOfficer(!isOfficer)}
-            style={{
-              padding: '0.35rem 0.75rem',
+        {/* Action Button & Role Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.45rem 0.85rem', borderRadius: '10px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Logged in as:</span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '3px 10px',
               borderRadius: '6px',
-              border: 'none',
-              background: isOfficer ? '#1e3a8a' : '#16a34a',
+              background: isAdmin ? '#faf5ff' : isDisasterOfficer ? '#eff6ff' : isResponder ? '#fffbeb' : '#f0fdf4',
+              color: isAdmin ? '#7e22ce' : isDisasterOfficer ? '#1e40af' : isResponder ? '#b45309' : '#15803d',
+              border: `1px solid ${isAdmin ? '#e9d5ff' : isDisasterOfficer ? '#bfdbfe' : isResponder ? '#fde68a' : '#bbf7d0'}`,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              {isAdmin ? '⚙️ System Admin' : isDisasterOfficer ? '🛡️ Disaster Officer' : isResponder ? '🚨 Field Responder' : '👥 Citizen Claimant'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
               color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
               fontWeight: 700,
-              fontSize: '0.8rem',
+              fontSize: '0.9rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.35rem',
+              gap: '0.5rem',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
             }}
           >
-            <span>{isOfficer ? '🛡️ DMC Officer View' : '👤 Citizen / Claimant View'}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>(Click to switch)</span>
+            <span>➕</span>
+            <span>File Damage Compensation Claim</span>
           </button>
         </div>
       </div>
 
-      {/* ── CITIZEN INFO BANNER ── */}
-      {!isOfficer && (
+      {/* ── ROLE INFORMATIONAL BANNER ── */}
+      {isCitizen ? (
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -157,56 +198,73 @@ export const CompensationPage: React.FC = () => {
           <div>
             <strong>Citizen Claimant Portal</strong>
             <p style={{ margin: '0.25rem 0 0 0', color: '#6b21a8', fontWeight: 400 }}>
-              You can <strong>file a new compensation claim</strong> for property damage or livelihood loss. Once submitted, a Grama Niladhari officer will conduct a field verification. Claim approvals and payout decisions are made by the DMC Recovery Officer.
+              You can <strong>file a new compensation claim</strong> for property damage or livelihood loss. Once submitted, a Grama Niladhari officer will conduct a field verification. Official claim approvals and payouts are authorized by the DMC Recovery Officer.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.75rem',
+          background: '#eff6ff',
+          border: '1px solid #dbeafe',
+          borderLeft: '4px solid #2563eb',
+          borderRadius: '10px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.25rem',
+          fontSize: '0.9rem',
+          color: '#1e40af',
+        }}>
+          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
+          <div>
+            <strong>DMC Officer Verification &amp; Payout Audit</strong>
+            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
+              Review submitted claims, adjust approved grant amounts according to statutory damage appraisal ceilings, and disburse relief funds to claimant accounts.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── METRICS & ACTION BUTTON ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Claims Filed</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0' }}>{claims.length} Claims</div>
-          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Claimed: Rs. {totalClaimed.toLocaleString()}</div>
+      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Claims Filed</span>
+            <span style={{ fontSize: '1.25rem' }}>📄</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
+            {claims.length} Claims
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+            Claimed: Rs. {totalClaimed.toLocaleString()}
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>Approved Payout Funds</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', margin: '0.2rem 0' }}>Rs. {totalApproved.toLocaleString()}</div>
-          <div style={{ fontSize: '0.8rem', color: '#15803d' }}>Verified by DMC audit</div>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Approved Payout Funds</span>
+            <span style={{ fontSize: '1.25rem' }}>💵</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
+            Rs. {totalApproved.toLocaleString()}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#15803d', marginTop: '0.25rem' }}>
+            Verified by DMC audit
+          </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>Under Field Verification</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', margin: '0.2rem 0' }}>{pendingCount}</div>
-          <div style={{ fontSize: '0.8rem', color: '#b45309' }}>Awaiting Grama Niladhari check</div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              width: '100%',
-              height: '100%',
-              padding: '0.85rem 1.25rem',
-              background: 'linear-gradient(135deg, #7e22ce, #6b21a8)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(126, 34, 206, 0.25)',
-            }}
-          >
-            <span>➕</span>
-            <span>File Damage Compensation Claim</span>
-          </button>
+        <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Under Field Verification</span>
+            <span style={{ fontSize: '1.25rem' }}>⏳</span>
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
+            {pendingCount} Pending
+          </div>
+          <div style={{ fontSize: '0.8rem', color: '#b45309', marginTop: '0.25rem' }}>
+            Awaiting Grama Niladhari check
+          </div>
         </div>
       </div>
 
@@ -352,13 +410,15 @@ export const CompensationPage: React.FC = () => {
                   type="submit"
                   disabled={submitting}
                   style={{
-                    padding: '0.65rem 1.5rem',
-                    background: '#7e22ce',
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
                   {submitting ? 'Submitting...' : '✓ File Claim'}

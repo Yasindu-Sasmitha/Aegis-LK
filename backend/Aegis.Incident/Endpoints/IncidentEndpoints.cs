@@ -17,12 +17,36 @@ public static class IncidentEndpoints
         var group = app.MapGroup("/api/incidents").WithTags("Incidents");
 
         // GET /api/incidents — list all (primaries only; duplicates are hidden here,
-        // available via GET /{id}/related-reports)
-        group.MapGet("/", async (IncidentDbContext db) =>
-            await db.Incidents
-                .Where(i => i.LinkedIncidentId == null)
-                .OrderByDescending(i => i.CreatedAt)
-                .ToListAsync());
+        // available via GET /{id}/related-reports). Matches Recovery/Weather's
+        // server-side filter + pagination convention: {status, district, page, pageSize} -> {total, page, pageSize, items}
+        group.MapGet("/", async (
+            string? status,
+            string? district,
+            int? page,
+            int? pageSize,
+            IncidentDbContext db) =>
+        {
+            var pageNum = page is null or < 1 ? 1 : page.Value;
+            var size = pageSize is null or < 1 ? 20 : pageSize.Value;
+
+            var query = db.Incidents.Where(i => i.LinkedIncidentId == null);
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(i => i.Status.ToLower() == status.ToLower());
+
+            var candidates = await query.OrderByDescending(i => i.CreatedAt).ToListAsync();
+
+            if (!string.IsNullOrWhiteSpace(district))
+                candidates = candidates
+                    .Where(i => DistrictHelper.NearestDistrict(i.Latitude, i.Longitude)
+                                 .Equals(district, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+            var total = candidates.Count;
+            var items = candidates.Skip((pageNum - 1) * size).Take(size).ToList();
+
+            return Results.Ok(new { total, page = pageNum, pageSize = size, items });
+        });
 
         // GET /api/incidents/nearby — internal, called by the Dedup Agent's search_nearby_incidents tool
         group.MapGet("/nearby", async (double lat, double lng, double radiusKm, double hours, IncidentDbContext db) =>
@@ -179,6 +203,52 @@ public static class IncidentEndpoints
             return Results.Ok(mission);
         });
 
+        group.MapPost("/{id:guid}/reject", async (Guid id, RejectIncidentRequest request, IncidentDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return Results.BadRequest("A reason is required to reject an incident.");
+
+            var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
+            if (incident is null) return Results.NotFound();
+            if (incident.Status is "Rejected" or "MissionApproved")
+                return Results.Conflict($"Incident is already {incident.Status}.");
+
+            incident.Status = "Rejected";
+            incident.RejectionReason = request.Reason;
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = $"Incident rejected. Reason: {request.Reason}"
+            });
+
+            await db.SaveChangesAsync();
+            return Results.Ok(incident);
+        });
+
+        group.MapPost("/{id:guid}/hold", async (Guid id, HoldIncidentRequest request, IncidentDbContext db) =>
+        {
+            var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
+            if (incident is null) return Results.NotFound();
+            if (incident.Status is "Rejected" or "MissionApproved")
+                return Results.Conflict($"Incident is already {incident.Status}.");
+
+            incident.Status = "OnHold";
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = request.Reason is null
+                    ? "Incident placed on hold."
+                    : $"Incident placed on hold. Reason: {request.Reason}"
+            });
+
+            await db.SaveChangesAsync();
+            return Results.Ok(incident);
+        });
+
         // POST /api/incidents/{id}/damage-report — closes the incident, records damage
         group.MapPost("/{id:guid}/damage-report", async (Guid id, CreateDamageReportRequest request, IncidentDbContext db) =>
         {
@@ -242,6 +312,65 @@ public static class IncidentEndpoints
                 .OrderBy(i => i.CreatedAt)
                 .ToListAsync();
             return Results.Ok(related);
+        });
+
+        // GET /api/incidents/logs — global, searchable activity log across all
+        // incidents: every agent run and every officer action, in one feed.
+        group.MapGet("/logs", async (
+            string? search,
+            Guid? incidentId,
+            int? page,
+            int? pageSize,
+            IncidentDbContext db) =>
+        {
+            var pageNum = page is null or < 1 ? 1 : page.Value;
+            var size = pageSize is null or < 1 ? 50 : pageSize.Value;
+
+            var query = db.MissionLogs.AsQueryable();
+
+            if (incidentId is not null)
+                query = query.Where(l => l.IncidentId == incidentId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(l => l.Note.ToLower().Contains(search.ToLower()));
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(l => l.Timestamp)
+                .Skip((pageNum - 1) * size)
+                .Take(size)
+                .ToListAsync();
+
+            return Results.Ok(new { total, page = pageNum, pageSize = size, items });
+        });
+
+                // POST /api/incidents/{id}/unlink — officer manually reverses a wrong Dedup Agent match.
+        // Called on the DUPLICATE (not the primary): clears its link, restoring it as its own
+        // primary incident, visible again in the main queue. No reason required — this corrects
+        // an agent guess, not a judgment call about the incident itself — but always logged.
+        group.MapPost("/{id:guid}/unlink", async (Guid id, IncidentDbContext db) =>
+        {
+            var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
+            if (incident is null) return Results.NotFound();
+
+            if (incident.LinkedIncidentId is null)
+                return Results.BadRequest("This incident is not currently linked as a duplicate.");
+
+            var previousPrimaryId = incident.LinkedIncidentId;
+
+            incident.LinkedIncidentId = null;
+            incident.DedupConfidence = null;
+            incident.DedupReasoning = null;
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = $"Manually unlinked by officer — was linked to incident {previousPrimaryId} as a duplicate. Restored as its own primary incident."
+            });
+
+            await db.SaveChangesAsync();
+            return Results.Ok(incident);
         });
 
         // ── Cross-module contract endpoint - Recovery calls this exact path ────────
@@ -356,6 +485,8 @@ public static class IncidentEndpoints
             if (matchedIncident is not null && matchedIncident.LinkedIncidentId is null)
             {
                 incident.LinkedIncidentId = matchedId;
+                incident.DedupConfidence = result.Confidence;
+                incident.DedupReasoning = result.Reasoning;
             }
         }
 
@@ -372,5 +503,35 @@ public static class IncidentEndpoints
                    Math.Sin(dLng / 2) * Math.Sin(dLng / 2);
         double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
         return earthRadiusKm * c;
+    }
+}
+
+// Mirrors agentic-ai/agents/incident_plausibility_agent.py's DISTRICT_COORDS + _nearest_district
+// exactly — same 9 centroids, same squared-distance nearest match. Keep both in sync if either changes.
+internal static class DistrictHelper
+{
+    private static readonly (string Name, double Lat, double Lng)[] DistrictCoords =
+    {
+        ("Colombo", 6.9271, 79.8612),
+        ("Gampaha", 7.0917, 79.9997),
+        ("Kalutara", 6.5854, 79.9607),
+        ("Kandy", 7.2906, 80.6337),
+        ("NuwaraEliya", 6.9497, 80.7891),
+        ("Ratnapura", 6.6828, 80.3992),
+        ("Galle", 6.0535, 80.2210),
+        ("Matara", 5.9549, 80.5550),
+        ("Kegalle", 7.2513, 80.3464),
+    };
+
+    public static string NearestDistrict(double lat, double lng)
+    {
+        string best = "Colombo";
+        double bestDist = double.MaxValue;
+        foreach (var (name, dLat, dLng) in DistrictCoords)
+        {
+            var dist = Math.Pow(lat - dLat, 2) + Math.Pow(lng - dLng, 2);
+            if (dist < bestDist) { bestDist = dist; best = name; }
+        }
+        return best;
     }
 }
