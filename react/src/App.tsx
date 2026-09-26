@@ -29,9 +29,9 @@ import {
 } from './features/incident';
 import {
   ResourceDashboardPage,
-  WarehouseManagementPage,
-  InventoryManagementPage,
-  DispatchManagementPage,
+  WarehousePage,
+  InventoryPage,
+  DispatchPage,
 } from './features/resource';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'resource' | 'incident';
@@ -791,26 +791,15 @@ const MainPlatform: React.FC = () => {
         {currentView === 'resource' && (
           <main>
             {resourceTab === 'dashboard' && (
-              <ResourceDashboardPage
-                key={resourceRefreshKey}
-                refreshKey={resourceRefreshKey}
-                onNavigate={(tab) => setResourceTab(tab)}
-              />
+              <ResourceDashboardPage key={resourceRefreshKey} />
             )}
             {resourceTab === 'warehouses' && (
-              <WarehouseManagementPage
-                refreshKey={resourceRefreshKey}
-                onDataChange={refreshResourceDashboard}
-              />
+              <WarehousePage key={resourceRefreshKey} />
             )}
             {resourceTab === 'inventory' && (
-              <InventoryManagementPage
-                refreshKey={resourceRefreshKey}
-                onDataChange={refreshResourceDashboard}
-                onNavigate={(tab) => setResourceTab(tab)}
-              />
+              <InventoryPage key={resourceRefreshKey} />
             )}
-            {resourceTab === 'dispatch' && <DispatchManagementPage />}
+            {resourceTab === 'dispatch' && <DispatchPage />}
           </main>
         )}
 
