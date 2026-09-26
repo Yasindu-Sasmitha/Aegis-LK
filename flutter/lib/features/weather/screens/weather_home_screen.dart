@@ -3,6 +3,7 @@ import '../models/weather_models.dart';
 import '../services/weather_service.dart';
 import 'district_forecast_screen.dart';
 import 'alerts_screen.dart';
+import 'prediction_history_screen.dart';
 
 class WeatherHomeScreen extends StatefulWidget {
   final bool showAppBar;
@@ -71,6 +72,16 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
               foregroundColor: Colors.white,
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.history_edu_outlined),
+                  tooltip: 'Prediction History',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PredictionHistoryScreen()),
+                    );
+                  },
+                ),
+                IconButton(
                   icon: const Icon(Icons.notifications_active_outlined),
                   tooltip: 'Weather Alerts',
                   onPressed: () {
@@ -126,20 +137,42 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                         ],
                       ),
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const WeatherAlertsScreen()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber[400],
-                        foregroundColor: Colors.black87,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      ),
-                      icon: const Icon(Icons.warning_amber_rounded, size: 18),
-                      label: const Text('Alerts Queue', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const PredictionHistoryScreen()),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: 0.2),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          icon: const Icon(Icons.history_edu, size: 16),
+                          label: const Text('Predictions', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const WeatherAlertsScreen()),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber[400],
+                            foregroundColor: Colors.black87,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          icon: const Icon(Icons.warning_amber_rounded, size: 18),
+                          label: const Text('Alerts Queue', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
                   ],
                 ),

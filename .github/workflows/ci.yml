@@ -13,6 +13,8 @@ permissions:
   contents: read
 
 jobs:
+
+  # ── 1. Backend: build + EF migrations + xUnit integration tests ─────────────
   backend-tests:
     name: Backend Build & Tests
     runs-on: ubuntu-latest
@@ -112,6 +114,48 @@ jobs:
           --no-restore
           --no-build
 
+  # ── 2. Python: Weather Agent deterministic guardrail tests ──────────────────
+  #    Does NOT require a live Gemini API key.
+  #    validate_and_decide() is pure Python — no LLM call is made during these tests.
+  weather-agent-guardrails:
+    name: Weather Agent Guardrail Tests (Python)
+    runs-on: ubuntu-latest
+
+    env:
+      # Set to empty so dotenv / langchain_google_genai don't raise on missing key.
+      # The guardrail tests never instantiate ChatGoogleGenerativeAI.
+      GOOGLE_API_KEY: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-guardrails-${{ hashFiles('agentic-ai/agents/requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-guardrails-
+
+      - name: Install CI dependencies
+        working-directory: "${{ github.workspace }}/agentic-ai/agents"
+        run: pip install -r requirements-ci.txt
+
+      - name: Run Weather Agent guardrail tests
+        working-directory: "${{ github.workspace }}/agentic-ai/agents"
+        run: |
+          python -m pytest test_weather_agent_guardrails.py \
+            --tb=short \
+            --no-header \
+            -v
+
+  # ── 3. Flutter: static analysis ─────────────────────────────────────────────
   flutter-analyze:
     name: Flutter Lint & Analyze
     runs-on: ubuntu-latest
@@ -130,6 +174,67 @@ jobs:
         working-directory: "${{ github.workspace }}/flutter"
         run: flutter pub get
 
-      - name: Run Flutter Analyze
+      - name: Run Flutter analyze
         working-directory: "${{ github.workspace }}/flutter"
         run: flutter analyze --no-fatal-infos
+
+  # ── 4. Flutter: unit & widget tests ─────────────────────────────────────────
+  flutter-test:
+    name: Flutter Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PUB_CACHE }}
+            ${{ github.workspace }}/flutter/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('flutter/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        working-directory: "${{ github.workspace }}/flutter"
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        working-directory: "${{ github.workspace }}/flutter"
+        # --no-sound-null-safety is NOT used — the project is fully null-safe.
+        # The widget test mocks flutter_secure_storage's platform channel
+        # so it runs cleanly on headless Linux without a system keyring.
+        run: flutter test --reporter expanded
+
+  # ── 5. React: build ─────────────────────────────────────────────────────────
+  react-build:
+    name: React Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: react/package-lock.json
+
+      - name: Install dependencies
+        working-directory: "${{ github.workspace }}/react"
+        run: npm ci
+
+      - name: Build React application
+        working-directory: "${{ github.workspace }}/react"
+        run: npm run build
+

@@ -1,0 +1,10 @@
+# Minimal packages needed to import weather_agent.py and run guardrail tests.
+# The guardrail tests call validate_and_decide() only - no LLM API call is made.
+# langchain-google-genai and langgraph are required so the module-level imports
+# in weather_agent.py succeed; ChatGoogleGenerativeAI is never instantiated
+# during the deterministic test run.
+langchain-google-genai==2.0.10
+langgraph==0.2.55
+pydantic>=2.0,<3
+python-dotenv>=1.0
+pytest>=8.0

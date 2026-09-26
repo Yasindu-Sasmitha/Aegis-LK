@@ -139,3 +139,141 @@ class WeatherAlert {
         createdAt: json['createdAt'] as String,
       );
 }
+
+class PredictionItem {
+  final String id;
+  final String districtId;
+  final String? districtName;
+  final String agentRunId;
+  final String hazardType;
+  final double riskProbabilityPct;
+  final double confidencePct;
+  final double forecastValue;
+  final double historicalThreshold;
+  final String unit;
+  final String status;
+  final String createdAt;
+  final bool hasOutcome;
+  final bool? actualDisasterOccurred;
+  final double? actualValue;
+  final String? confirmedByUserId;
+  final String? outcomeConfirmedAt;
+  final String? outcomeNotes;
+
+  const PredictionItem({
+    required this.id,
+    required this.districtId,
+    this.districtName,
+    required this.agentRunId,
+    required this.hazardType,
+    required this.riskProbabilityPct,
+    required this.confidencePct,
+    required this.forecastValue,
+    required this.historicalThreshold,
+    required this.unit,
+    required this.status,
+    required this.createdAt,
+    this.hasOutcome = false,
+    this.actualDisasterOccurred,
+    this.actualValue,
+    this.confirmedByUserId,
+    this.outcomeConfirmedAt,
+    this.outcomeNotes,
+  });
+
+  factory PredictionItem.fromJson(Map<String, dynamic> json) => PredictionItem(
+        id: json['id'] as String,
+        districtId: json['districtId'] as String,
+        districtName: json['districtName'] as String?,
+        agentRunId: json['agentRunId'] as String,
+        hazardType: json['hazardType'] as String,
+        riskProbabilityPct: (json['riskProbabilityPct'] as num).toDouble(),
+        confidencePct: (json['confidencePct'] as num).toDouble(),
+        forecastValue: (json['forecastValue'] as num).toDouble(),
+        historicalThreshold: (json['historicalThreshold'] as num).toDouble(),
+        unit: json['unit'] as String? ?? 'mm',
+        status: json['status'] as String? ?? 'Completed',
+        createdAt: json['createdAt'] as String,
+        hasOutcome: json['hasOutcome'] as bool? ?? false,
+        actualDisasterOccurred: json['actualDisasterOccurred'] as bool?,
+        actualValue: (json['actualValue'] as num?)?.toDouble(),
+        confirmedByUserId: json['confirmedByUserId'] as String?,
+        outcomeConfirmedAt: json['outcomeConfirmedAt'] as String?,
+        outcomeNotes: json['outcomeNotes'] as String?,
+      );
+}
+
+class PredictionsResponse {
+  final int total;
+  final int page;
+  final int pageSize;
+  final List<PredictionItem> items;
+
+  const PredictionsResponse({
+    required this.total,
+    required this.page,
+    required this.pageSize,
+    required this.items,
+  });
+
+  factory PredictionsResponse.fromJson(Map<String, dynamic> json) =>
+      PredictionsResponse(
+        total: json['total'] as int? ?? 0,
+        page: json['page'] as int? ?? 1,
+        pageSize: json['pageSize'] as int? ?? 20,
+        items: (json['items'] as List?)
+                ?.map((e) => PredictionItem.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+      );
+}
+
+class PredictionOutcomeRequest {
+  final bool actualDisasterOccurred;
+  final double? actualValue;
+  final String? notes;
+
+  const PredictionOutcomeRequest({
+    required this.actualDisasterOccurred,
+    this.actualValue,
+    this.notes,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'actualDisasterOccurred': actualDisasterOccurred,
+        if (actualValue != null) 'actualValue': actualValue,
+        if (notes != null) 'notes': notes,
+      };
+}
+
+class PredictionOutcomeResponse {
+  final String id;
+  final String predictionId;
+  final bool? actualDisasterOccurred;
+  final double? actualValue;
+  final String? confirmedByUserId;
+  final String? confirmedAt;
+  final String? notes;
+
+  const PredictionOutcomeResponse({
+    required this.id,
+    required this.predictionId,
+    this.actualDisasterOccurred,
+    this.actualValue,
+    this.confirmedByUserId,
+    this.confirmedAt,
+    this.notes,
+  });
+
+  factory PredictionOutcomeResponse.fromJson(Map<String, dynamic> json) =>
+      PredictionOutcomeResponse(
+        id: json['id'] as String,
+        predictionId: json['predictionId'] as String,
+        actualDisasterOccurred: json['actualDisasterOccurred'] as bool?,
+        actualValue: (json['actualValue'] as num?)?.toDouble(),
+        confirmedByUserId: json['confirmedByUserId'] as String?,
+        confirmedAt: json['confirmedAt'] as String?,
+        notes: json['notes'] as String?,
+      );
+}
+

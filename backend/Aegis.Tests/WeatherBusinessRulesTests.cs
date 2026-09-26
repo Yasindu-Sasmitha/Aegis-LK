@@ -1140,6 +1140,7 @@ public class WeatherPredictPipelineIntegrationTests
         HttpResponseMessage? openMeteoResponse,
         HttpResponseMessage? agentResponse)
     {
+        var databaseName = $"WeatherPredictPipelineTests-{Guid.NewGuid():N}";
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -1157,7 +1158,7 @@ public class WeatherPredictPipelineIntegrationTests
                     .BuildServiceProvider();
                 services.AddDbContext<WeatherDbContext>(options =>
                 {
-                    options.UseInMemoryDatabase(Guid.NewGuid().ToString()); // unique per test
+                    options.UseInMemoryDatabase(databaseName);
                     options.UseInternalServiceProvider(inMemoryProvider);
                 });
 
@@ -1256,20 +1257,24 @@ public class WeatherPredictPipelineIntegrationTests
         return districtId;
     }
 
-    private static string MakeToken(string role = "DisasterOfficer")
+    private static string MakeToken(string role = "DisasterOfficer", string? userId = null, bool includeNameIdentifier = true)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtTokenService.DefaultDevSigningKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var claims = new[]
+        var claimsList = new List<Claim>
         {
             new Claim(ClaimTypes.Role, role),
-            new Claim("role", role),
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new Claim("sub", Guid.NewGuid().ToString())
+            new Claim("role", role)
         };
+        if (includeNameIdentifier)
+        {
+            var id = userId ?? Guid.NewGuid().ToString();
+            claimsList.Add(new Claim(ClaimTypes.NameIdentifier, id));
+            claimsList.Add(new Claim("sub", id));
+        }
         var token = new JwtSecurityTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(claims),
+            Subject = new ClaimsIdentity(claimsList),
             Expires = DateTime.UtcNow.AddHours(2),
             Issuer = "Aegis.Api", Audience = "Aegis.Client",
             SigningCredentials = creds
@@ -1618,5 +1623,82 @@ public class WeatherPredictPipelineIntegrationTests
             .Where(a => a.DistrictId == districtId && a.HazardType == "Flood")
             .CountAsync();
         Assert.Equal(2, alertCount); // Old one + the new one
+    }
+
+    // ── Test: Missing NameIdentifier claim → 401 Unauthorized ─────────────────
+
+    [Fact]
+    public async Task PostPredict_MissingNameIdentifier_Returns401()
+    {
+        var factory = BuildFactory(
+            openMeteoResponse: new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(MakeOpenMeteoJson(), Encoding.UTF8, "application/json")
+            },
+            agentResponse: null);
+
+        var districtId = await SeedDistrictWithBaselineAsync(factory);
+        using var client = factory.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/weather/predict/{districtId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MakeToken(includeNameIdentifier: false));
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // ── Test: Non-GUID NameIdentifier claim → 401 Unauthorized ────────────────
+
+    [Fact]
+    public async Task PostPredict_NonGuidNameIdentifier_Returns401()
+    {
+        var factory = BuildFactory(
+            openMeteoResponse: new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(MakeOpenMeteoJson(), Encoding.UTF8, "application/json")
+            },
+            agentResponse: null);
+
+        var districtId = await SeedDistrictWithBaselineAsync(factory);
+        using var client = factory.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/weather/predict/{districtId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MakeToken(userId: "not-a-valid-guid"));
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // ── Test: Valid NameIdentifier persists TriggeredByUserId in AgentLog ─────
+
+    [Fact]
+    public async Task PostPredict_ValidNameIdentifier_PersistsTriggeredByUserIdInAgentLog()
+    {
+        var expectedUserId = Guid.NewGuid();
+        var factory = BuildFactory(
+            openMeteoResponse: new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(MakeOpenMeteoJson(), Encoding.UTF8, "application/json")
+            },
+            agentResponse: new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(MakeAgentSuccessJson("no_action"), Encoding.UTF8, "application/json")
+            });
+
+        var districtId = await SeedDistrictWithBaselineAsync(factory);
+        using var client = factory.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/weather/predict/{districtId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MakeToken(userId: expectedUserId.ToString()));
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var jsonDoc = JsonDocument.Parse(body);
+        var agentRunId = Guid.Parse(jsonDoc.RootElement.GetProperty("agentRunId").GetString()!);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<WeatherDbContext>();
+        var log = await db.AgentExecutionLogs.FindAsync(agentRunId);
+        Assert.NotNull(log);
+        Assert.Equal(expectedUserId, log.TriggeredByUserId);
     }
 }
