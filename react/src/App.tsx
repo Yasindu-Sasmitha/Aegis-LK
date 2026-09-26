@@ -17,6 +17,7 @@ import {
   WeatherDashboardPage,
   AlertReviewQueuePage,
   PredictionHistoryPage,
+  AlertHistoryPage,
   AnalyticsPage,
   fetchAlerts,
   WeatherAlert,
@@ -85,6 +86,7 @@ const MainPlatform: React.FC = () => {
   const WEATHER_TABS = [
     { id: 'dashboard', label: '🌦️ Forecast & Live Risk' },
     ...(isOfficerOrAdmin ? [{ id: 'review', label: '🔔 Alert Review Queue' }] : []),
+    { id: 'predictions', label: '📈 Prediction History' },
     { id: 'history', label: '📜 Alert History' },
     ...(isOfficerOrAdmin ? [{ id: 'analytics', label: '📊 Accuracy Analytics' }] : []),
   ];
@@ -761,7 +763,8 @@ const MainPlatform: React.FC = () => {
                   Access restricted to Disaster Officers.
                 </div>
             )}
-            {weatherTab === 'history' && <PredictionHistoryPage />}
+            {weatherTab === 'predictions' && <PredictionHistoryPage />}
+            {weatherTab === 'history' && <AlertHistoryPage />}
             {weatherTab === 'analytics' && (
               isOfficerOrAdmin
                 ? <AnalyticsPage />

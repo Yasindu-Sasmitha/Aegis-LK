@@ -6,6 +6,9 @@ import type {
   AlertsResponse,
   AlertReviewResponse,
   AnalyticsResponse,
+  PredictionsResponse,
+  PredictionOutcomeRequest,
+  PredictionOutcomeResponse,
 } from '../types/weatherTypes';
 import { getAuthHeaders } from '../../../shared/auth/authApi';
 
@@ -101,5 +104,48 @@ export async function fetchAnalytics(): Promise<AnalyticsResponse> {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error('Failed to fetch analytics');
+  return res.json();
+}
+
+// ── Predictions (History & Outcomes) ──────────────────────────────────────────
+
+export async function fetchPredictions(params?: {
+  districtId?: string;
+  hazardType?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<PredictionsResponse> {
+  const qs = new URLSearchParams();
+  if (params?.districtId) qs.append('districtId', params.districtId);
+  if (params?.hazardType) qs.append('hazardType', params.hazardType);
+  if (params?.status) qs.append('status', params.status);
+  if (params?.page) qs.append('page', String(params.page));
+  if (params?.pageSize) qs.append('pageSize', String(params.pageSize));
+  if (params?.sortBy) qs.append('sortBy', params.sortBy);
+  if (params?.sortOrder) qs.append('sortOrder', params.sortOrder);
+
+  const res = await fetch(`${API_BASE}/predictions?${qs.toString()}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch predictions');
+  return res.json();
+}
+
+export async function recordPredictionOutcome(
+  predictionId: string,
+  request: PredictionOutcomeRequest
+): Promise<PredictionOutcomeResponse> {
+  const res = await fetch(`${API_BASE}/predictions/${predictionId}/outcome`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error || `Failed to record outcome (${res.status})`);
+  }
   return res.json();
 }

@@ -286,7 +286,135 @@ public static class WeatherEndpoints
                 byHazardType = byHazardResult
             });
         });
+
+        // ── Prediction History & Audit Trail ──────────────────────────────────
+        group.MapGet("/predictions", async (
+            WeatherDbContext db,
+            Guid? districtId,
+            string? hazardType,
+            string? status,
+            int page = 1,
+            int pageSize = 20,
+            string sortBy = "createdAt",
+            string sortOrder = "desc") =>
+        {
+            var query = db.Predictions
+                .Include(p => p.District)
+                .AsQueryable();
+
+            if (districtId.HasValue)
+                query = query.Where(p => p.DistrictId == districtId.Value);
+            if (!string.IsNullOrWhiteSpace(hazardType))
+                query = query.Where(p => p.HazardType == hazardType);
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(p => p.Status == status);
+
+            bool isAsc = string.Equals(sortOrder, "asc", StringComparison.OrdinalIgnoreCase);
+            query = sortBy.ToLowerInvariant() switch
+            {
+                "riskprobabilitypct" or "risk" => isAsc ? query.OrderBy(p => p.RiskProbabilityPct) : query.OrderByDescending(p => p.RiskProbabilityPct),
+                "confidencepct" or "confidence" => isAsc ? query.OrderBy(p => p.ConfidencePct) : query.OrderByDescending(p => p.ConfidencePct),
+                "hazardtype" or "hazard" => isAsc ? query.OrderBy(p => p.HazardType) : query.OrderByDescending(p => p.HazardType),
+                "forecastvalue" or "value" => isAsc ? query.OrderBy(p => p.ForecastValue) : query.OrderByDescending(p => p.ForecastValue),
+                _ => isAsc ? query.OrderBy(p => p.CreatedAt) : query.OrderByDescending(p => p.CreatedAt)
+            };
+
+            var total = await query.CountAsync();
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.DistrictId,
+                    DistrictName = p.District != null ? p.District.Name : null,
+                    p.AgentRunId,
+                    p.HazardType,
+                    p.RiskProbabilityPct,
+                    p.ConfidencePct,
+                    p.ForecastValue,
+                    p.HistoricalThreshold,
+                    p.Unit,
+                    p.Status,
+                    p.CreatedAt
+                })
+                .ToListAsync();
+
+            var predictionIds = items.Select(i => i.Id).ToList();
+            var outcomes = await db.ForecastHistory
+                .Where(f => predictionIds.Contains(f.PredictionId))
+                .ToDictionaryAsync(f => f.PredictionId);
+
+            var enrichedItems = items.Select(i => new
+            {
+                i.Id,
+                i.DistrictId,
+                i.DistrictName,
+                i.AgentRunId,
+                i.HazardType,
+                i.RiskProbabilityPct,
+                i.ConfidencePct,
+                i.ForecastValue,
+                i.HistoricalThreshold,
+                i.Unit,
+                i.Status,
+                i.CreatedAt,
+                HasOutcome = outcomes.ContainsKey(i.Id),
+                ActualDisasterOccurred = outcomes.TryGetValue(i.Id, out var o) ? o.ActualDisasterOccurred : null,
+                ActualValue = outcomes.TryGetValue(i.Id, out var o2) ? o2.ActualValue : null,
+                ConfirmedByUserId = outcomes.TryGetValue(i.Id, out var o3) ? o3.ConfirmedByUserId : null,
+                OutcomeConfirmedAt = outcomes.TryGetValue(i.Id, out var o4) ? o4.ConfirmedAt : null,
+                OutcomeNotes = outcomes.TryGetValue(i.Id, out var o5) ? o5.Notes : null
+            });
+
+            return Results.Ok(new { total, page, pageSize, items = enrichedItems });
+        });
+
+        // ── Post-Event Outcome Confirmation Workflow ───────────────────────────
+        group.MapPost("/predictions/{predictionId:guid}/outcome", async (
+            Guid predictionId,
+            PredictionOutcomeRequest body,
+            WeatherDbContext db,
+            ClaimsPrincipal principal) =>
+        {
+            var prediction = await db.Predictions.FindAsync(predictionId);
+            if (prediction is null)
+                return Results.NotFound(new { error = "Prediction not found." });
+
+            var existingOutcome = await db.ForecastHistory.AnyAsync(f => f.PredictionId == predictionId);
+            if (existingOutcome)
+                return Results.Conflict(new { error = "An outcome has already been recorded for this prediction." });
+
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdClaim, out var officerId))
+                return Results.Unauthorized();
+
+            var outcome = new ForecastHistory
+            {
+                PredictionId = predictionId,
+                ActualDisasterOccurred = body.ActualDisasterOccurred,
+                ActualValue = body.ActualValue,
+                ConfirmedByUserId = officerId,
+                ConfirmedAt = DateTime.UtcNow,
+                Notes = body.Notes
+            };
+
+            db.ForecastHistory.Add(outcome);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                outcome.Id,
+                outcome.PredictionId,
+                outcome.ActualDisasterOccurred,
+                outcome.ActualValue,
+                outcome.ConfirmedByUserId,
+                outcome.ConfirmedAt,
+                outcome.Notes
+            });
+        }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
     }
 }
 
 public record AlertReviewRequest(string Decision, string? ReviewNotes);
+public record PredictionOutcomeRequest(bool ActualDisasterOccurred, double? ActualValue, string? Notes);
