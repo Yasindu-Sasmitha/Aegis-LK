@@ -65,8 +65,8 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | `GET /api/weather/districts/{id}/historical` | ✅ done | Historical baseline for a district |
 | `GET /api/weather/forecast/{districtId}` | ✅ done | Live Open-Meteo pull + baseline, no AI |
 | `POST /api/weather/predict/{districtId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Full 3-node agent pipeline — forecast → Assessor → Critic → validate → persist. Response now includes a `trace` array of agent reasoning steps. |
-| `GET /api/weather/agent-runs/{agentRunId}` | ✅ done | Fetch the full reasoning trace for a past prediction run from `AgentExecutionLogs` (unprotected read, useful for audit/demo). |
-| `POST /api/weather/alerts/{id}/review` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Officer approve/reject a `PendingReview` alert — human audit with real JWT `ReviewedByUserId` |
+| `GET /api/weather/agent-runs/{agentRunId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Fetch the full reasoning trace for a past prediction run from `AgentExecutionLogs`. |
+| `POST /api/weather/alerts/{id}/review` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Officer approve/reject a `PendingReview` alert — human audit with authentic JWT `ReviewedByUserId` (rejects missing/invalid identity, no fallback identity). |
 | `GET /api/weather/alerts` | ✅ done | Paginated & filterable list (status, district, hazardType) |
 | `GET /api/weather/analytics/accuracy` | ✅ done | Reporting requirement — compares `Predictions` vs `ForecastHistory` |
 | CRUD `/api/weather/stations` | ❌ not built | Admin management, low priority |
@@ -254,6 +254,7 @@ flutter run
 - [x] Agent evaluation suite (`eval_weather_agent.py` + `test_weather_agent_guardrails.py`)
 - [x] Shared Role-Based Authentication & Authorization (JWT) in `Aegis.Shared` & `Aegis.Api`
 - [x] **Assessor / Critic multi-agent split** — `weather_agent.py` refactored from 2-node to 3-node LangGraph graph: `assess_hazards` (Assessor LLM) → `critique_assessment` (Critic LLM) → `validate_and_decide` (code gate). Critic disagreements produce deterministic `flag_for_review` overrides with annotated reasoning.
-- [x] **Agent Reasoning Trace** — every pipeline run emits a `steps` array with per-node timing, status, and plain-English summary. Persisted to `AgentExecutionLogs.StepsJson`, returned in `POST /predict` response as `trace`, retrievable independently via `GET /api/weather/agent-runs/{agentRunId}`. Visualized in React via `AgentTraceTimeline.tsx`.
+- [x] **Agent Reasoning Trace** — every pipeline run emits a `steps` array with per-node timing, status, and plain-English summary. Persisted to `AgentExecutionLogs.StepsJson`, returned in `POST /predict` response as `trace`, retrievable independently via protected `GET /api/weather/agent-runs/{agentRunId}` (`DisasterOfficer`, `Admin`). Visualized in React via `AgentTraceTimeline.tsx`.
+- [x] **Audit Security & Deterministic Guardrails** — Alert review strictly extracts and records authentic officer GUID from JWT (rejects missing/invalid claims, eliminates default GUID fallback). Guardrail test suite deterministically verifies Confidence Gate, Anomaly Gate, and Critic Override Gate.
 - [ ] CRUD `/api/weather/stations` (optional future enhancement)
 - [ ] Group-level shared blockers: `docker-compose.yml`, CI workflow (Section 13 requirement)

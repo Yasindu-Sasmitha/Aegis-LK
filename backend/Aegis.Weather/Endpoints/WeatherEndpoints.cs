@@ -157,7 +157,8 @@ public static class WeatherEndpoints
                 log.StartedAt, log.CompletedAt,
                 Steps = System.Text.Json.JsonSerializer.Deserialize<object>(log.StepsJson)
             });
-        });
+        }).RequireAuthorization(policy => policy.RequireRole("DisasterOfficer", "Admin"));
+
         group.MapPost("/alerts/{id:guid}/review", async (
             Guid id,
             AlertReviewRequest body,
@@ -174,15 +175,12 @@ public static class WeatherEndpoints
 
             // Extract reviewer GUID from authenticated JWT claims
             var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (Guid.TryParse(userIdClaim, out var officerId))
+            if (!Guid.TryParse(userIdClaim, out var officerId))
             {
-                alert.ReviewedByUserId = officerId;
-            }
-            else
-            {
-                alert.ReviewedByUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+                return Results.Unauthorized();
             }
 
+            alert.ReviewedByUserId = officerId;
             alert.ReviewedAt = DateTime.UtcNow;
 
             if (body.Decision == "Approved")
