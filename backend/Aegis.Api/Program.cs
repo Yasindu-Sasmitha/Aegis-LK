@@ -62,7 +62,7 @@ builder.Services.AddDbContext<ResourceDbContext>(options =>
 // ── Resource Module Services ────────────────────────────────────────────────
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
-builder.Services.AddScoped<IDispatchService, DispatchService>();
+// builder.Services.AddScoped<IDispatchService, DispatchService>();
 
 // ── Authentication & Authorization ──────────────────────────────────────────
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
