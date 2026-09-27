@@ -23,6 +23,41 @@ class RecoveryService {
     throw Exception('Failed to load shelters');
   }
 
+  Future<ShelterModel> createShelter({
+    required String name,
+    required String district,
+    required String location,
+    required int capacity,
+    required String contactPerson,
+    required String contactPhone,
+    required List<String> facilities,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/shelters'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'district': district,
+        'location': location,
+        'capacity': capacity,
+        'currentOccupancy': 0,
+        'status': 'Open',
+        'contactPerson': contactPerson,
+        'contactPhone': contactPhone,
+        'facilities': facilities,
+        'latitude': latitude,
+        'longitude': longitude,
+      }),
+    );
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return ShelterModel.fromJson(jsonDecode(response.body));
+    }
+    final err = jsonDecode(response.body);
+    throw Exception(err['error'] ?? 'Failed to create shelter');
+  }
+
   // ── 2. Aid Requests ─────────────────────────────────────────────────────────
 
   Future<AidRequestModel> submitAidRequest({
