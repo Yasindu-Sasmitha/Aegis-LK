@@ -1107,7 +1107,83 @@ export const RecoveryPlanningPage: React.FC = () => {
                 </div>
                 <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem' }}>
                   <div style={{ color: '#334155', marginBottom: '0.25rem' }}><strong>Input:</strong> {step.inputSummary}</div>
-                  <div style={{ color: '#1e3a8a' }}><strong>Decomposition Output:</strong> {step.outputSummary}</div>
+                  <div style={{ color: '#1e3a8a' }}>
+                    <strong>Decomposition Output:</strong>{' '}
+                    {(() => {
+                      if (step.outputSummary.includes(' • ')) {
+                        const colonIdx = step.outputSummary.indexOf(':');
+                        let header = step.outputSummary;
+                        let phaseItems: string[] = [];
+                        
+                        if (colonIdx !== -1) {
+                          header = step.outputSummary.substring(0, colonIdx + 1).trim();
+                          const rest = step.outputSummary.substring(colonIdx + 1).trim();
+                          phaseItems = rest.split(' • ').map(s => s.replace(/^•\s*/, '').trim()).filter(Boolean);
+                        } else {
+                          const parts = step.outputSummary.split(' • ');
+                          header = parts[0];
+                          phaseItems = parts.slice(1);
+                        }
+
+                        return (
+                          <div style={{ marginTop: '0.35rem' }}>
+                            <div style={{ fontWeight: 600 }}>{header}</div>
+                            <ul style={{ margin: '0.35rem 0 0 1.25rem', padding: 0, listStyleType: 'disc' }}>
+                              {phaseItems.map((phaseItem, pIdx) => (
+                                <li key={pIdx} style={{ color: '#0369a1', marginTop: '0.25rem', fontWeight: 600 }}>
+                                  {phaseItem}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      }
+
+                      if (idx === 0) {
+                        let parsedPhases: Array<{ phaseNumber?: number; PhaseNumber?: number; phaseName?: string; PhaseName?: string; priority?: string; Priority?: string; estimatedDurationDays?: number; EstimatedDurationDays?: number; objective?: string; Objective?: string }> = [];
+                        if (currentPlan?.planSummaryJson) {
+                          try {
+                            const p = typeof currentPlan.planSummaryJson === 'string' ? JSON.parse(currentPlan.planSummaryJson) : currentPlan.planSummaryJson;
+                            if (Array.isArray(p?.Phases)) parsedPhases = p.Phases;
+                            else if (Array.isArray(p?.recoveryPhases)) parsedPhases = p.recoveryPhases;
+                          } catch { }
+                        }
+
+                        return (
+                          <div style={{ marginTop: '0.35rem' }}>
+                            <div style={{ fontWeight: 600 }}>{step.outputSummary}</div>
+                            {parsedPhases.length > 0 && (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.5rem', marginTop: '0.6rem' }}>
+                                {parsedPhases.map((ph, pIdx) => {
+                                  const num = ph.PhaseNumber ?? ph.phaseNumber ?? (pIdx + 1);
+                                  const name = ph.PhaseName ?? ph.phaseName ?? `Phase ${num}`;
+                                  const prio = ph.Priority ?? ph.priority ?? 'Medium';
+                                  const days = ph.EstimatedDurationDays ?? ph.estimatedDurationDays ?? 30;
+                                  const obj = ph.Objective ?? ph.objective;
+                                  const prioColor = prio === 'Critical' ? '#dc2626' : prio === 'High' ? '#ea580c' : '#2563eb';
+                                  const prioBg = prio === 'Critical' ? '#fef2f2' : prio === 'High' ? '#fff7ed' : '#eff6ff';
+                                  return (
+                                    <div key={pIdx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.6rem 0.75rem', fontSize: '0.8rem' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{name}</span>
+                                        <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: prioBg, color: prioColor, fontWeight: 700 }}>
+                                          {prio}
+                                        </span>
+                                      </div>
+                                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>⏱️ Target: {days} days</div>
+                                      {obj && <div style={{ color: '#334155', fontSize: '0.75rem', fontStyle: 'italic' }}>"{obj}"</div>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return step.outputSummary;
+                    })()}
+                  </div>
                 </div>
               </div>
             ))}
