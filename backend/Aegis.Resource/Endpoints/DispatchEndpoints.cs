@@ -15,6 +15,11 @@ namespace Aegis.Resource.Endpoints
                 .RequireAuthorization()
                 .WithTags("Resource - Dispatch");
 
+            group.MapGet("/", async (IDispatchService svc) =>
+            {
+                var plans = await svc.GetAllAsync();
+                return Results.Ok(plans);
+            });
             group.MapPost("/requests", async (
                 CreateDispatchRequestDto dto, IDispatchService svc) =>
             {
