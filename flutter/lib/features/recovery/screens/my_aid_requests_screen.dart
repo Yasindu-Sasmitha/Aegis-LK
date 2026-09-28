@@ -71,7 +71,7 @@ class _MyAidRequestsScreenState extends State<MyAidRequestsScreen> {
           ? AppBar(
               backgroundColor: kNavBg,
               iconTheme: const IconThemeData(color: Colors.white),
-              title: Text(isOfficer ? 'Citizen Relief Aid Applications' : 'My Aid Applications',
+              title: Text(isOfficer ? 'Citizen Relief Aid Requests' : 'Requested Aids',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
           : null,

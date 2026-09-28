@@ -6,7 +6,6 @@ import 'my_aid_requests_screen.dart';
 import 'donate_screen.dart';
 import 'recovery_plan_status_screen.dart';
 import 'citizen_damage_report_screen.dart';
-import 'compensation_claim_screen.dart';
 import 'recovery_reports_screen.dart';
 
 class RecoveryHomeScreen extends StatelessWidget {
@@ -121,7 +120,7 @@ class RecoveryHomeScreen extends StatelessWidget {
 
           _buildActionCard(
             context,
-            title: 'My Aid Applications',
+            title: 'Requested Aids',
             subtitle: 'Track live status and shelter allocations for your relief requests.',
             icon: Icons.assignment_outlined,
             color: const Color(0xFFD97706),
@@ -151,16 +150,6 @@ class RecoveryHomeScreen extends StatelessWidget {
 
           _buildActionCard(
             context,
-            title: 'Housing Damage Compensation',
-            subtitle: 'File property damage claims and monitor verification ledger.',
-            icon: Icons.roofing_outlined,
-            color: const Color(0xFF9D174D),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompensationClaimScreen())),
-          ),
-          const SizedBox(height: 10),
-
-          _buildActionCard(
-            context,
             title: 'Donate Relief Supplies & Funds',
             subtitle: 'Contribute monetary aid or supplies with direct shelter tracking.',
             icon: Icons.volunteer_activism_outlined,
@@ -177,7 +166,9 @@ class RecoveryHomeScreen extends StatelessWidget {
             subtitle: 'Explore national recovery metrics, fund disbursement, and audit reports.',
             icon: Icons.assessment_outlined,
             color: const Color(0xFF0284C7),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryReportsScreen())),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(7)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryReportsScreen())),
           ),
           const SizedBox(height: 16),
         ],

@@ -130,7 +130,7 @@ Aegis-LK/
 
 ## 4. Multi-Agent AI Workflow
 
-The Recovery Planning Agent is a **4-Agent Collaborative Pipeline** built with Google Gemini (`gemini-3.1-flash-lite-preview` / `gemini-2.5-flash-lite`) and reinforced by deterministic C# guardrails:
+The Recovery Planning Agent is a **4-Agent Collaborative Pipeline** built with Google Gemini (`gemini-3.1-flash-lite` / `gemini-2.5-flash-lite`) and reinforced by deterministic C# guardrails:
 
 ```
                   ┌─────────────────────────────────────┐

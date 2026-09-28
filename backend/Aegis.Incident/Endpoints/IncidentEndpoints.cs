@@ -314,6 +314,33 @@ public static class IncidentEndpoints
             return Results.Ok(related);
         });
 
+        // GET /api/incidents/my-reports — citizen's own reports, with an honest
+        // display status: a report merged as a duplicate never gets its own
+        // lifecycle, so we surface that explicitly instead of leaving it stuck
+        // on "Reported" forever, indistinguishable from an ignored report.
+        group.MapGet("/my-reports", async (Guid reportedByUserId, IncidentDbContext db) =>
+        {
+            var reports = await db.Incidents
+                .Where(i => i.ReportedByUserId == reportedByUserId)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            var response = reports.Select(i => new MyIncidentReportResponse
+            {
+                Id = i.Id,
+                DisasterType = i.DisasterType,
+                Description = i.Description,
+                SeverityReported = i.SeverityReported,
+                PhotoUrl = i.PhotoUrl,
+                DisplayStatus = i.LinkedIncidentId != null
+                    ? "Confirmed — merged with an existing report"
+                    : i.Status,
+                CreatedAt = i.CreatedAt
+            }).ToList();
+
+            return Results.Ok(response);
+        });
+
         // GET /api/incidents/logs — global, searchable activity log across all
         // incidents: every agent run and every officer action, in one feed.
         group.MapGet("/logs", async (
