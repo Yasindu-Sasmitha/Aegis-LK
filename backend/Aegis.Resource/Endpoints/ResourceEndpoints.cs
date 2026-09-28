@@ -8,7 +8,7 @@ namespace Aegis.Resource.Endpoints
         {
             app.MapWarehouseEndpoints();
             app.MapInventoryEndpoints();
-            // app.MapDispatchEndpoints(); // add once ResourceRequest/Dispatch flow is built
+            app.MapDispatchEndpoints(); // add once ResourceRequest/Dispatch flow is built
         }
     }
 }

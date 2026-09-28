@@ -4,6 +4,7 @@ using Aegis.Incident;
 using Aegis.Incident.Data;
 using Aegis.Incident.Endpoints;
 using Aegis.Incident.Services;
+using Aegis.Recovery;
 using Aegis.Recovery.Data;
 using Aegis.Recovery.Endpoints;
 using Aegis.Recovery.Services;
@@ -62,7 +63,7 @@ builder.Services.AddDbContext<ResourceDbContext>(options =>
 // ── Resource Module Services ────────────────────────────────────────────────
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
-// builder.Services.AddScoped<IDispatchService, DispatchService>();
+builder.Services.AddScoped<IDispatchService, DispatchService>();
 
 // ── Authentication & Authorization ──────────────────────────────────────────
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -117,7 +118,7 @@ builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentDedupAgentClient>
     client.BaseAddress = new Uri("http://127.0.0.1:8002");
 });
 
-// Resource Agent Client — SINGLE registration (duplicate removed)
+// Resource Agent Client — SINGLE registration
 builder.Services.AddHttpClient<Aegis.Resource.Services.ResourceAgentClient>(client =>
 {
     client.BaseAddress = new Uri("http://127.0.0.1:8003");
@@ -135,7 +136,7 @@ builder.Services.AddSingleton<Aegis.Incident.Services.CloudinaryService>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
@@ -166,9 +167,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseCors("AllowLocalDev");
-
 app.UseAuthentication();
 app.UseAuthorization();
 
