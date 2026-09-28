@@ -1,0 +1,61 @@
+# Auto-detect text files and normalise line endings to LF in the repo.
+# Each developer's working copy gets their OS-native endings on checkout.
+* text=auto
+
+# === Source code — always LF in repo ===
+*.cs        text diff=csharp
+*.csproj    text
+*.sln       text eol=crlf
+*.razor     text
+*.cshtml    text
+
+*.dart      text
+*.yaml      text
+*.yml       text
+
+*.py        text diff=python
+*.pyi       text diff=python
+
+*.js        text
+*.jsx       text
+*.ts        text
+*.tsx       text
+*.json      text
+*.css       text
+*.html      text
+*.md        text
+
+*.xml       text
+*.config    text
+*.props     text
+*.targets   text
+
+# === Shell scripts — always LF even on Windows ===
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+# === Windows scripts — always CRLF ===
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# === Binary files — never touch ===
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.webp      binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.otf       binary
+*.zip       binary
+*.gz        binary
+*.tar       binary
+*.pdf       binary
+*.pfx       binary
+*.snk       binary
+*.sqlite    binary
+*.db        binary
