@@ -231,9 +231,13 @@ export async function approveDispatchPlan(id: string): Promise<DispatchPlan> {
 }
 
 export async function fetchDispatchPlans(): Promise<DispatchPlan[]> {
-  // Backend does not expose a list endpoint yet — return [] so the UI
-  // starts empty and populates as plans are created in the session.
-  return [];
+  const res = await fetch(`${API_BASE}/dispatch/`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch dispatch plans');
+  const data = await res.json();
+  const plans = Array.isArray(data) ? data : [];
+  return plans.map(mapDispatchResponse);
 }
 
 // ---------------------------------------------------------------------------
