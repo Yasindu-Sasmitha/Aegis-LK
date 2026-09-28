@@ -84,3 +84,15 @@ public class HoldIncidentRequest
 {
     public string? Reason { get; set; } // optional
 }
+
+// ── GET /api/incidents/my-reports — citizen-facing status, honest about merges ──
+public class MyIncidentReportResponse
+{
+    public Guid Id { get; set; }
+    public string DisasterType { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string SeverityReported { get; set; } = string.Empty;
+    public string? PhotoUrl { get; set; }
+    public string DisplayStatus { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
