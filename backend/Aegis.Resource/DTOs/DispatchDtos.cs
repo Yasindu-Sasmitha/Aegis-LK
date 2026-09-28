@@ -35,5 +35,7 @@ namespace Aegis.Resource.DTOs
         public string OverallStatus { get; set; } = "Success";
         public string? Error { get; set; }
         public DateTime CreatedAt { get; set; }
+        public int TeamsRequired { get; set; }
+                   
     }
 }
