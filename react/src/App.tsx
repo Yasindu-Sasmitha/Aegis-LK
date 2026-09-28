@@ -29,9 +29,9 @@ import {
 } from './features/incident';
 import {
   ResourceDashboardPage,
-  WarehousePage,
-  InventoryPage,
-  DispatchPage,
+  WarehouseManagementPage,
+  InventoryManagementPage,
+  DispatchManagementPage,
 } from './features/resource';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'resource' | 'incident';
@@ -503,7 +503,7 @@ const MainPlatform: React.FC = () => {
                 <div className="ae-feature-card-link">→</div>
               </div>
 
-              {/* Card 3: Resource Management */}
+              {/* Card 3: Recovery Management */}
               <div
                 className="ae-feature-card"
                 onClick={() => navigateToRecovery('donations')}
@@ -511,6 +511,23 @@ const MainPlatform: React.FC = () => {
                 <div>
                   <div className="ae-feature-card-icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
                     🛡️
+                  </div>
+                  <div className="ae-feature-card-title">Recovery Management</div>
+                  <div className="ae-feature-card-desc">
+                    Coordinate post-disaster recovery efforts, track reconstruction progress, and manage long-term rehabilitation plans.
+                  </div>
+                </div>
+                <div className="ae-feature-card-link">→</div>
+              </div>
+
+              {/* Card 4: Resource Management */}
+              <div
+                className="ae-feature-card"
+                onClick={() => navigateToResource('dashboard')} 
+              >
+                <div>
+                  <div className="ae-feature-card-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+                    🔄
                   </div>
                   <div className="ae-feature-card-title">Resource Management</div>
                   <div className="ae-feature-card-desc">
@@ -520,7 +537,7 @@ const MainPlatform: React.FC = () => {
                 <div className="ae-feature-card-link">→</div>
               </div>
 
-              {/* Card 4: Disaster Information */}
+              {/* Card 5: Disaster Information */}
               <div
                 className="ae-feature-card"
                 onClick={() => navigateToWeather('history')}
@@ -537,7 +554,7 @@ const MainPlatform: React.FC = () => {
                 <div className="ae-feature-card-link">→</div>
               </div>
 
-              {/* Card 5: Reports & Analytics */}
+              {/* Card 6: Reports & Analytics */}
               <div
                 className="ae-feature-card"
                 onClick={() => navigateToWeather(isOfficerOrAdmin ? 'analytics' : 'history')}
@@ -794,12 +811,12 @@ const MainPlatform: React.FC = () => {
               <ResourceDashboardPage key={resourceRefreshKey} />
             )}
             {resourceTab === 'warehouses' && (
-              <WarehousePage key={resourceRefreshKey} />
+              <WarehouseManagementPage key={resourceRefreshKey} />
             )}
             {resourceTab === 'inventory' && (
-              <InventoryPage key={resourceRefreshKey} />
+              <InventoryManagementPage key={resourceRefreshKey} />
             )}
-            {resourceTab === 'dispatch' && <DispatchPage />}
+            {resourceTab === 'dispatch' && <DispatchManagementPage />}
           </main>
         )}
 
