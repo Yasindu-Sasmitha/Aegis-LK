@@ -168,7 +168,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             const SizedBox(height: 20),
 
             DropdownButtonFormField<String>(
-              value: _disasterType,
+              initialValue: _disasterType,
               decoration: const InputDecoration(labelText: 'Type of disaster', border: OutlineInputBorder()),
               items: _disasterTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
               onChanged: (v) => setState(() => _disasterType = v ?? _disasterType),
@@ -176,7 +176,7 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             const SizedBox(height: 14),
 
             DropdownButtonFormField<String>(
-              value: _severity,
+              initialValue: _severity,
               decoration: const InputDecoration(labelText: 'How severe is it?', border: OutlineInputBorder()),
               items: _severities.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
               onChanged: (v) => setState(() => _severity = v ?? _severity),
