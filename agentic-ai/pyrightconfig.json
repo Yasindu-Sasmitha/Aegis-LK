@@ -1,0 +1,12 @@
+{
+  "pythonVersion": "3.14",
+  "include": [
+    "agents",
+    "tests",
+    "orchestrator"
+  ],
+  "extraPaths": [
+    "agents"
+  ],
+  "typeCheckingMode": "basic"
+}

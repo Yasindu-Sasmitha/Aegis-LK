@@ -8,3 +8,6 @@ langgraph==0.2.55
 pydantic>=2.0,<3
 python-dotenv>=1.0
 pytest>=8.0
+# Required for recovery_agent.py module-level imports (no API call is made during tests)
+fastapi>=0.100.0
+google-generativeai>=0.8.0
