@@ -188,7 +188,7 @@ def run_agent_1_planner(payload: AgentRequestPayload) -> Agent1Output:
 # ── Agent 2: Infrastructure & Shelter Analysis ────────────────────────────────
 
 def run_agent_2_analysis(payload: AgentRequestPayload) -> Agent2Output:
-    assets_json = json.dumps([a.dict() for a in payload.assets])
+    assets_json = json.dumps([a.model_dump() for a in payload.assets])
     prompt = f"""
     You are Agent 2 (Infrastructure & Shelter Domain Analysis Agent).
     Prioritize the damaged assets by criticality and urgency rank (1 = highest).
@@ -236,7 +236,7 @@ def run_agent_3_matching(payload: AgentRequestPayload, agent2: Agent2Output) -> 
 
     Qualified NGOs: {ngos}
     Repair Benchmarks: {benchmarks}
-    Prioritized Assets: {json.dumps([p.dict() for p in agent2.prioritizedDamageList])}
+    Prioritized Assets: {json.dumps([p.model_dump() for p in agent2.prioritizedDamageList])}
     Displaced Families: {payload.displacedFamilies} (Must preserve the exact count of {payload.displacedFamilies} families for any family relief or shelter tasks)
 
     Return JSON:
