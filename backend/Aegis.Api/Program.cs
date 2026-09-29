@@ -17,7 +17,9 @@ using Aegis.Shared.Auth.Entities;
 using Aegis.Shared.Auth.Services;
 using Aegis.Weather.Data;
 using Aegis.Weather.Endpoints;
+using Aegis.Api.Health;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -26,6 +28,10 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+
+// ── Health Checks ────────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database", tags: ["db", "postgresql"]);
 
 // ── CORS ────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
@@ -176,5 +182,19 @@ app.MapWeatherEndpoints();
 app.MapRecoveryEndpoints();
 app.MapIncidentEndpoints();
 app.MapResourceEndpoints();
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    AllowCachingResponses = false,
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var payload = new
+        {
+            status = report.Status.ToString()
+        };
+        await context.Response.WriteAsJsonAsync(payload);
+    }
+}).AllowAnonymous();
 
 app.Run();
