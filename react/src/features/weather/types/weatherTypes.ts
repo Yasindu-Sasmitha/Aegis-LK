@@ -99,3 +99,47 @@ export interface AgentStep {
   summary: string;
   error?: string;
 }
+
+export interface PredictionItem {
+  id: string;
+  districtId: string;
+  districtName: string | null;
+  agentRunId: string;
+  hazardType: 'Flood' | 'Landslide' | 'StrongWind';
+  riskProbabilityPct: number;
+  confidencePct: number;
+  forecastValue: number;
+  historicalThreshold: number;
+  unit: string;
+  status: string;
+  createdAt: string;
+  hasOutcome: boolean;
+  actualDisasterOccurred: boolean | null;
+  actualValue: number | null;
+  confirmedByUserId?: string | null;
+  outcomeConfirmedAt?: string | null;
+  outcomeNotes?: string | null;
+}
+
+export interface PredictionsResponse {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: PredictionItem[];
+}
+
+export interface PredictionOutcomeRequest {
+  actualDisasterOccurred: boolean;
+  actualValue?: number | null;
+  notes?: string | null;
+}
+
+export interface PredictionOutcomeResponse {
+  id: string;
+  predictionId: string;
+  actualDisasterOccurred: boolean;
+  actualValue: number | null;
+  confirmedByUserId: string;
+  confirmedAt: string;
+  notes: string | null;
+}

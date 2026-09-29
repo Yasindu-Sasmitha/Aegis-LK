@@ -12,9 +12,40 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 API_KEY = os.getenv("GOOGLE_API_KEY", "")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-2.5-flash-lite")
-assert API_KEY and "XXXX" not in API_KEY, (
-    "GOOGLE_API_KEY missing: copy .env.example -> .env and paste your Google AI Studio key"
-)
+
+
+def _get_assessor_llm():
+    if not API_KEY or "XXXX" in API_KEY:
+        raise RuntimeError(
+            "GOOGLE_API_KEY missing: copy .env.example -> .env and paste your Google AI Studio key"
+        )
+
+    llm = ChatGoogleGenerativeAI(
+        model=CHAT_MODEL,
+        google_api_key=API_KEY,
+        temperature=0,
+        timeout=60,
+        max_retries=3,
+    )
+
+    return llm.with_structured_output(WeatherAgentOutput)
+
+
+def _get_critic_llm():
+    if not API_KEY or "XXXX" in API_KEY:
+        raise RuntimeError(
+            "GOOGLE_API_KEY missing: copy .env.example -> .env and paste your Google AI Studio key"
+        )
+
+    llm = ChatGoogleGenerativeAI(
+        model=CHAT_MODEL,
+        google_api_key=API_KEY,
+        temperature=0,
+        timeout=60,
+        max_retries=3,
+    )
+
+    return llm.with_structured_output(CritiqueOutput)
 
 
 class HazardAssessment(BaseModel):
@@ -54,10 +85,6 @@ class WeatherAgentState(TypedDict):
     overall_status: str
     error: Optional[str]
 
-
-llm = ChatGoogleGenerativeAI(model=CHAT_MODEL, google_api_key=API_KEY, temperature=0, timeout=60, max_retries=3)
-assessor_llm = llm.with_structured_output(WeatherAgentOutput)
-critic_llm = llm.with_structured_output(CritiqueOutput)
 
 
 def _log_step(step: str, tool: str, started: datetime, status: str, summary: str, error: str | None = None) -> dict:
@@ -99,7 +126,7 @@ with risk_probability_pct and confidence_pct.
     for attempt in range(1, 3):
         started = datetime.now(timezone.utc)
         try:
-            result: WeatherAgentOutput = assessor_llm.invoke(prompt)
+            result: WeatherAgentOutput = _get_assessor_llm().invoke(prompt)
             summary = f"Assessed {len(result.hazards)} hazard(s): " + ", ".join(
                 f"{h.hazard_type} {h.risk_probability_pct:.0f}%" for h in result.hazards
             )
@@ -145,7 +172,7 @@ Only flag genuine inconsistencies or errors — not stylistic disagreement or mi
 If the assessment is sound, agrees=true with an empty concerns list.
 """
     try:
-        result: CritiqueOutput = critic_llm.invoke(prompt)
+        result: CritiqueOutput = _get_critic_llm().invoke(prompt)
         summary = "Agrees with assessment" if result.agrees else \
             f"Disagreement flagged: {'; '.join(c.issue for c in result.concerns)}"
         steps.append(_log_step("critique_assessment", f"gemini:{CHAT_MODEL}", started, "success", summary))

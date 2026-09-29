@@ -89,6 +89,7 @@ public class ForecastHistory
     public double? ActualValue { get; set; }
     public Guid? ConfirmedByUserId { get; set; }
     public DateTime? ConfirmedAt { get; set; }
+    public string? Notes { get; set; }
 }
 
 public class AgentExecutionLog

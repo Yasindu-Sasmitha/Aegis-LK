@@ -1,59 +1,130 @@
-export type WarehouseStatus = 'Active' | 'Low' | 'Critical';
-export type ResourcePriority = 'Low' | 'Medium' | 'High';
-export type DispatchStatus = 'Scheduled' | 'InTransit' | 'Delivered';
-export type ResourceRequestStatus = 'Pending' | 'Approved' | 'Dispatched';
+export type ItemTypeName =
+  | 'Food'
+  | 'Medical'
+  | 'Shelter'
+  | 'RescueEquipment'
+  | 'Fuel'
+  | 'Other';
 
-export type Warehouse = {
+export type ResourceItemType = ItemTypeName | number;
+
+export interface Warehouse {
   id: string;
   name: string;
   district: string;
-  capacity: number;
-  availableStock: number;
-  status: WarehouseStatus;
-  updatedAt: string;
-};
+  latitude: number;
+  longitude: number;
+  contactPhone?: string | null;
+  inventoryItemCount?: number;
+  vehicleCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-export type InventoryItem = {
+export interface InventoryItem {
   id: string;
   warehouseId: string;
+  warehouseName: string;
   itemName: string;
-  quantity: number;
+  itemType: ResourceItemType;
+  quantityAvailable: number;
   unit: string;
-  reorderLevel: number;
-  lastUpdated: string;
-};
+  reorderThreshold?: number | null;
+  isLowStock: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-export type ResourceRequest = {
-  id: string;
-  itemName: string;
-  quantity: number;
-  priority: ResourcePriority;
-  status: ResourceRequestStatus;
-  requester: string;
+export interface ResourceListResponse<T> {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: T[];
+}
+
+export interface CreateWarehouseDto {
+  name: string;
   district: string;
-};
+  latitude: number;
+  longitude: number;
+  contactPhone?: string;
+  inventoryItemCount?: number;
+  vehicleCount?: number;
+}
 
-export type DispatchItem = {
-  id: string;
-  requestId: string;
-  destination: string;
-  status: DispatchStatus;
-  vehicleCount: number;
-  eta: string;
-};
+export interface UpdateWarehouseDto extends CreateWarehouseDto {}
 
-export type DeliveryItem = {
-  id: string;
-  dispatchId: string;
+export interface CreateInventoryDto {
+  warehouseId: string;
+  itemName: string;
+  itemType: ResourceItemType;
+  quantityAvailable: number;
+  unit?: string;
+  reorderThreshold?: number | null;
+}
+
+export interface UpdateInventoryDto {
+  itemName: string;
+  itemType: ResourceItemType;
+  quantityAvailable: number;
+  unit?: string;
+  reorderThreshold?: number | null;
+}
+
+export interface AdjustInventoryDto {
+  quantityChange: number;
+  reason?: string;
+}
+
+export interface DispatchAllocationItem {
   itemName: string;
   quantity: number;
-  delivered: boolean;
-  deliveredAt?: string;
+}
+
+export interface DispatchPlan {
+  id: string;
+  missionId: string;
+  district: string;
+  teamsRequired: number;
+  warehouseId: string;
+  warehouseName: string;
+  routeSummary: string;
+  estimatedArrivalMinutes: number;
+  approvalStatus: 'PendingApproval' | 'Approved' | 'Rejected';
+  items: DispatchAllocationItem[];
+  createdAt: string;
+}
+
+export interface CreateDispatchRequestDto {
+  missionId: string;
+  teamsRequired: number;
+  district: string;
+  latitude: number;
+  longitude: number;
+}
+
+export const ITEM_TYPE_LABELS: Record<string, string> = {
+  Food: 'Food',
+  Medical: 'Medical',
+  Shelter: 'Shelter',
+  RescueEquipment: 'Rescue Equipment',
+  Fuel: 'Fuel',
+  Other: 'Other',
 };
 
-export type ResourceSummary = {
-  warehouseCount: number;
-  totalInventory: number;
-  criticalItems: number;
-  activeDispatches: number;
-};
+export function getItemTypeLabel(itemType: ResourceItemType): string {
+  if (typeof itemType === 'string') {
+    return ITEM_TYPE_LABELS[itemType] ?? itemType;
+  }
+
+  const map: Record<number, string> = {
+    0: 'Food',
+    1: 'Medical',
+    2: 'Shelter',
+    3: 'Rescue Equipment',
+    4: 'Fuel',
+    5: 'Other',
+  };
+
+  return map[itemType] ?? 'Other';
+}

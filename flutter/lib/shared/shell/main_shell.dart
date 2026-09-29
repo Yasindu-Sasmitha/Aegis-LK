@@ -5,6 +5,7 @@ import '../theme/aegis_theme.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/weather/screens/weather_home_screen.dart';
 import '../../features/weather/screens/alerts_screen.dart';
+import '../../features/weather/screens/prediction_history_screen.dart';
 import '../../features/recovery/screens/recovery_home_screen.dart';
 import '../../features/recovery/screens/shelter_finder_screen.dart';
 import '../../features/recovery/screens/aid_request_screen.dart';
@@ -12,7 +13,6 @@ import '../../features/recovery/screens/my_aid_requests_screen.dart';
 import '../../features/recovery/screens/donate_screen.dart';
 import '../../features/recovery/screens/citizen_damage_report_screen.dart';
 import '../../features/recovery/screens/recovery_plan_status_screen.dart';
-import '../../features/recovery/screens/compensation_claim_screen.dart';
 import '../../features/recovery/screens/recovery_reports_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -55,6 +55,9 @@ class _MainShellState extends State<MainShell> {
       } else if (section == 'weather_alerts') {
         _primaryIndex = 1;
         _weatherSubIndex = subIndex ?? 1;
+      } else if (section == 'weather_predictions') {
+        _primaryIndex = 1;
+        _weatherSubIndex = subIndex ?? 3;
       } else if (section == 'recovery') {
         _primaryIndex = 2;
         _recoverySubIndex = subIndex ?? 0;
@@ -335,6 +338,13 @@ class _MainShellState extends State<MainShell> {
               onTap: () => setState(() => _weatherSubIndex = 2),
             ),
           ],
+          const SizedBox(width: 6),
+          _buildSubNavItem(
+            label: 'Predictions & Outcomes',
+            icon: Icons.history_edu_outlined,
+            isActive: _weatherSubIndex == 3,
+            onTap: () => setState(() => _weatherSubIndex = 3),
+          ),
         ],
       ),
     );
@@ -373,7 +383,7 @@ class _MainShellState extends State<MainShell> {
           ),
           const SizedBox(width: 6),
           _buildSubNavItem(
-            label: 'My Applications',
+            label: 'Requested Aids',
             icon: Icons.assignment_outlined,
             isActive: _recoverySubIndex == 3,
             onTap: () => setState(() => _recoverySubIndex = 3),
@@ -401,17 +411,10 @@ class _MainShellState extends State<MainShell> {
           ),
           const SizedBox(width: 6),
           _buildSubNavItem(
-            label: 'Compensation',
-            icon: Icons.roofing_outlined,
-            isActive: _recoverySubIndex == 7,
-            onTap: () => setState(() => _recoverySubIndex = 7),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
             label: 'Audit Reports',
             icon: Icons.assessment_outlined,
-            isActive: _recoverySubIndex == 8,
-            onTap: () => setState(() => _recoverySubIndex = 8),
+            isActive: _recoverySubIndex == 7,
+            onTap: () => setState(() => _recoverySubIndex = 7),
           ),
         ],
       ),
@@ -489,6 +492,8 @@ class _MainShellState extends State<MainShell> {
             showAppBar: false,
             initialStatus: 'PendingReview',
           );
+        case 3:
+          return const PredictionHistoryScreen(showAppBar: false);
         default:
           return const WeatherHomeScreen(showAppBar: false);
       }
@@ -514,8 +519,6 @@ class _MainShellState extends State<MainShell> {
         case 6:
           return const RecoveryPlanStatusScreen(showAppBar: false);
         case 7:
-          return const CompensationClaimScreen(showAppBar: false);
-        case 8:
           return const RecoveryReportsScreen(showAppBar: false);
         default:
           return RecoveryHomeScreen(

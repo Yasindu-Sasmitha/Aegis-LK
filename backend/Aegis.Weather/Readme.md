@@ -40,7 +40,7 @@ Flutter/React → ASP.NET Core (Aegis.Api) → WeatherDbContext (PostgreSQL, sch
 
 ## 3. Database schema
 
-Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandslideAndWindHazards`.
+Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandslideAndWindHazards`, `AddForecastHistoryUniquePredictionAndNotes`.
 
 | Table | Key columns | Notes |
 |---|---|---|
@@ -49,7 +49,7 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | `WeatherStation` / `WeatherObservation` | — | Scaffolded, not actively used yet (future: real station data) |
 | `Predictions` | DistrictId, **AgentRunId**, **HazardType**, RiskProbabilityPct, ConfidencePct, ForecastValue, HistoricalThreshold, Unit, Status | **One row per hazard per agent run** — up to 3 rows share one AgentRunId |
 | `WeatherAlerts` | PredictionId, HazardType, Severity, Message, Status (`PendingReview`/`Published`/`Rejected`), ReviewedByUserId, PublishedAt | Only created when action is `publish_alert` or `flag_for_review` |
-| `ForecastHistory` | PredictionId, ActualDisasterOccurred, ActualValue | Feeds accuracy analytics comparing predictions vs ground truth |
+| `ForecastHistory` | PredictionId (unique constraint), ActualDisasterOccurred, ActualValue, **ConfirmedByUserId** (Guid from JWT), **ConfirmedAt**, **Notes** | Feeds accuracy analytics. Unique constraint on `PredictionId` prevents duplicate outcomes — second `POST` returns `409 Conflict`. |
 | `AgentExecutionLogs` | DistrictId, StepsJson, OverallStatus, ErrorMessage, StartedAt/CompletedAt | The audit trail — one row per `/predict` call, includes retry attempts |
 
 **Landslide-prone districts (seeded true):** Kandy, Matale, Nuwara Eliya, Badulla, Kegalle, Ratnapura
@@ -64,11 +64,13 @@ Schema: `weather`. Migrations applied so far: `InitialWeatherSchema`, `AddLandsl
 | `GET /api/weather/districts` | ✅ done | List all 25 districts |
 | `GET /api/weather/districts/{id}/historical` | ✅ done | Historical baseline for a district |
 | `GET /api/weather/forecast/{districtId}` | ✅ done | Live Open-Meteo pull + baseline, no AI |
-| `POST /api/weather/predict/{districtId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Full 3-node agent pipeline — forecast → Assessor → Critic → validate → persist. Response now includes a `trace` array of agent reasoning steps. |
+| `POST /api/weather/predict/{districtId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Full 3-node agent pipeline — forecast → Assessor → Critic → validate → persist. Response includes a `trace` array of agent reasoning steps. Returns `404` if district unknown, `503` if Open-Meteo unreachable, `500` if no historical baseline, `502` if agent fails (and always writes `AgentExecutionLog` with `OverallStatus="Failed"`). |
 | `GET /api/weather/agent-runs/{agentRunId}` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Fetch the full reasoning trace for a past prediction run from `AgentExecutionLogs`. |
-| `POST /api/weather/alerts/{id}/review` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Officer approve/reject a `PendingReview` alert — human audit with authentic JWT `ReviewedByUserId` (rejects missing/invalid identity, no fallback identity). |
+| `POST /api/weather/alerts/{id}/review` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Officer approve/reject a `PendingReview` alert — human audit with authentic JWT `ReviewedByUserId` (rejects missing/invalid identity, no fallback identity). Returns `400` for invalid decision string or non-`PendingReview` status. |
 | `GET /api/weather/alerts` | ✅ done | Paginated & filterable list (status, district, hazardType) |
-| `GET /api/weather/analytics/accuracy` | ✅ done | Reporting requirement — compares `Predictions` vs `ForecastHistory` |
+| `GET /api/weather/analytics/accuracy` | ✅ done | Reporting requirement — compares `Predictions` vs `ForecastHistory` ground truth |
+| `GET /api/weather/predictions` | ✅ done | Paginated & sortable prediction history (district, hazardType, status filters; sorting by createdAt, riskProbabilityPct, confidencePct, hazardType, forecastValue). Each item includes `hasOutcome`, `actualDisasterOccurred`, `actualValue` from joined `ForecastHistory`. |
+| `POST /api/weather/predictions/{id}/outcome` | ✅ done | Protected (`DisasterOfficer`, `Admin`). Records ground-truth outcome into `ForecastHistory`. Extracts confirmer GUID from JWT (401 if missing/invalid). Returns `404` if prediction not found, `409 Conflict` if outcome already recorded (unique DB constraint). Feeds accuracy analytics. |
 | CRUD `/api/weather/stations` | ❌ not built | Admin management, low priority |
 
 ---
@@ -249,12 +251,15 @@ flutter run
 - [x] `POST /api/weather/alerts/{id}/review` — officer approve/reject human-in-the-loop endpoint
 - [x] `GET /api/weather/alerts` with status/district/hazard filter + pagination
 - [x] `GET /api/weather/analytics/accuracy` — model accuracy analytics vs ground truth
-- [x] React: forecast dashboard, alert review queue, prediction history, analytics
+- [x] React: forecast dashboard, alert review queue, prediction history, alert history, analytics
 - [x] Flutter: weather home screen, district forecast, alert review queue
 - [x] Agent evaluation suite (`eval_weather_agent.py` + `test_weather_agent_guardrails.py`)
 - [x] Shared Role-Based Authentication & Authorization (JWT) in `Aegis.Shared` & `Aegis.Api`
 - [x] **Assessor / Critic multi-agent split** — `weather_agent.py` refactored from 2-node to 3-node LangGraph graph: `assess_hazards` (Assessor LLM) → `critique_assessment` (Critic LLM) → `validate_and_decide` (code gate). Critic disagreements produce deterministic `flag_for_review` overrides with annotated reasoning.
 - [x] **Agent Reasoning Trace** — every pipeline run emits a `steps` array with per-node timing, status, and plain-English summary. Persisted to `AgentExecutionLogs.StepsJson`, returned in `POST /predict` response as `trace`, retrievable independently via protected `GET /api/weather/agent-runs/{agentRunId}` (`DisasterOfficer`, `Admin`). Visualized in React via `AgentTraceTimeline.tsx`.
 - [x] **Audit Security & Deterministic Guardrails** — Alert review strictly extracts and records authentic officer GUID from JWT (rejects missing/invalid claims, eliminates default GUID fallback). Guardrail test suite deterministically verifies Confidence Gate, Anomaly Gate, and Critic Override Gate.
+- [x] **Post-Event Outcome Recording** — `POST /api/weather/predictions/{id}/outcome` (DisasterOfficer, Admin) records ground truth into `ForecastHistory` with real JWT confirmer GUID. Unique DB constraint on `PredictionId`; duplicate attempts return `409 Conflict`. Feeds accuracy analytics.
+- [x] **Prediction History Endpoint** — `GET /api/weather/predictions` with filtering (district, hazardType, status), server-side pagination, and 5-way database-level sorting. Each item includes outcome enrichment (`hasOutcome`, `actualDisasterOccurred`, `actualValue`).
+- [x] **Strengthened Integration Tests** — `WeatherEndpointAuthIntegrationTests` covers: full auth/authz matrix for all 4 protected endpoints (`/predict`, `/alerts/{id}/review`, `/agent-runs/{id}`, `/predictions/{id}/outcome`); alert review workflow (invalid decision, already-published, reject keeps PublishedAt null, approve populates all audit fields); predict pipeline error paths (503 Open-Meteo failure, 500 missing baseline, 502 agent failure with AgentExecutionLog saved, successful run creates Prediction+AgentExecutionLog rows, 24-hour duplicate alert deduplication); outcome workflow (valid creation with real JWT GUID, 409 duplicate, 404 unknown prediction, 401 missing claim).
 - [ ] CRUD `/api/weather/stations` (optional future enhancement)
 - [ ] Group-level shared blockers: `docker-compose.yml`, CI workflow (Section 13 requirement)

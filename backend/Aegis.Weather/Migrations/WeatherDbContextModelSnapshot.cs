@@ -110,12 +110,16 @@ namespace Aegis.Weather.Migrations
                     b.Property<Guid?>("ConfirmedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("PredictionId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PredictionId");
+                    b.HasIndex("PredictionId")
+                        .IsUnique();
 
                     b.ToTable("ForecastHistory", "weather");
                 });

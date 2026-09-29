@@ -1,209 +1,265 @@
 import { getAuthHeaders } from '../../../shared/auth/authApi';
 import type {
-  DeliveryItem,
-  DispatchItem,
+  AdjustInventoryDto,
+  CreateDispatchRequestDto,
+  CreateInventoryDto,
+  CreateWarehouseDto,
+  DispatchPlan,
   InventoryItem,
-  ResourceRequest,
-  ResourceSummary,
+  ResourceListResponse,
+  UpdateInventoryDto,
+  UpdateWarehouseDto,
   Warehouse,
 } from '../types/resourceTypes';
 
-const API_BASE = 'http://localhost:5012/api';
+const API_BASE = '/api/resource';
 
-const fallbackWarehouses: Warehouse[] = [
-  { id: 'W-101', name: 'Colombo Central Depot', district: 'Colombo', capacity: 1200, availableStock: 880, status: 'Active', updatedAt: '2026-09-18T08:30:00Z' },
-  { id: 'W-204', name: 'Kandy Relief Hub', district: 'Kandy', capacity: 900, availableStock: 310, status: 'Low', updatedAt: '2026-09-18T07:15:00Z' },
-  { id: 'W-315', name: 'Galle Supply Base', district: 'Galle', capacity: 1300, availableStock: 230, status: 'Critical', updatedAt: '2026-09-18T06:45:00Z' },
-];
-
-const fallbackInventory: InventoryItem[] = [
-  { id: 'I-1', warehouseId: 'W-101', itemName: 'Water Bottles', quantity: 420, unit: 'cases', reorderLevel: 200, lastUpdated: '2026-09-18T08:00:00Z' },
-  { id: 'I-2', warehouseId: 'W-101', itemName: 'Medical Kits', quantity: 70, unit: 'kits', reorderLevel: 80, lastUpdated: '2026-09-18T08:00:00Z' },
-  { id: 'I-3', warehouseId: 'W-204', itemName: 'Rice Bags', quantity: 180, unit: 'bags', reorderLevel: 150, lastUpdated: '2026-09-18T07:10:00Z' },
-  { id: 'I-4', warehouseId: 'W-315', itemName: 'Blankets', quantity: 120, unit: 'packs', reorderLevel: 200, lastUpdated: '2026-09-18T06:40:00Z' },
-];
-
-const fallbackRequests: ResourceRequest[] = [
-  { id: 'R-1', itemName: 'Water Bottles', quantity: 250, priority: 'High', status: 'Approved', requester: 'District Office', district: 'Colombo' },
-  { id: 'R-2', itemName: 'Medical Kits', quantity: 45, priority: 'High', status: 'Pending', requester: 'Kandy Hospital', district: 'Kandy' },
-  { id: 'R-3', itemName: 'Blankets', quantity: 90, priority: 'Medium', status: 'Dispatched', requester: 'Galle Field Unit', district: 'Galle' },
-];
-
-const fallbackDispatches: DispatchItem[] = [
-  { id: 'D-1', requestId: 'R-1', destination: 'Colombo North Shelter', status: 'InTransit', vehicleCount: 3, eta: '2026-09-18T10:30:00Z' },
-  { id: 'D-2', requestId: 'R-2', destination: 'Kandy Clinic', status: 'Scheduled', vehicleCount: 2, eta: '2026-09-18T12:00:00Z' },
-  { id: 'D-3', requestId: 'R-3', destination: 'Galle Community Center', status: 'Delivered', vehicleCount: 1, eta: '2026-09-18T05:00:00Z' },
-];
-
-const fallbackDeliveries: DeliveryItem[] = [
-  { id: 'L-1', dispatchId: 'D-1', itemName: 'Water Bottles', quantity: 150, delivered: false },
-  { id: 'L-2', dispatchId: 'D-2', itemName: 'Medical Kits', quantity: 25, delivered: false },
-  { id: 'L-3', dispatchId: 'D-3', itemName: 'Blankets', quantity: 90, delivered: true, deliveredAt: '2026-09-18T05:05:00Z' },
-];
-
-const fallbackSummary: ResourceSummary = {
-  warehouseCount: 3,
-  totalInventory: 790,
-  criticalItems: 2,
-  activeDispatches: 2,
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const buildQueryString = (
+  params: Record<string, string | number | boolean | undefined>,
+) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      qs.append(key, String(value));
+    }
+  });
+  const query = qs.toString();
+  return query ? `?${query}` : '';
 };
 
-export type DispatchPlanRequest = {
-  missionId?: string;
-  teamsRequired: number;
-  district?: string;
-  location: {
-    lat: number;
-    lng: number;
+const normalizeListResponse = <T>(payload: any): ResourceListResponse<T> => {
+  if (Array.isArray(payload)) {
+    return {
+      total: payload.length,
+      page: 1,
+      pageSize: payload.length,
+      items: payload,
+    };
+  }
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return {
+    total: Number(payload?.total ?? items.length ?? 0),
+    page: Number(payload?.page ?? 1),
+    pageSize: Number(payload?.pageSize ?? items.length ?? 20),
+    items,
   };
 };
 
-export type DispatchPlanResult = {
-  requestId: string;
-  missionId: string;
-  status: string;
-  dispatchPlan?: {
-    missionId: string;
-    warehouseId: string;
-    warehouseName: string;
-    district: string;
-    vehicleCount: number;
-    items: Array<{ itemName: string; quantity: number }>;
-    routeSummary: string;
-    approvalStatus: string;
-  };
-  estimatedArrival: number;
-  requestedAt: string;
-  resourceRequestStatus: string;
-};
-
-async function readJson<T>(endpoint: string, fallback: T): Promise<T> {
+const readError = async (res: Response, fallback: string) => {
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) return fallback;
-    return (await response.json()) as T;
+    const body = await res.json();
+    return (body as any)?.message || (body as any)?.error || fallback;
   } catch {
     return fallback;
   }
+};
+
+// ---------------------------------------------------------------------------
+// Warehouses
+// ---------------------------------------------------------------------------
+export async function fetchWarehouses(params?: {
+  district?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<ResourceListResponse<Warehouse>> {
+  const query = buildQueryString({
+    district: params?.district,
+    search: params?.search,
+    page: params?.page ?? 1,
+    pageSize: params?.pageSize ?? 20,
+  });
+
+  const res = await fetch(`${API_BASE}/warehouses/${query}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch warehouses');
+  return normalizeListResponse<Warehouse>(await res.json());
 }
 
-export const resourceApi = {
-  getWarehouses: async (): Promise<Warehouse[]> => {
-    const [warehouseRows, inventoryRows] = await Promise.all([
-      readJson<Array<{ id: string; name: string; district: string; updatedAt?: string }>>('/resource/warehouses', []),
-      readJson<Array<{ warehouseId: string; quantityAvailable?: number; quantity?: number; itemName?: string; reorderThreshold?: number; updatedAt?: string }>>('/resource/inventory', []),
-    ]);
+export async function fetchWarehouseById(id: string): Promise<Warehouse> {
+  const res = await fetch(`${API_BASE}/warehouses/${id}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch warehouse');
+  return res.json();
+}
 
-    if (!warehouseRows.length) return fallbackWarehouses;
+export async function createWarehouse(
+  payload: CreateWarehouseDto,
+): Promise<Warehouse> {
+  const res = await fetch(`${API_BASE}/warehouses/`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readError(res, 'Failed to create warehouse'));
+  return res.json();
+}
 
-    const perWarehouse = new Map<string, Array<{ quantity: number; reorderLevel: number; lastUpdated: string }>>();
-    for (const item of inventoryRows) {
-      const warehouseId = String(item.warehouseId ?? '');
-      if (!warehouseId) continue;
-      const qty = Number(item.quantityAvailable ?? item.quantity ?? 0);
-      const entry = perWarehouse.get(warehouseId) ?? [];
-      entry.push({ quantity: qty, reorderLevel: Number(item.reorderThreshold ?? 0), lastUpdated: item.updatedAt ?? new Date().toISOString() });
-      perWarehouse.set(warehouseId, entry);
+export async function updateWarehouse(
+  id: string,
+  payload: UpdateWarehouseDto,
+): Promise<Warehouse> {
+  const res = await fetch(`${API_BASE}/warehouses/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readError(res, 'Failed to update warehouse'));
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
+export async function fetchInventoryItems(params?: {
+  warehouseId?: string;
+  itemType?: string;
+  lowStockOnly?: boolean;
+  descending?: boolean;
+  page?: number;
+  pageSize?: number;
+}): Promise<ResourceListResponse<InventoryItem>> {
+  const query = buildQueryString({
+    warehouseId: params?.warehouseId,
+    itemType: params?.itemType,
+    lowStockOnly: params?.lowStockOnly,
+    descending: params?.descending ?? false,
+    page: params?.page ?? 1,
+    pageSize: params?.pageSize ?? 20,
+  });
+
+  const res = await fetch(`${API_BASE}/inventory/${query}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch inventory');
+  return normalizeListResponse<InventoryItem>(await res.json());
+}
+
+export async function fetchInventoryById(id: string): Promise<InventoryItem> {
+  const res = await fetch(`${API_BASE}/inventory/${id}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch inventory item');
+  return res.json();
+}
+
+export async function createInventoryItem(
+  payload: CreateInventoryDto,
+): Promise<InventoryItem> {
+  const res = await fetch(`${API_BASE}/inventory/`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok)
+    throw new Error(await readError(res, 'Failed to create inventory item'));
+  return res.json();
+}
+
+export async function updateInventoryItem(
+  id: string,
+  payload: UpdateInventoryDto,
+): Promise<InventoryItem> {
+  const res = await fetch(`${API_BASE}/inventory/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok)
+    throw new Error(await readError(res, 'Failed to update inventory item'));
+  return res.json();
+}
+
+export async function adjustInventoryQuantity(
+  id: string,
+  payload: AdjustInventoryDto,
+): Promise<InventoryItem> {
+  const res = await fetch(`${API_BASE}/inventory/${id}/adjust`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok)
+    throw new Error(await readError(res, 'Failed to adjust inventory'));
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch — real backend endpoints, no localStorage fallback
+// ---------------------------------------------------------------------------
+export async function createDispatchPlan(
+  payload: CreateDispatchRequestDto,
+): Promise<DispatchPlan> {
+  const res = await fetch(`${API_BASE}/dispatch/requests`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    if (res.status === 422) {
+      // Agent returned SafeFailure — propagate the reason to the UI
+      const body = await res.json();
+      throw new Error(body?.error || 'Dispatch planning failed validation.');
     }
-
-    return warehouseRows.map((warehouse) => {
-      const values = perWarehouse.get(warehouse.id) ?? [];
-      const availableStock = values.reduce((sum, item) => sum + item.quantity, 0);
-      const capacity = Math.max(500, Math.round(availableStock * 1.4));
-      const ratio = capacity > 0 ? availableStock / capacity : 0;
-      const status: Warehouse['status'] = ratio < 0.35 ? 'Critical' : ratio < 0.6 ? 'Low' : 'Active';
-
-      return {
-        id: warehouse.id,
-        name: warehouse.name,
-        district: warehouse.district,
-        capacity,
-        availableStock,
-        status,
-        updatedAt: values[0]?.lastUpdated ?? warehouse.updatedAt ?? new Date().toISOString(),
-      } satisfies Warehouse;
-    });
-  },
-
-  getInventory: async (): Promise<InventoryItem[]> => {
-    const rows = await readJson<Array<{ id: string; warehouseId: string; itemName: string; quantityAvailable?: number; quantity?: number; unit?: string; reorderThreshold?: number; updatedAt?: string; lastUpdated?: string }>>('/resource/inventory', []);
-    if (!rows.length) return fallbackInventory;
-
-    return rows.map((row) => ({
-      id: row.id,
-      warehouseId: row.warehouseId,
-      itemName: row.itemName,
-      quantity: Number(row.quantityAvailable ?? row.quantity ?? 0),
-      unit: row.unit ?? 'units',
-      reorderLevel: Number(row.reorderThreshold ?? 0),
-      lastUpdated: row.updatedAt ?? row.lastUpdated ?? new Date().toISOString(),
-    } satisfies InventoryItem));
-  },
-
-  getRequests: async (): Promise<ResourceRequest[]> => {
-    const rows = await readJson<Array<{ id: string; itemName: string; quantity: number; priority: ResourceRequest['priority']; status: ResourceRequest['status']; requester: string; district: string }>>('/resource/requests', []);
-    return rows.length ? rows : fallbackRequests;
-  },
-
-  getDispatches: async (): Promise<DispatchItem[]> => {
-    const rows = await readJson<Array<{ id: string; requestId: string; destination: string; status: DispatchItem['status']; vehicleCount: number; eta: string }>>('/resource/dispatches', []);
-    return rows.length ? rows : fallbackDispatches;
-  },
-
-  getDeliveries: async (): Promise<DeliveryItem[]> => {
-    const rows = await readJson<Array<{ id: string; dispatchId: string; itemName: string; quantity: number; delivered: boolean; deliveredAt?: string }>>('/resource/deliveries', []);
-    return rows.length ? rows : fallbackDeliveries;
-  },
-
-  getSummary: async (): Promise<ResourceSummary> => {
-    const summary = await readJson<ResourceSummary>('/resource/summary', fallbackSummary);
-    return summary ?? fallbackSummary;
-  },
-
-  generateDispatchPlan: async (payload: DispatchPlanRequest): Promise<DispatchPlanResult> => {
-    const response = await fetch(`${API_BASE}/resource/dispatch-requests`, {
-      method: 'POST',
-      headers: {
-        ...getAuthHeaders(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        missionId: payload.missionId ?? `mission-${Date.now()}`,
-        teamsRequired: payload.teamsRequired,
-        district: payload.district ?? 'Colombo',
-        location: payload.location,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(errorBody || 'Failed to generate dispatch plan');
+    if (res.status === 503) {
+      throw new Error(
+        'Agent service unavailable. Confirm the Python service is running on port 8003.',
+      );
     }
+    throw new Error(await readError(res, 'Failed to create dispatch plan'));
+  }
 
-    return (await response.json()) as DispatchPlanResult;
-  },
+  const result = await res.json();
+  return mapDispatchResponse(result);
+}
 
-  updateDispatchStatus: async (dispatchId: string, status: DispatchItem['status']) => {
-    const response = await fetch(`${API_BASE}/resource/dispatches/${dispatchId}/status`, {
-      method: 'PATCH',
-      headers: {
-        ...getAuthHeaders(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ status }),
-    });
-    if (!response.ok) throw new Error('Failed to update dispatch status');
-    return response.json();
-  },
+export async function approveDispatchPlan(id: string): Promise<DispatchPlan> {
+  const res = await fetch(`${API_BASE}/dispatch/${id}/approve`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok)
+    throw new Error(await readError(res, 'Failed to approve dispatch plan'));
+  const result = await res.json();
+  return mapDispatchResponse(result);
+}
 
-  completeDelivery: async (deliveryId: string) => {
-    const response = await fetch(`${API_BASE}/resource/deliveries/${deliveryId}/complete`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) throw new Error('Failed to complete delivery');
-    return response.json();
-  },
-};
+export async function fetchDispatchPlans(): Promise<DispatchPlan[]> {
+  const res = await fetch(`${API_BASE}/dispatch/`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch dispatch plans');
+  const data = await res.json();
+  const plans = Array.isArray(data) ? data : [];
+  return plans.map(mapDispatchResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Response → UI shape mapper (backend uses PascalCase-friendly JSON via
+// default ASP.NET Core JSON options, so both camelCase and PascalCase work)
+// ---------------------------------------------------------------------------
+function mapDispatchResponse(raw: any): DispatchPlan {
+  return {
+    id: raw.id ?? raw.Id ?? '',
+    missionId: raw.missionId ?? raw.MissionId ?? '',
+    district: raw.district ?? raw.District ?? '',
+    teamsRequired: raw.teamsRequired ?? raw.TeamsRequired ?? 0,
+    warehouseId: raw.warehouseId ?? raw.WarehouseId ?? '',
+    warehouseName: raw.warehouseName ?? raw.WarehouseName ?? '',
+    routeSummary: raw.routeSummary ?? raw.RouteSummary ?? '',
+    estimatedArrivalMinutes:
+      raw.estimatedArrivalMinutes ?? raw.EstimatedArrivalMinutes ?? 0,
+    approvalStatus: raw.approvalStatus ?? raw.ApprovalStatus ?? 'PendingApproval',
+    items: (raw.items ?? raw.Items ?? []).map((i: any) => ({
+      itemName: i.itemName ?? i.ItemName ?? '',
+      quantity: i.quantity ?? i.Quantity ?? 0,
+    })),
+    createdAt: raw.createdAt ?? raw.CreatedAt ?? new Date().toISOString(),
+  };
+}

@@ -5,6 +5,21 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from pathlib import Path
+
+# Resilient .env loader without requiring external python-dotenv package
+def _load_env_file():
+    env_path = Path(__file__).resolve().parent / ".env"
+    if not env_path.exists():
+        env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+_load_env_file()
 import google.generativeai as genai
 
 app = FastAPI(
@@ -22,8 +37,8 @@ app.add_middleware(
 )
 
 # Configure Gemini
-API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("Gemini__ApiKey") or ""
-MODEL_NAME = os.getenv("GEMINI_MODEL") or os.getenv("CHAT_MODEL") or "gemini-2.5-flash-lite"
+API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("Gemini__ApiKey") or ""
+MODEL_NAME = os.getenv("GEMINI_MODEL") or os.getenv("CHAT_MODEL") or "gemini-3.1-flash-lite"
 
 if API_KEY:
     genai.configure(api_key=API_KEY)
@@ -173,7 +188,7 @@ def run_agent_1_planner(payload: AgentRequestPayload) -> Agent1Output:
 # ── Agent 2: Infrastructure & Shelter Analysis ────────────────────────────────
 
 def run_agent_2_analysis(payload: AgentRequestPayload) -> Agent2Output:
-    assets_json = json.dumps([a.dict() for a in payload.assets])
+    assets_json = json.dumps([a.model_dump() for a in payload.assets])
     prompt = f"""
     You are Agent 2 (Infrastructure & Shelter Domain Analysis Agent).
     Prioritize the damaged assets by criticality and urgency rank (1 = highest).
@@ -221,7 +236,7 @@ def run_agent_3_matching(payload: AgentRequestPayload, agent2: Agent2Output) -> 
 
     Qualified NGOs: {ngos}
     Repair Benchmarks: {benchmarks}
-    Prioritized Assets: {json.dumps([p.dict() for p in agent2.prioritizedDamageList])}
+    Prioritized Assets: {json.dumps([p.model_dump() for p in agent2.prioritizedDamageList])}
     Displaced Families: {payload.displacedFamilies} (Must preserve the exact count of {payload.displacedFamilies} families for any family relief or shelter tasks)
 
     Return JSON:
@@ -338,7 +353,7 @@ async def run_recovery_workflow(payload: AgentRequestPayload):
             inputSummary=f"Damage Intake: {payload.disasterType} in {payload.location} ({payload.housesDamaged} damaged houses, {payload.displacedFamilies} displaced families)",
             status="success",
             durationMs=120,
-            summaryOutput=f"Generated {len(agent1.recoveryPhases)} structured recovery phases. Category: {agent1.disasterCategory}"
+            summaryOutput=f"Generated {len(agent1.recoveryPhases)} structured recovery phases ({agent1.disasterCategory}): " + " • ".join([f"{p.phaseName} ({p.estimatedDurationDays}d, {p.priority})" for p in agent1.recoveryPhases])
         ),
         TimelineStepItem(
             stepNumber=2,

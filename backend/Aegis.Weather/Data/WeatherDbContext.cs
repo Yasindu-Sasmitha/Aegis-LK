@@ -26,5 +26,6 @@ public class WeatherDbContext : DbContext
             .HasForeignKey<WeatherAlert>(a => a.PredictionId);
         builder.Entity<Prediction>().HasIndex(p => new { p.DistrictId, p.HazardType, p.CreatedAt });
         builder.Entity<WeatherAlert>().HasIndex(a => new { a.DistrictId, a.HazardType, a.Status });
+        builder.Entity<ForecastHistory>().HasIndex(f => f.PredictionId).IsUnique();
     }
 }
