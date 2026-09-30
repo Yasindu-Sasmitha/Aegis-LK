@@ -232,6 +232,8 @@ app.UseForwardedHeaders();
 // ── Production database initialization ───────────────────────────────────────
 // Applies EF Core migrations for all DbContexts on startup (idempotent).
 // Never destroys data. SEED_DEMO_DATA=true enables demo data seeders.
+// Skipped in the Testing environment where tests use in-memory providers.
+if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
@@ -242,8 +244,11 @@ app.UseForwardedHeaders();
         try
         {
             var db = services.GetRequiredService<TContext>();
-            await db.Database.MigrateAsync();
-            logger.LogInformation("Migrations applied for {Context}", name);
+            if (db.Database.IsRelational())
+            {
+                await db.Database.MigrateAsync();
+                logger.LogInformation("Migrations applied for {Context}", name);
+            }
         }
         catch (Exception ex)
         {
