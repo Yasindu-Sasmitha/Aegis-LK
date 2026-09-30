@@ -211,10 +211,14 @@ public static class RecoveryDataSeeder
                 "InfrastructureJson" text NOT NULL DEFAULT '[]',
                 "Status" text NOT NULL DEFAULT 'Submitted',
                 "RecoveryPlanId" uuid NULL,
+                "SubmittedByUserId" uuid NULL,
                 "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW(),
                 "ProcessedAt" timestamp with time zone NULL
             );
-            """
+            """,
+            "ALTER TABLE recovery.\"AidRequests\" ADD COLUMN IF NOT EXISTS \"SubmittedByUserId\" uuid NULL;",
+            "ALTER TABLE recovery.\"Compensations\" ADD COLUMN IF NOT EXISTS \"SubmittedByUserId\" uuid NULL;",
+            "ALTER TABLE recovery.\"DamageReports\" ADD COLUMN IF NOT EXISTS \"SubmittedByUserId\" uuid NULL;"
         };
 
         foreach (var stmt in statements)

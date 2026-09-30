@@ -1,3 +1,4 @@
+import { getAuthHeaders } from '../../../shared/auth/authApi';
 import {
   Shelter,
   AidRequest,
@@ -21,7 +22,9 @@ export async function fetchShelters(district?: string, status?: string, search?:
   if (district) params.append('district', district);
   if (status) params.append('status', status);
   if (search) params.append('search', search);
-  const res = await fetch(`${API_BASE}/shelters?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/shelters?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch shelters');
   return res.json();
 }
@@ -29,7 +32,7 @@ export async function fetchShelters(district?: string, status?: string, search?:
 export async function createShelter(data: Partial<Shelter>): Promise<Shelter> {
   const res = await fetch(`${API_BASE}/shelters`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to create shelter'); }
@@ -39,7 +42,7 @@ export async function createShelter(data: Partial<Shelter>): Promise<Shelter> {
 export async function updateShelterOccupancy(id: string, currentOccupancy: number, status?: string): Promise<Shelter> {
   const res = await fetch(`${API_BASE}/shelters/${id}/occupancy`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ currentOccupancy, status }),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update occupancy'); }
@@ -53,7 +56,9 @@ export async function fetchAidRequests(status?: string, urgency?: string, distri
   if (status) params.append('status', status);
   if (urgency) params.append('urgency', urgency);
   if (district) params.append('district', district);
-  const res = await fetch(`${API_BASE}/aid-requests?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/aid-requests?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch aid requests');
   return res.json();
 }
@@ -61,7 +66,7 @@ export async function fetchAidRequests(status?: string, urgency?: string, distri
 export async function createAidRequest(data: Partial<AidRequest>): Promise<AidRequest> {
   const res = await fetch(`${API_BASE}/aid-requests`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to submit aid request'); }
@@ -71,7 +76,7 @@ export async function createAidRequest(data: Partial<AidRequest>): Promise<AidRe
 export async function updateAidRequestStatus(id: string, status: string, shelterId?: string, notes?: string): Promise<AidRequest> {
   const res = await fetch(`${API_BASE}/aid-requests/${id}/status`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ status, shelterId, notes }),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update aid request status'); }
@@ -81,7 +86,9 @@ export async function updateAidRequestStatus(id: string, status: string, shelter
 // ── Donations ─────────────────────────────────────────────────────────────────
 
 export async function fetchDonations(): Promise<{ total: number; items: Donation[] }> {
-  const res = await fetch(`${API_BASE}/donations`);
+  const res = await fetch(`${API_BASE}/donations`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch donations');
   return res.json();
 }
@@ -89,7 +96,7 @@ export async function fetchDonations(): Promise<{ total: number; items: Donation
 export async function createDonation(data: Partial<Donation>): Promise<Donation> {
   const res = await fetch(`${API_BASE}/donations`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to record donation'); }
@@ -99,7 +106,7 @@ export async function createDonation(data: Partial<Donation>): Promise<Donation>
 export async function updateDonationAllocation(id: string, allocationStatus: string, targetShelterId?: string): Promise<Donation> {
   const res = await fetch(`${API_BASE}/donations/${id}/allocation`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ allocationStatus, targetShelterId }),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update donation allocation'); }
@@ -111,7 +118,9 @@ export async function updateDonationAllocation(id: string, allocationStatus: str
 export async function fetchCompensations(status?: string): Promise<{ total: number; items: Compensation[] }> {
   const params = new URLSearchParams();
   if (status) params.append('status', status);
-  const res = await fetch(`${API_BASE}/compensations?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/compensations?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch compensations');
   return res.json();
 }
@@ -119,7 +128,7 @@ export async function fetchCompensations(status?: string): Promise<{ total: numb
 export async function createCompensation(data: Partial<Compensation>): Promise<Compensation> {
   const res = await fetch(`${API_BASE}/compensations`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to submit compensation claim'); }
@@ -129,7 +138,7 @@ export async function createCompensation(data: Partial<Compensation>): Promise<C
 export async function approveCompensation(id: string, approvedAmount: number, status: string, notes: string, approvedBy: string): Promise<Compensation> {
   const res = await fetch(`${API_BASE}/compensations/${id}/approve`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ approvedAmount, status, verificationNotes: notes, approvedBy }),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to update compensation approval'); }
@@ -141,7 +150,9 @@ export async function approveCompensation(id: string, approvedAmount: number, st
 export async function fetchNGOs(status?: string): Promise<NGO[]> {
   const params = new URLSearchParams();
   if (status) params.append('status', status);
-  const res = await fetch(`${API_BASE}/ngos?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/ngos?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch NGOs');
   return res.json();
 }
@@ -149,7 +160,7 @@ export async function fetchNGOs(status?: string): Promise<NGO[]> {
 export async function createNGO(data: Partial<NGO>): Promise<NGO> {
   const res = await fetch(`${API_BASE}/ngos`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to register NGO'); }
@@ -158,7 +169,9 @@ export async function createNGO(data: Partial<NGO>): Promise<NGO> {
 
 export async function fetchInfrastructureDamage(incidentId?: string): Promise<InfrastructureDamage[]> {
   const url = incidentId ? `${API_BASE}/infrastructure-damage?incidentId=${incidentId}` : `${API_BASE}/infrastructure-damage`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch infrastructure damage');
   return res.json();
 }
@@ -166,7 +179,9 @@ export async function fetchInfrastructureDamage(incidentId?: string): Promise<In
 // ── Legacy Plan Endpoints ─────────────────────────────────────────────────────
 
 export async function fetchRecoveryPlan(incidentId: string): Promise<RecoveryPlan> {
-  const res = await fetch(`${API_BASE}/plan/${incidentId}`);
+  const res = await fetch(`${API_BASE}/plan/${incidentId}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('No recovery plan found for this incident');
   return res.json();
 }
@@ -174,7 +189,7 @@ export async function fetchRecoveryPlan(incidentId: string): Promise<RecoveryPla
 export async function generateRecoveryPlan(incidentId: string): Promise<RecoveryPlan> {
   const res = await fetch(`${API_BASE}/plan/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ incidentId }),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to generate recovery plan'); }
@@ -184,7 +199,7 @@ export async function generateRecoveryPlan(incidentId: string): Promise<Recovery
 export async function approveRecoveryPlan(planId: string, action: 'Approve' | 'Reject' | 'Revise', reviewerNotes: string, reviewedBy: string): Promise<RecoveryPlan> {
   const res = await fetch(`${API_BASE}/plan/${planId}/approve`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ action, reviewerNotes, reviewedBy }),
   });
   if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to submit plan approval decision'); }
@@ -197,7 +212,7 @@ export async function approveRecoveryPlan(planId: string, action: 'Approve' | 'R
 export async function startWorkflowFromIntake(intake: DamageIntakeFormData, damageReportId?: string): Promise<RecoveryPlan> {
   const res = await fetch(`${API_BASE}/workflows/start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ directDamageIntake: intake, damageReportId }),
   });
   if (!res.ok) {
@@ -211,7 +226,7 @@ export async function startWorkflowFromIntake(intake: DamageIntakeFormData, dama
 export async function startWorkflowFromIncident(incidentId: string): Promise<RecoveryPlan> {
   const res = await fetch(`${API_BASE}/workflows/start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ incidentId }),
   });
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed to start workflow'); }
@@ -220,13 +235,17 @@ export async function startWorkflowFromIncident(incidentId: string): Promise<Rec
 
 /** Get the agent execution trace for a plan */
 export async function fetchWorkflowDetail(planId: string): Promise<RecoveryPlan> {
-  const res = await fetch(`${API_BASE}/workflows/${planId}`);
+  const res = await fetch(`${API_BASE}/workflows/${planId}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch plan detail');
   return res.json();
 }
 
 export async function fetchWorkflowTrace(planId: string): Promise<WorkflowTrace> {
-  const res = await fetch(`${API_BASE}/workflows/${planId}/trace`);
+  const res = await fetch(`${API_BASE}/workflows/${planId}/trace`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('No workflow trace found for this plan');
   return res.json();
 }
@@ -235,7 +254,9 @@ export async function fetchWorkflowTrace(planId: string): Promise<WorkflowTrace>
 export async function fetchWorkflows(status?: string, page = 1, pageSize = 20): Promise<{ total: number; items: WorkflowListItem[] }> {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (status) params.append('status', status);
-  const res = await fetch(`${API_BASE}/workflows?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/workflows?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch workflows');
   return res.json();
 }
@@ -249,7 +270,7 @@ export async function submitWorkflowDecision(
 ): Promise<RecoveryPlan> {
   const res = await fetch(`${API_BASE}/workflows/${planId}/approve`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ action, reviewerNotes, reviewedBy }),
   });
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed to submit decision'); }
@@ -259,7 +280,9 @@ export async function submitWorkflowDecision(
 // ── Reports ──────────────────────────────────────────────────────────────────
 
 export async function fetchReports(): Promise<{ total: number; items: RecoveryReport[] }> {
-  const res = await fetch(`${API_BASE}/reports`);
+  const res = await fetch(`${API_BASE}/reports`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch reports');
   return res.json();
 }
@@ -267,7 +290,7 @@ export async function fetchReports(): Promise<{ total: number; items: RecoveryRe
 export async function generateReport(incidentId: string, title: string): Promise<RecoveryReport> {
   const res = await fetch(`${API_BASE}/reports/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ incidentId, title }),
   });
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed to generate report'); }
@@ -277,6 +300,7 @@ export async function generateReport(incidentId: string, title: string): Promise
 export async function deleteReport(reportId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/reports/${reportId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed to delete report'); }
 }
@@ -287,7 +311,9 @@ export async function fetchDamageReports(status?: string, district?: string): Pr
   const params = new URLSearchParams();
   if (status) params.append('status', status);
   if (district) params.append('district', district);
-  const res = await fetch(`${API_BASE}/damage-reports?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/damage-reports?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error('Failed to fetch citizen damage reports');
   return res.json();
 }
@@ -305,7 +331,7 @@ export async function submitCitizenDamageReport(data: {
 }): Promise<import('../types/recoveryTypes').DamageReportItem> {
   const res = await fetch(`${API_BASE}/damage-reports`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -318,6 +344,7 @@ export async function submitCitizenDamageReport(data: {
 export async function deleteDamageReport(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/damage-reports/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

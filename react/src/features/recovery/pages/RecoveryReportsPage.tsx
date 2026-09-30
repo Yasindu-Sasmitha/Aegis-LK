@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchReports, generateReport, deleteReport, fetchShelters, fetchAidRequests, fetchWorkflows, fetchNGOs } from '../api/recoveryApi';
 import { RecoveryReport } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
+import { Pagination } from '../components/Pagination';
 
 interface ReportStats {
   totalSheltered: number;
@@ -298,14 +299,15 @@ const exportReportToPdf = (r: RecoveryReport, stats: ReportStats) => {
   printWindow.document.close();
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Component ──────────────────────────────────────────────────────────────────
 export const RecoveryReportsPage: React.FC = () => {
   const { user } = useAuth();
   const isOfficer = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
-
   const [reports, setReports] = useState<RecoveryReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
 
   // Live Aggregates
   const [liveStats, setLiveStats] = useState<ReportStats>({
@@ -387,6 +389,10 @@ export const RecoveryReportsPage: React.FC = () => {
       alert(err.message || 'Failed to delete report');
     }
   };
+
+  const totalPages = Math.ceil(reports.length / pageSize);
+  const safePage = Math.min(currentPage, Math.max(1, totalPages));
+  const paginatedReports = reports.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
@@ -524,98 +530,109 @@ export const RecoveryReportsPage: React.FC = () => {
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {reports.map((r) => {
-            const reportDisplayBudget = r.totalBudgetSpent > 0 ? r.totalBudgetSpent : liveStats.totalBudgetSpent;
-            return (
-              <div
-                key={r.id}
-                style={{
-                  border: '1px solid #e2e8f0',
-                  padding: '1.5rem',
-                  borderRadius: '12px',
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                      {r.title}
-                    </h3>
-                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                      Generated on {new Date(r.generatedAt).toLocaleString()} • Verified by Disaster Recovery Operations
-                    </span>
-                  </div>
-                  {/* Action Buttons: Export PDF & Delete (for Admin/Officer) */}
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <button
-                      onClick={() => exportReportToPdf(r, liveStats)}
-                      style={{
-                        padding: '0.45rem 0.9rem',
-                        background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-                        border: 'none',
-                        borderRadius: '7px',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        color: '#ffffff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
-                      }}
-                    >
-                      Export PDF
-                    </button>
-                    {isOfficer && (
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            {paginatedReports.map((r) => {
+              const reportDisplayBudget = r.totalBudgetSpent > 0 ? r.totalBudgetSpent : liveStats.totalBudgetSpent;
+              return (
+                <div
+                  key={r.id}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    padding: '1.5rem',
+                    borderRadius: '12px',
+                    backgroundColor: '#ffffff',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                        {r.title}
+                      </h3>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                        Generated on {new Date(r.generatedAt).toLocaleString()} • Verified by Disaster Recovery Operations
+                      </span>
+                    </div>
+                    {/* Action Buttons: Export PDF & Delete (for Admin/Officer) */}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <button
-                        onClick={() => handleDeleteReport(r.id, r.title)}
+                        onClick={() => exportReportToPdf(r, liveStats)}
                         style={{
-                          padding: '0.45rem 0.8rem',
-                          background: '#fef2f2',
-                          border: '1px solid #fecaca',
+                          padding: '0.45rem 0.9rem',
+                          background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                          border: 'none',
                           borderRadius: '7px',
                           fontSize: '0.8rem',
                           fontWeight: 700,
-                          color: '#dc2626',
+                          color: '#ffffff',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.35rem',
+                          boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
                         }}
                       >
-                        Delete
+                        Export PDF
                       </button>
-                    )}
+                      {isOfficer && (
+                        <button
+                          onClick={() => handleDeleteReport(r.id, r.title)}
+                          style={{
+                            padding: '0.45rem 0.8rem',
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '7px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <p style={{ margin: '0 0 1.25rem 0', color: '#334155', fontSize: '0.95rem', lineHeight: 1.5, background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                    {r.reportSummary || `Official audit summary: ${r.totalSheltered || liveStats.totalSheltered} sheltered citizens, ${r.totalAidRequestsFulfilled || liveStats.fulfilledAid} aid requests fulfilled, and LKR ${reportDisplayBudget.toLocaleString()} allocated for disaster recovery operations.`}
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#fafafa', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Evacuees Sheltered</span>
+                      <strong style={{ fontSize: '1.1rem', color: '#1e3a8a' }}>{(r.totalSheltered || liveStats.totalSheltered).toLocaleString()} citizens</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Operating Shelters</span>
+                      <strong style={{ fontSize: '1.1rem', color: '#0284c7' }}>{liveStats.activeShelters} facilities</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Fulfilled Aid Requests</span>
+                      <strong style={{ fontSize: '1.1rem', color: '#15803d' }}>{(r.totalAidRequestsFulfilled || liveStats.fulfilledAid).toLocaleString()} packages</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Total Budget Allocated</span>
+                      <strong style={{ fontSize: '1.1rem', color: '#0f172a' }}>Rs. {reportDisplayBudget.toLocaleString()}</strong>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <p style={{ margin: '0 0 1.25rem 0', color: '#334155', fontSize: '0.95rem', lineHeight: 1.5, background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                  {r.reportSummary || `Official audit summary: ${r.totalSheltered || liveStats.totalSheltered} sheltered citizens, ${r.totalAidRequestsFulfilled || liveStats.fulfilledAid} aid requests fulfilled, and LKR ${reportDisplayBudget.toLocaleString()} allocated for disaster recovery operations.`}
-                </p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#fafafa', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Evacuees Sheltered</span>
-                    <strong style={{ fontSize: '1.1rem', color: '#1e3a8a' }}>{(r.totalSheltered || liveStats.totalSheltered).toLocaleString()} citizens</strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Operating Shelters</span>
-                    <strong style={{ fontSize: '1.1rem', color: '#0284c7' }}>{liveStats.activeShelters} facilities</strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Fulfilled Aid Requests</span>
-                    <strong style={{ fontSize: '1.1rem', color: '#15803d' }}>{(r.totalAidRequestsFulfilled || liveStats.fulfilledAid).toLocaleString()} packages</strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Total Budget Allocated</span>
-                    <strong style={{ fontSize: '1.1rem', color: '#0f172a' }}>Rs. {reportDisplayBudget.toLocaleString()}</strong>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <Pagination
+              currentPage={safePage}
+              totalItems={reports.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         </div>
       )}
 

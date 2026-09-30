@@ -169,7 +169,7 @@ export const AidRequestsPage: React.FC = () => {
               textTransform: 'uppercase',
               letterSpacing: '0.04em'
             }}>
-              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+              {user?.role === 'Admin' ? 'System Admin' : user?.role === 'DisasterOfficer' ? 'Disaster Officer' : user?.role === 'Responder' ? 'Field Responder' : 'Citizen'}
             </span>
           </div>
 
@@ -191,65 +191,16 @@ export const AidRequestsPage: React.FC = () => {
               transition: 'all 0.15s ease',
             }}
           >
-            <span>➕</span>
             <span>Apply for Emergency Relief</span>
           </button>
         </div>
       </div>
 
-      {/* ── CITIZEN INFO BANNER ── */}
-      {isCitizen ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderLeft: '4px solid #16a34a',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#166534',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>ℹ️</span>
-          <div>
-            <strong>Citizen Relief Request Service</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#15803d', fontWeight: 400 }}>
-              Need emergency rations, potable drinking water, medical kits, or temporary bedding? Click <strong>"+ Apply for Emergency Relief"</strong>. Your request will be prioritized and assigned to field response teams.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#eff6ff',
-          border: '1px solid #dbeafe',
-          borderLeft: '4px solid #2563eb',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#1e40af',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
-          <div>
-            <strong>Officer Relief Dispatch &amp; Fulfillment Portal</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
-              Manage intake volume, filter by critical urgency, assign victims to emergency shelters, and advance request fulfillment status.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      {/* ── METRICS SUMMARY CARDS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Applications</span>
-            <span style={{ fontSize: '1.25rem' }}>📋</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
             {requests.length} Requests
@@ -262,7 +213,6 @@ export const AidRequestsPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Pending Review</span>
-            <span style={{ fontSize: '1.25rem' }}>⏳</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
             {pendingCount} Pending
@@ -275,7 +225,6 @@ export const AidRequestsPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Fulfilled / Dispatched</span>
-            <span style={{ fontSize: '1.25rem' }}>✅</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
             {fulfilledCount} Completed

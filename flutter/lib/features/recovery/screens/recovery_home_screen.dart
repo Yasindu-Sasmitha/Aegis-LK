@@ -7,6 +7,7 @@ import 'donate_screen.dart';
 import 'recovery_plan_status_screen.dart';
 import 'citizen_damage_report_screen.dart';
 import 'recovery_reports_screen.dart';
+import 'compensation_claim_screen.dart';
 
 class RecoveryHomeScreen extends StatelessWidget {
   final bool showAppBar;
@@ -145,6 +146,18 @@ class RecoveryHomeScreen extends StatelessWidget {
             onTap: () => onSelectSubIndex != null
                 ? onSelectSubIndex!(6)
                 : Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryPlanStatusScreen())),
+          ),
+          const SizedBox(height: 10),
+
+          _buildActionCard(
+            context,
+            title: 'Damage Compensation Claims',
+            subtitle: 'File citizen property damage claims and track verified grant payouts.',
+            icon: Icons.account_balance_wallet_outlined,
+            color: const Color(0xFF10B981),
+            onTap: () => onSelectSubIndex != null
+                ? onSelectSubIndex!(8)
+                : Navigator.push(context, MaterialPageRoute(builder: (_) => const CompensationClaimScreen())),
           ),
           const SizedBox(height: 10),
 

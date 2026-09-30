@@ -39,6 +39,8 @@ public class RecoveryDbContext : DbContext
             .HasIndex(a => a.Status);
         builder.Entity<AidRequest>()
             .HasIndex(a => a.District);
+        builder.Entity<AidRequest>()
+            .HasIndex(a => a.SubmittedByUserId);
 
         // Donation
         builder.Entity<Donation>()
@@ -55,6 +57,8 @@ public class RecoveryDbContext : DbContext
             .HasIndex(c => c.NIC);
         builder.Entity<Compensation>()
             .HasIndex(c => c.Status);
+        builder.Entity<Compensation>()
+            .HasIndex(c => c.SubmittedByUserId);
         builder.Entity<Compensation>()
             .Property(c => c.ClaimAmount)
             .HasPrecision(18, 2);
@@ -128,5 +132,7 @@ public class RecoveryDbContext : DbContext
             .HasIndex(d => d.District);
         builder.Entity<DamageReport>()
             .HasIndex(d => d.Status);
+        builder.Entity<DamageReport>()
+            .HasIndex(d => d.SubmittedByUserId);
     }
 }
