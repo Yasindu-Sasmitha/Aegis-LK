@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../shared/auth/auth_service.dart';
+import '../../../shared/api/api_config.dart';
 import '../models/recovery_models.dart';
 
 class RecoveryService {
@@ -8,7 +9,7 @@ class RecoveryService {
   final AuthService _authService;
 
   RecoveryService({
-    this.baseUrl = 'http://localhost:5012/api/recovery',
+    this.baseUrl = ApiConfig.recoveryBase,
     AuthService? authService,
   }) : _authService = authService ?? AuthService();
 

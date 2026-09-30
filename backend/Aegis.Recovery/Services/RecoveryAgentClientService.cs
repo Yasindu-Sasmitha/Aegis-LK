@@ -214,7 +214,18 @@ public class RecoveryAgentClientService
                 stipendData = stipend
             };
 
-            using var response = await _httpClient.PostAsJsonAsync(run.AgentServiceUrl, payload, JsonOptions, run.Ct);
+            using var req = new HttpRequestMessage(HttpMethod.Post, run.AgentServiceUrl)
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions)
+            };
+            var agentKey = Environment.GetEnvironmentVariable("AEGIS_AGENT_KEY")
+                ?? _configuration?["AgenticAi:AgentKey"];
+            if (!string.IsNullOrWhiteSpace(agentKey) && !_httpClient.DefaultRequestHeaders.Contains("X-Aegis-Agent-Key"))
+            {
+                req.Headers.Add("X-Aegis-Agent-Key", agentKey);
+            }
+
+            using var response = await _httpClient.SendAsync(req, run.Ct);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<PythonWorkflowResponse>(JsonOptions, run.Ct);
