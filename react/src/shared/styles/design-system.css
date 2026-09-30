@@ -823,4 +823,15 @@
 .ae-quick-access-item:hover {
     background: rgba(255, 255, 255, 0.14);
     transform: translateX(3px);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

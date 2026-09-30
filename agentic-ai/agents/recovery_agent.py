@@ -150,6 +150,11 @@ class WorkflowResponse(BaseModel):
 # ── Gemini LLM Call Helper ──────────────────────────────────────────────────
 
 def call_gemini_json(prompt: str) -> Dict[str, Any]:
+    if genai is None:
+        raise RuntimeError(
+            "The 'google-generativeai' package is not installed. "
+            "Please run: pip install google-generativeai (or pip install -r requirements-prod.txt)"
+        )
     if not API_KEY:
         raise ValueError("GEMINI_API_KEY environment variable is not configured.")
     
@@ -279,7 +284,20 @@ def run_agent_3_matching(payload: AgentRequestPayload, agent2: Agent2Output) -> 
     """
     try:
         data = call_gemini_json(prompt)
-        return Agent3Output(**data)
+        output = Agent3Output(**data)
+        has_family_stipend = any("family" in t.title.lower() or "stipend" in t.title.lower() or "displaced" in t.title.lower() for t in output.tasks)
+        if payload.displacedFamilies > 0 and not has_family_stipend:
+            stipend_cost = float(payload.displacedFamilies * 30 * 1500)
+            output.tasks.append(TaskDraft(
+                title=f"Emergency Family Living Stipend ({payload.displacedFamilies} Families)",
+                description=f"Disburse daily living stipend of LKR 1,500/day for 30 days to {payload.displacedFamilies} displaced families.",
+                assignedNgoName=payload.qualifiedNgos[0]["name"] if payload.qualifiedNgos else None,
+                sector="Social Welfare",
+                priority="High",
+                estimatedCost=stipend_cost
+            ))
+        output.estimatedTotalBudget = sum(t.estimatedCost for t in output.tasks)
+        return output
     except Exception:
         tasks = []
         total = 0.0

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAidRequests, createAidRequest, updateAidRequestStatus } from '../api/recoveryApi';
+import { fetchAidRequests, createAidRequest, updateAidRequestStatus, fetchShelters } from '../api/recoveryApi';
 import { AidRequestTable } from '../components/AidRequestTable';
-import { AidRequest } from '../types/recoveryTypes';
+import { AidRequest, Shelter } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
 
 const SRI_LANKA_DISTRICTS = [
@@ -28,6 +28,7 @@ export const AidRequestsPage: React.FC = () => {
   const isCitizen = user?.role === 'Citizen';
 
   const [requests, setRequests] = useState<AidRequest[]>([]);
+  const [shelters, setShelters] = useState<Shelter[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,21 +36,35 @@ export const AidRequestsPage: React.FC = () => {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [newRequest, setNewRequest] = useState({
+  const [newRequest, setNewRequest] = useState<{
+    victimName: string;
+    contactPhone: string;
+    district: string;
+    aidType: string;
+    familySize: number;
+    urgency: string;
+    shelterId?: string;
+    notes: string;
+  }>({
     victimName: user?.fullName || '',
     contactPhone: user?.phoneNumber || '',
     district: user?.district || 'Kalutara',
     aidType: 'Food Rations',
     familySize: 4,
     urgency: 'High',
+    shelterId: '',
     notes: '',
   });
 
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const data = await fetchAidRequests(filterStatus === 'all' ? undefined : filterStatus);
+      const [data, shelterData] = await Promise.all([
+        fetchAidRequests(filterStatus === 'all' ? undefined : filterStatus),
+        fetchShelters()
+      ]);
       setRequests(Array.isArray(data) ? data : (data as any).items || []);
+      setShelters(Array.isArray(shelterData) ? shelterData : (shelterData as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -399,6 +414,24 @@ export const AidRequestsPage: React.FC = () => {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                  Designated Emergency Shelter (Optional)
+                </label>
+                <select
+                  value={newRequest.shelterId || ''}
+                  onChange={(e) => setNewRequest({ ...newRequest, shelterId: e.target.value || undefined })}
+                  style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem', boxSizing: 'border-box', background: '#f8fafc' }}
+                >
+                  <option value="">Unassigned (Direct Field Relief / Community Delivery)</option>
+                  {shelters.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.district} — {s.currentOccupancy}/{s.capacity} beds)
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
