@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text.Json;
 using Aegis.Recovery.Data;
 using Aegis.Recovery.Dtos;
 using Aegis.Recovery.Models;
 using Aegis.Recovery.Services;
+using Aegis.Shared.Auth.Entities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -37,13 +39,13 @@ public static class RecoveryEndpoints
                 .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             return Results.Ok(new { total, page, pageSize, items = shelters.Select(MapShelterDto) });
-        });
+        }).AllowAnonymous();
 
         group.MapGet("/shelters/{id:guid}", async (Guid id, RecoveryDbContext db) =>
         {
             var shelter = await db.Shelters.FindAsync(id);
             return shelter is null ? Results.NotFound() : Results.Ok(MapShelterDto(shelter));
-        });
+        }).AllowAnonymous();
 
         group.MapPost("/shelters", async (CreateShelterRequest request, RecoveryDbContext db) =>
         {
@@ -71,7 +73,7 @@ public static class RecoveryEndpoints
             db.Shelters.Add(shelter);
             await db.SaveChangesAsync();
             return Results.Created($"/api/recovery/shelters/{shelter.Id}", MapShelterDto(shelter));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         group.MapPut("/shelters/{id:guid}/occupancy", async (Guid id, UpdateShelterOccupancyRequest request, RecoveryDbContext db) =>
         {
@@ -89,16 +91,28 @@ public static class RecoveryEndpoints
             shelter.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
             return Results.Ok(MapShelterDto(shelter));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
 
         #endregion
 
         #region Aid Requests
 
-        group.MapGet("/aid-requests", async (string? status, string? urgency, string? district,
+        group.MapGet("/aid-requests", async (ClaimsPrincipal user, string? status, string? urgency, string? district,
             int page = 1, int pageSize = 20, RecoveryDbContext db = default!) =>
         {
             var query = db.AidRequests.Include(a => a.Shelter).AsQueryable();
+
+            var role = user.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = GetUserId(user);
+
+            if (role == Roles.Citizen)
+            {
+                if (userId.HasValue)
+                    query = query.Where(a => a.SubmittedByUserId == userId.Value);
+                else
+                    query = query.Where(a => false);
+            }
+
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(a => a.Status.ToLower() == status.ToLower());
             if (!string.IsNullOrWhiteSpace(urgency)) query = query.Where(a => a.Urgency.ToLower() == urgency.ToLower());
             if (!string.IsNullOrWhiteSpace(district)) query = query.Where(a => a.District.ToLower() == district.ToLower());
@@ -107,9 +121,9 @@ public static class RecoveryEndpoints
             var list = await query.OrderByDescending(a => a.CreatedAt)
                 .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return Results.Ok(new { total, page, pageSize, items = list.Select(MapAidRequestDto) });
-        });
+        }).RequireAuthorization();
 
-        group.MapPost("/aid-requests", async (CreateAidRequest request, RecoveryDbContext db) =>
+        group.MapPost("/aid-requests", async (ClaimsPrincipal user, CreateAidRequest request, RecoveryDbContext db) =>
         {
             if (string.IsNullOrWhiteSpace(request.VictimName) || string.IsNullOrWhiteSpace(request.ContactPhone))
                 return Results.BadRequest(new { error = "Victim name and contact phone are required." });
@@ -136,6 +150,7 @@ public static class RecoveryEndpoints
                 Status = "Pending",
                 ShelterId = request.ShelterId,
                 Notes = request.Notes?.Trim() ?? string.Empty,
+                SubmittedByUserId = GetUserId(user),
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -143,9 +158,9 @@ public static class RecoveryEndpoints
             await db.SaveChangesAsync();
             var loaded = await db.AidRequests.Include(a => a.Shelter).FirstAsync(a => a.Id == aidRequest.Id);
             return Results.Created($"/api/recovery/aid-requests/{aidRequest.Id}", MapAidRequestDto(loaded));
-        });
+        }).RequireAuthorization();
 
-        group.MapPut("/aid-requests/{id:guid}/status", async (Guid id, UpdateAidRequestStatus request, RecoveryDbContext db) =>
+        group.MapPut("/aid-requests/{id:guid}/status", async (ClaimsPrincipal user, Guid id, UpdateAidRequestStatus request, RecoveryDbContext db) =>
         {
             var aidRequest = await db.AidRequests.Include(a => a.Shelter).FirstOrDefaultAsync(a => a.Id == id);
             if (aidRequest is null) return Results.NotFound();
@@ -155,6 +170,12 @@ public static class RecoveryEndpoints
             var validStatuses = new[] { "Pending", "Approved", "Fulfilled", "Rejected" };
             if (!validStatuses.Contains(request.Status))
                 return Results.BadRequest(new { error = $"Invalid status. Must be one of: {string.Join(", ", validStatuses)}" });
+
+            var role = user.FindFirst(ClaimTypes.Role)?.Value;
+            if (role == Roles.Responder && request.Status != "Fulfilled")
+            {
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, detail: "Responders can only mark aid requests as Fulfilled.");
+            }
 
             if (request.ShelterId.HasValue && request.ShelterId != aidRequest.ShelterId)
             {
@@ -181,7 +202,7 @@ public static class RecoveryEndpoints
             aidRequest.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
             return Results.Ok(MapAidRequestDto(aidRequest));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
 
         #endregion
 
@@ -193,7 +214,7 @@ public static class RecoveryEndpoints
             var list = await db.Donations.OrderByDescending(d => d.CreatedAt)
                 .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return Results.Ok(new { total, page, pageSize, items = list.Select(MapDonationDto) });
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         group.MapPost("/donations", async (CreateDonationRequest request, RecoveryDbContext db) =>
         {
@@ -221,7 +242,7 @@ public static class RecoveryEndpoints
             db.Donations.Add(donation);
             await db.SaveChangesAsync();
             return Results.Created($"/api/recovery/donations/{donation.Id}", MapDonationDto(donation));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         group.MapPut("/donations/{id:guid}/allocation", async (Guid id, UpdateDonationAllocationRequest request, RecoveryDbContext db) =>
         {
@@ -235,23 +256,35 @@ public static class RecoveryEndpoints
 
             await db.SaveChangesAsync();
             return Results.Ok(MapDonationDto(donation));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         #endregion
 
         #region Compensation
 
-        group.MapGet("/compensations", async (string? status, int page = 1, int pageSize = 20, RecoveryDbContext db = default!) =>
+        group.MapGet("/compensations", async (ClaimsPrincipal user, string? status, int page = 1, int pageSize = 20, RecoveryDbContext db = default!) =>
         {
             var query = db.Compensations.AsQueryable();
+
+            var role = user.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = GetUserId(user);
+
+            if (role == Roles.Citizen)
+            {
+                if (userId.HasValue)
+                    query = query.Where(c => c.SubmittedByUserId == userId.Value);
+                else
+                    query = query.Where(c => false);
+            }
+
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(c => c.Status.ToLower() == status.ToLower());
             var total = await query.CountAsync();
             var list = await query.OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return Results.Ok(new { total, page, pageSize, items = list.Select(MapCompensationDto) });
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Citizen));
 
-        group.MapPost("/compensations", async (CreateCompensationRequest request, RecoveryDbContext db) =>
+        group.MapPost("/compensations", async (ClaimsPrincipal user, CreateCompensationRequest request, RecoveryDbContext db) =>
         {
             if (string.IsNullOrWhiteSpace(request.ApplicantName) || string.IsNullOrWhiteSpace(request.NIC))
                 return Results.BadRequest(new { error = "Applicant name and NIC are required." });
@@ -266,15 +299,16 @@ public static class RecoveryEndpoints
                 ClaimAmount = request.ClaimAmount,
                 Status = "Submitted",
                 VerificationNotes = request.VerificationNotes?.Trim() ?? string.Empty,
+                SubmittedByUserId = GetUserId(user),
                 CreatedAt = DateTime.UtcNow
             };
 
             db.Compensations.Add(compensation);
             await db.SaveChangesAsync();
             return Results.Created($"/api/recovery/compensations/{compensation.Id}", MapCompensationDto(compensation));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Citizen));
 
-        group.MapPut("/compensations/{id:guid}/approve", async (Guid id, ApproveCompensationRequest request, RecoveryDbContext db) =>
+        group.MapPut("/compensations/{id:guid}/approve", async (ClaimsPrincipal user, Guid id, ApproveCompensationRequest request, RecoveryDbContext db) =>
         {
             var compensation = await db.Compensations.FindAsync(id);
             if (compensation is null) return Results.NotFound();
@@ -286,11 +320,11 @@ public static class RecoveryEndpoints
             compensation.ApprovedAmount = request.ApprovedAmount;
             compensation.Status = string.IsNullOrWhiteSpace(request.Status) ? "Approved" : request.Status;
             compensation.VerificationNotes = request.VerificationNotes;
-            compensation.ApprovedBy = request.ApprovedBy;
+            compensation.ApprovedBy = GetActorName(user);
             compensation.ApprovedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
             return Results.Ok(MapCompensationDto(compensation));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         #endregion
 
@@ -302,7 +336,7 @@ public static class RecoveryEndpoints
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(n => n.Status.ToLower() == status.ToLower());
             var ngos = await query.OrderBy(n => n.Name).ToListAsync();
             return Results.Ok(ngos.Select(MapNGODto));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
 
         group.MapPost("/ngos", async (CreateNGORequest request, RecoveryDbContext db) =>
         {
@@ -324,7 +358,7 @@ public static class RecoveryEndpoints
             db.NGOs.Add(ngo);
             await db.SaveChangesAsync();
             return Results.Created($"/api/recovery/ngos/{ngo.Id}", MapNGODto(ngo));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         group.MapGet("/infrastructure-damage", async (Guid? incidentId, RecoveryDbContext db) =>
         {
@@ -332,7 +366,7 @@ public static class RecoveryEndpoints
             if (incidentId.HasValue) query = query.Where(i => i.IncidentId == incidentId.Value);
             var items = await query.OrderByDescending(i => i.PriorityScore).ToListAsync();
             return Results.Ok(items);
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
 
         #endregion
 
@@ -349,7 +383,7 @@ public static class RecoveryEndpoints
             return plan is null
                 ? Results.NotFound(new { message = $"No recovery plan found for incident {incidentId}." })
                 : Results.Ok(MapRecoveryPlanDetailDto(plan));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
 
         // Kept for backward compat — still uses Gemini but single-step
         group.MapPost("/plan/generate", async (GeneratePlanRequest request, RecoveryDbContext db,
@@ -363,9 +397,9 @@ public static class RecoveryEndpoints
                 return Results.NotFound(new { error = "Damage report not found for incident." });
 
             return await RunWorkflowInternal(request.IncidentId, damageReport, null, db, agentClient);
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
-        group.MapPost("/plan/{id:guid}/approve", async (Guid id, ApprovePlanRequest request, RecoveryDbContext db) =>
+        group.MapPost("/plan/{id:guid}/approve", async (ClaimsPrincipal user, Guid id, ApprovePlanRequest request, RecoveryDbContext db) =>
         {
             var plan = await db.RecoveryPlans
                 .Include(p => p.Tasks)
@@ -378,6 +412,8 @@ public static class RecoveryEndpoints
             if (!new[] { "Approve", "Reject", "Revise" }.Contains(action, StringComparer.OrdinalIgnoreCase))
                 return Results.BadRequest(new { error = "Invalid action. Must be 'Approve', 'Reject', or 'Revise'." });
 
+            var reviewer = GetActorName(user);
+
             if (string.Equals(action, "Approve", StringComparison.OrdinalIgnoreCase))
             {
                 plan.Status = "Approved";
@@ -389,7 +425,7 @@ public static class RecoveryEndpoints
                 plan.Status = "RevisionRequested";
 
             plan.ReviewNotes = request.ReviewerNotes;
-            plan.ReviewedBy = string.IsNullOrWhiteSpace(request.ReviewedBy) ? "Recovery Officer" : request.ReviewedBy;
+            plan.ReviewedBy = reviewer;
             plan.ReviewedAt = DateTime.UtcNow;
             plan.UpdatedAt = DateTime.UtcNow;
 
@@ -397,7 +433,7 @@ public static class RecoveryEndpoints
             if (plan.WorkflowLog != null)
             {
                 plan.WorkflowLog.ApprovalDecision = action;
-                plan.WorkflowLog.ApprovedBy = plan.ReviewedBy;
+                plan.WorkflowLog.ApprovedBy = reviewer;
                 plan.WorkflowLog.ApprovalTimestamp = DateTime.UtcNow;
                 plan.WorkflowLog.ApprovalNotes = request.ReviewerNotes;
                 plan.WorkflowLog.ExecutionStatus = plan.Status;
@@ -405,17 +441,29 @@ public static class RecoveryEndpoints
 
             await db.SaveChangesAsync();
             return Results.Ok(MapRecoveryPlanDetailDto(plan));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         #endregion
 
         #region Citizen Damage Reports
 
         /// GET /api/recovery/damage-reports — List citizen/field submitted disaster damage reports
-        group.MapGet("/damage-reports", async (string? district, string? status, string? search,
+        group.MapGet("/damage-reports", async (ClaimsPrincipal user, string? district, string? status, string? search,
             int page = 1, int pageSize = 50, RecoveryDbContext db = default!) =>
         {
             var query = db.DamageReports.AsQueryable();
+
+            var role = user.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = GetUserId(user);
+
+            if (role == Roles.Citizen)
+            {
+                if (userId.HasValue)
+                    query = query.Where(d => d.SubmittedByUserId == userId.Value);
+                else
+                    query = query.Where(d => false);
+            }
+
             if (!string.IsNullOrWhiteSpace(district) && district != "All")
                 query = query.Where(d => d.District.ToLower() == district.ToLower());
             if (!string.IsNullOrWhiteSpace(status) && status != "All")
@@ -435,17 +483,24 @@ public static class RecoveryEndpoints
                 return new DamageReportDto(
                     r.Id, r.IncidentId, r.District, r.Location, r.DisasterType,
                     r.HousesDamaged, r.DisplacedFamilies, r.ReporterName, r.ReporterContact,
-                    r.AdditionalNotes, items, r.Status, r.RecoveryPlanId, r.CreatedAt, r.ProcessedAt);
+                    r.AdditionalNotes, items, r.Status, r.RecoveryPlanId, r.CreatedAt, r.ProcessedAt, r.SubmittedByUserId);
             });
 
             return Results.Ok(new { total, page, pageSize, items = dtos });
-        });
+        }).RequireAuthorization();
 
         /// GET /api/recovery/damage-reports/{id:guid}
-        group.MapGet("/damage-reports/{id:guid}", async (Guid id, RecoveryDbContext db) =>
+        group.MapGet("/damage-reports/{id:guid}", async (ClaimsPrincipal user, Guid id, RecoveryDbContext db) =>
         {
             var r = await db.DamageReports.FindAsync(id);
             if (r is null) return Results.NotFound(new { error = "Damage report not found." });
+
+            var role = user.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = GetUserId(user);
+            if (role == Roles.Citizen && (!userId.HasValue || r.SubmittedByUserId != userId.Value))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, detail: "Access denied to damage report.");
+            }
 
             var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             List<DamageIntakeInfrastructureItem> items = [];
@@ -454,11 +509,11 @@ public static class RecoveryEndpoints
             return Results.Ok(new DamageReportDto(
                 r.Id, r.IncidentId, r.District, r.Location, r.DisasterType,
                 r.HousesDamaged, r.DisplacedFamilies, r.ReporterName, r.ReporterContact,
-                r.AdditionalNotes, items, r.Status, r.RecoveryPlanId, r.CreatedAt, r.ProcessedAt));
-        });
+                r.AdditionalNotes, items, r.Status, r.RecoveryPlanId, r.CreatedAt, r.ProcessedAt, r.SubmittedByUserId));
+        }).RequireAuthorization();
 
         /// POST /api/recovery/damage-reports — Direct citizen disaster damage report submission
-        group.MapPost("/damage-reports", async (CreateDamageReportRequest request, RecoveryDbContext db) =>
+        group.MapPost("/damage-reports", async (ClaimsPrincipal user, CreateDamageReportRequest request, RecoveryDbContext db) =>
         {
             // Safety net: ensure schema exists before first write
             await RecoveryDataSeeder.EnsureSchemaAsync(db);
@@ -484,6 +539,7 @@ public static class RecoveryEndpoints
                     AdditionalNotes = request.AdditionalNotes?.Trim() ?? string.Empty,
                     InfrastructureJson = infraJson,
                     Status = "Submitted",
+                    SubmittedByUserId = GetUserId(user),
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -494,7 +550,7 @@ public static class RecoveryEndpoints
                 var dto = new DamageReportDto(
                     report.Id, report.IncidentId, report.District, report.Location, report.DisasterType,
                     report.HousesDamaged, report.DisplacedFamilies, report.ReporterName, report.ReporterContact,
-                    report.AdditionalNotes, items, report.Status, report.RecoveryPlanId, report.CreatedAt, report.ProcessedAt);
+                    report.AdditionalNotes, items, report.Status, report.RecoveryPlanId, report.CreatedAt, report.ProcessedAt, report.SubmittedByUserId);
 
                 return Results.Created($"/api/recovery/damage-reports/{report.Id}", dto);
             }
@@ -503,7 +559,7 @@ public static class RecoveryEndpoints
                 Console.WriteLine($"[DamageReport] Submission error: {ex.Message}");
                 return Results.Problem(detail: ex.Message, title: "Failed to save damage report", statusCode: 500);
             }
-        });
+        }).AllowAnonymous();
 
         /// DELETE /api/recovery/damage-reports/{id:guid}
         group.MapDelete("/damage-reports/{id:guid}", async (Guid id, RecoveryDbContext db) =>
@@ -513,7 +569,7 @@ public static class RecoveryEndpoints
             db.DamageReports.Remove(r);
             await db.SaveChangesAsync();
             return Results.NoContent();
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin));
 
         #endregion
 
@@ -609,7 +665,7 @@ public static class RecoveryEndpoints
 
             var workflowResult = await RunWorkflowInternal(incidentId, damageReport, request.RevisionGuidance, db, agentClient, null, dbDamageReport);
             return workflowResult;
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         /// GET /api/recovery/workflows/{planId:guid}
         /// Returns full RecoveryPlan detail (with Tasks, NGO names, and WorkflowLog Trace) by Plan ID.
@@ -624,7 +680,7 @@ public static class RecoveryEndpoints
                 return Results.NotFound(new { error = "Recovery plan not found." });
 
             return Results.Ok(MapRecoveryPlanDetailDto(plan));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
 
         /// GET /api/recovery/workflows/{planId}/trace
         /// Returns the full agentic execution trace for observability.
@@ -637,10 +693,10 @@ public static class RecoveryEndpoints
                 return Results.NotFound(new { message = "No workflow trace found for this plan." });
 
             return Results.Ok(MapWorkflowTraceDto(log));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         /// POST /api/recovery/workflows/{planId}/approve — Human-in-the-loop approval
-        group.MapPost("/workflows/{planId:guid}/approve", async (Guid planId, ApprovePlanRequest request, RecoveryDbContext db,
+        group.MapPost("/workflows/{planId:guid}/approve", async (ClaimsPrincipal user, Guid planId, ApprovePlanRequest request, RecoveryDbContext db,
             IIncidentIntegrationService incidentService, RecoveryAgentClientService agentClient) =>
         {
             var plan = await db.RecoveryPlans
@@ -656,7 +712,7 @@ public static class RecoveryEndpoints
             if (!new[] { "Approve", "Reject", "Revise" }.Contains(action, StringComparer.OrdinalIgnoreCase))
                 return Results.BadRequest(new { error = "Action must be 'Approve', 'Reject', or 'Revise'." });
 
-            var reviewer = string.IsNullOrWhiteSpace(request.ReviewedBy) ? "Recovery Officer" : request.ReviewedBy;
+            var reviewer = GetActorName(user);
 
             if (string.Equals(action, "Approve", StringComparison.OrdinalIgnoreCase))
             {
@@ -720,7 +776,7 @@ public static class RecoveryEndpoints
             }
 
             return Results.Ok(MapRecoveryPlanDetailDto(plan));
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         /// GET /api/recovery/workflows — List all workflow plans with status
         group.MapGet("/workflows", async (string? status, int page = 1, int pageSize = 20, RecoveryDbContext db = default!) =>
@@ -753,7 +809,7 @@ public static class RecoveryEndpoints
                     TotalAgentDurationMs = p.WorkflowLog?.TotalDurationMs
                 })
             });
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
 
         #endregion
 
@@ -765,7 +821,7 @@ public static class RecoveryEndpoints
             var reports = await db.RecoveryReports.OrderByDescending(r => r.GeneratedAt)
                 .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return Results.Ok(new { total, page, pageSize, items = reports });
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         group.MapPost("/reports/generate", async (GenerateReportRequest request, RecoveryDbContext db) =>
         {
@@ -798,7 +854,7 @@ public static class RecoveryEndpoints
             db.RecoveryReports.Add(report);
             await db.SaveChangesAsync();
             return Results.Created($"/api/recovery/reports/{report.Id}", report);
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
 
         group.MapDelete("/reports/{id:guid}", async (Guid id, RecoveryDbContext db) =>
         {
@@ -807,7 +863,7 @@ public static class RecoveryEndpoints
             db.RecoveryReports.Remove(report);
             await db.SaveChangesAsync();
             return Results.Ok(new { message = "Report deleted successfully." });
-        });
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin));
 
         #endregion
     }
@@ -1001,6 +1057,22 @@ public static class RecoveryEndpoints
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // Actor / User Identity Helpers
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private static string GetActorName(ClaimsPrincipal user) =>
+        user.FindFirst(ClaimTypes.Name)?.Value
+        ?? user.FindFirst(ClaimTypes.Email)?.Value
+        ?? user.Identity?.Name
+        ?? "Disaster Officer";
+
+    private static Guid? GetUserId(ClaimsPrincipal user)
+    {
+        var idStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(idStr, out var id) ? id : null;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Mapping Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -1010,7 +1082,7 @@ public static class RecoveryEndpoints
 
     private static AidRequestDto MapAidRequestDto(AidRequest a) => new(
         a.Id, a.VictimName, a.ContactPhone, a.District, a.AidType, a.FamilySize, a.Urgency,
-        a.Status, a.ShelterId, a.Shelter?.Name, a.Notes, a.CreatedAt);
+        a.Status, a.ShelterId, a.Shelter?.Name, a.Notes, a.CreatedAt, a.SubmittedByUserId);
 
     private static DonationDto MapDonationDto(Donation d) => new(
         d.Id, d.DonorName, d.DonationType, d.AmountOrQuantity, d.ItemDescription,
@@ -1018,7 +1090,7 @@ public static class RecoveryEndpoints
 
     private static CompensationDto MapCompensationDto(Compensation c) => new(
         c.Id, c.ApplicantName, c.DamageCategory, c.ClaimAmount, c.ApprovedAmount,
-        c.Status, c.VerificationNotes, c.ApprovedBy, c.CreatedAt, c.ApprovedAt);
+        c.Status, c.VerificationNotes, c.ApprovedBy, c.CreatedAt, c.ApprovedAt, c.SubmittedByUserId);
 
     private static NGODto MapNGODto(NGO n) => new(
         n.Id, n.Name, n.ContactEmail, n.ContactPhone, n.Sectors, n.OperatingDistricts, n.AssignedBudget, n.Status);
