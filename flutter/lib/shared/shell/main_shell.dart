@@ -352,73 +352,197 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildRecoverySubNav(BuildContext context) {
+    final recoveryTabs = [
+      {'label': 'Overview', 'icon': Icons.dashboard_outlined, 'index': 0},
+      {'label': 'Safe Shelters', 'icon': Icons.night_shelter_outlined, 'index': 1},
+      {'label': 'Request Aid', 'icon': Icons.handshake_outlined, 'index': 2},
+      {'label': 'Requested Aids', 'icon': Icons.assignment_outlined, 'index': 3},
+      {'label': 'Compensation', 'icon': Icons.account_balance_wallet_outlined, 'index': 8},
+      {'label': 'Donate Support', 'icon': Icons.volunteer_activism_outlined, 'index': 4},
+      {'label': 'Report Damage', 'icon': Icons.crisis_alert_outlined, 'index': 5},
+      {'label': 'Rebuilding', 'icon': Icons.analytics_outlined, 'index': 6},
+      {'label': 'Audit Reports', 'icon': Icons.assessment_outlined, 'index': 7},
+    ];
+
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: const BoxDecoration(
         color: kSubNavBg,
         border: Border(bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1)),
       ),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          _buildSubNavItem(
-            label: 'Overview',
-            icon: Icons.dashboard_outlined,
-            isActive: _recoverySubIndex == 0,
-            onTap: () => setState(() => _recoverySubIndex = 0),
+          // Quick Grid Menu Button so user can view all tabs at a glance
+          Tooltip(
+            message: 'All Recovery Services',
+            child: InkWell(
+              onTap: () => _showAllRecoveryTabsSheet(context),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F2B48),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.6)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.grid_view_rounded, size: 16, color: kAccent),
+                    SizedBox(width: 4),
+                    Text('All Tabs', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: kAccent)),
+                  ],
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Safe Shelters',
-            icon: Icons.night_shelter_outlined,
-            isActive: _recoverySubIndex == 1,
-            onTap: () => setState(() => _recoverySubIndex = 1),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Request Aid',
-            icon: Icons.handshake_outlined,
-            isActive: _recoverySubIndex == 2,
-            onTap: () => setState(() => _recoverySubIndex = 2),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Requested Aids',
-            icon: Icons.assignment_outlined,
-            isActive: _recoverySubIndex == 3,
-            onTap: () => setState(() => _recoverySubIndex = 3),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Donate Support',
-            icon: Icons.volunteer_activism_outlined,
-            isActive: _recoverySubIndex == 4,
-            onTap: () => setState(() => _recoverySubIndex = 4),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Report Damage',
-            icon: Icons.report_problem_outlined,
-            isActive: _recoverySubIndex == 5,
-            onTap: () => setState(() => _recoverySubIndex = 5),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Rebuilding Progress',
-            icon: Icons.analytics_outlined,
-            isActive: _recoverySubIndex == 6,
-            onTap: () => setState(() => _recoverySubIndex = 6),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Audit Reports',
-            icon: Icons.assessment_outlined,
-            isActive: _recoverySubIndex == 7,
-            onTap: () => setState(() => _recoverySubIndex = 7),
+          const SizedBox(width: 8),
+          Container(width: 1, height: 24, color: const Color(0xFF1E3A8A)),
+          const SizedBox(width: 8),
+
+          // Scrollable sub-nav items with clean styling
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: recoveryTabs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (ctx, i) {
+                final item = recoveryTabs[i];
+                final idx = item['index'] as int;
+                return _buildSubNavItem(
+                  label: item['label'] as String,
+                  icon: item['icon'] as IconData,
+                  isActive: _recoverySubIndex == idx,
+                  onTap: () => setState(() => _recoverySubIndex = idx),
+                );
+              },
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showAllRecoveryTabsSheet(BuildContext context) {
+    final recoveryServices = [
+      {'label': 'Operations Overview', 'desc': 'Recovery summary and live relief statistics', 'icon': Icons.dashboard_outlined, 'index': 0, 'color': const Color(0xFF3B82F6)},
+      {'label': 'Safe Shelters', 'desc': 'Locate evacuation centers & check capacity', 'icon': Icons.night_shelter_outlined, 'index': 1, 'color': const Color(0xFF0D9488)},
+      {'label': 'Request Emergency Aid', 'desc': 'Apply for rations, water, kits or temporary shelter', 'icon': Icons.handshake_outlined, 'index': 2, 'color': const Color(0xFF2563EB)},
+      {'label': 'Requested Aids Tracker', 'desc': 'Track fulfillment & dispatch status of aid claims', 'icon': Icons.assignment_outlined, 'index': 3, 'color': const Color(0xFFD97706)},
+      {'label': 'Damage Compensation', 'desc': 'Submit property loss claims & check grant payouts', 'icon': Icons.account_balance_wallet_outlined, 'index': 8, 'color': const Color(0xFF10B981)},
+      {'label': 'Donate Support', 'desc': 'Contribute funds or supplies with shelter allocation', 'icon': Icons.volunteer_activism_outlined, 'index': 4, 'color': const Color(0xFF059669)},
+      {'label': 'Report Damage (AI Trigger)', 'desc': 'Submit impact report for 4-agent recovery synthesis', 'icon': Icons.crisis_alert_outlined, 'index': 5, 'color': const Color(0xFFDC2626)},
+      {'label': 'Rebuilding & AI Trace', 'desc': 'Inspect multi-agent timeline, tasks & NGO matches', 'icon': Icons.analytics_outlined, 'index': 6, 'color': const Color(0xFF4F46E5)},
+      {'label': 'Audit Reports', 'desc': 'View national recovery audits & KPI metrics', 'icon': Icons.assessment_outlined, 'index': 7, 'color': const Color(0xFF0284C7)},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF07162C),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Recovery & Relief Services',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 2.2,
+                    ),
+                    itemCount: recoveryServices.length,
+                    itemBuilder: (context, idx) {
+                      final s = recoveryServices[idx];
+                      final isCurrent = _recoverySubIndex == (s['index'] as int);
+                      final c = s['color'] as Color;
+
+                      return InkWell(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          setState(() => _recoverySubIndex = s['index'] as int);
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? c.withValues(alpha: 0.25) : const Color(0xFF0F2B48),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isCurrent ? c : const Color(0xFF1E3A8A),
+                              width: isCurrent ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: c.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(s['icon'] as IconData, color: c, size: 20),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      s['label'] as String,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: isCurrent ? Colors.white : const Color(0xFFE2E8F0),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      s['desc'] as String,
+                                      style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

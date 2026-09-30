@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AidRequest } from '../types/recoveryTypes';
+import { Pagination } from './Pagination';
 
 interface Props {
   requests: AidRequest[];
@@ -8,10 +9,12 @@ interface Props {
 }
 
 export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatusChange }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
   if (requests.length === 0) {
     return (
       <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📭</div>
         <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Aid Applications Found</h3>
         <p style={{ margin: 0, fontSize: '0.9rem' }}>
           {isOfficer
@@ -21,6 +24,10 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
       </div>
     );
   }
+
+  const totalPages = Math.ceil(requests.length / pageSize);
+  const safePage = Math.min(currentPage, Math.max(1, totalPages));
+  const paginatedRequests = requests.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
@@ -40,8 +47,7 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
             </tr>
           </thead>
           <tbody>
-            {requests.map((r, idx) => {
-              const isUrgent = r.urgency === 'Critical' || r.urgency === 'High';
+            {paginatedRequests.map((r, idx) => {
               return (
                 <tr
                   key={r.id}
@@ -64,14 +70,14 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#334155' }}>
                     <span style={{ background: '#f1f5f9', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.8rem' }}>
-                      📍 {r.district}
+                      {r.district}
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: '#1e3a8a' }}>
                     {r.aidType}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#334155' }}>
-                    👥 {r.familySize} members
+                    {r.familySize} members
                   </td>
                   <td style={{ padding: '0.85rem 1rem' }}>
                     <span
@@ -84,7 +90,7 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
                         color: r.urgency === 'Critical' ? '#dc2626' : r.urgency === 'High' ? '#b45309' : '#475569',
                       }}
                     >
-                      {isUrgent ? '🔥 ' : ''}{r.urgency}
+                      {r.urgency}
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem' }}>
@@ -102,7 +108,7 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
-                    {r.shelterName ? `⛺ ${r.shelterName}` : '—'}
+                    {r.shelterName || '—'}
                   </td>
                   {isOfficer && onStatusChange && (
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
@@ -113,13 +119,13 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
                               onClick={() => onStatusChange(r.id, 'Approved')}
                               style={{ padding: '0.35rem 0.75rem', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem' }}
                             >
-                              ✓ Approve
+                              Approve
                             </button>
                             <button
                               onClick={() => onStatusChange(r.id, 'Rejected')}
                               style={{ padding: '0.35rem 0.6rem', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem' }}
                             >
-                              ✕ Reject
+                              Reject
                             </button>
                           </>
                         )}
@@ -128,14 +134,14 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
                             onClick={() => onStatusChange(r.id, 'Fulfilled')}
                             style={{ padding: '0.35rem 0.75rem', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem' }}
                           >
-                            📦 Mark Dispatched / Fulfilled
+                            Mark Dispatched
                           </button>
                         )}
                         {r.status === 'Fulfilled' && (
-                          <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700 }}>✓ Completed</span>
+                          <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700 }}>Completed</span>
                         )}
                         {r.status === 'Rejected' && (
-                          <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600 }}>✕ Declined</span>
+                          <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600 }}>Declined</span>
                         )}
                       </div>
                     </td>
@@ -146,6 +152,13 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        currentPage={safePage}
+        totalItems={requests.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };
