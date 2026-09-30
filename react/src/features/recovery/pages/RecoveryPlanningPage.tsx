@@ -1326,7 +1326,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              Field Damage Assessment
+              Damage Report &amp; Plan Intake
             </button>
             <button
               onClick={() => {
@@ -2184,7 +2184,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <p style={{ margin: 0, fontSize: '0.9rem' }}>
                   {isOfficer
                     ? 'No citizen damage reports match your filter criteria.'
-                    : 'You have not submitted any disaster impact assessments yet. Submit your report from the Field Damage Assessment tab.'}
+                    : 'You have not submitted any disaster impact assessments yet. Submit your report from the Damage Report & Plan Intake tab.'}
                 </p>
               </div>
             ) : (

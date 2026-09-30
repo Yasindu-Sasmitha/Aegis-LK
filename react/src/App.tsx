@@ -1103,7 +1103,7 @@ const MainPlatform: React.FC = () => {
             RECOVERY & COMMUNITY SUPPORT MODULE WORKSPACE
            ========================================================================= */}
         {currentView === 'recovery' && (
-          <main>
+          <main key={recoveryTab} style={{ animation: 'fadeIn 0.18s ease-in-out' }}>
             {recoveryTab === 'dashboard' && <RecoveryDashboardPage onNavigate={(tab) => setRecoveryTab(tab)} />}
             {recoveryTab === 'shelters' && <ShelterManagementPage />}
             {recoveryTab === 'aid' && <AidRequestsPage />}

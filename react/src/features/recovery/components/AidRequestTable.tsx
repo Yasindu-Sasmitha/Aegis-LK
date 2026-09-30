@@ -107,8 +107,27 @@ export const AidRequestTable: React.FC<Props> = ({ requests, isOfficer, onStatus
                       {r.status}
                     </span>
                   </td>
-                  <td style={{ padding: '0.85rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
-                    {r.shelterName || '—'}
+                  <td style={{ padding: '0.85rem 1rem', fontSize: '0.8rem' }}>
+                    {r.shelterName ? (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#eff6ff',
+                        color: '#1e40af',
+                        border: '1px solid #bfdbfe',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        fontSize: '0.775rem',
+                      }}>
+                        {r.shelterName}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.75rem' }}>
+                        Unassigned (Direct Relief)
+                      </span>
+                    )}
                   </td>
                   {isOfficer && onStatusChange && (
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>

@@ -37,28 +37,39 @@ export const ShelterManagementPage: React.FC = () => {
     facilities: 'Clean Water, Sanitation, Hot Meals, Emergency Medical Post, Generator',
   });
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const data = await fetchShelters(selectedDistrict === 'all' ? undefined : selectedDistrict);
       setShelters(Array.isArray(data) ? data : (data as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
   }, [selectedDistrict]);
 
   const handleOccupancyChange = async (id: string, newOccupancy: number) => {
+    // Optimistic UI state update
+    setShelters(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const isFull = newOccupancy >= s.capacity;
+      return {
+        ...s,
+        currentOccupancy: newOccupancy,
+        status: isFull ? 'Full' : (s.status === 'Full' ? 'Active' : s.status)
+      };
+    }));
+
     try {
       await updateShelterOccupancy(id, newOccupancy);
-      loadData();
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Failed to update shelter occupancy');
+      loadData(false);
     }
   };
 
