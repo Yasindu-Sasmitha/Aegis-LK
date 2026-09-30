@@ -155,7 +155,46 @@ jobs:
             --no-header \
             -v
 
-  # ── 3. Flutter: static analysis ─────────────────────────────────────────────
+  # ── 3. Python: Recovery Agent deterministic offline tests ───────────────────
+  #    Uses mocked LLM responses — no live GOOGLE_API_KEY required.
+  #    Tests the 4-agent recovery pipeline in isolation.
+  recovery-agent-tests:
+    name: Recovery Agent Tests (Python)
+    runs-on: ubuntu-latest
+
+    env:
+      GOOGLE_API_KEY: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-recovery-${{ hashFiles('agentic-ai/agents/requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-recovery-
+
+      - name: Install CI dependencies
+        working-directory: "${{ github.workspace }}/agentic-ai/agents"
+        run: pip install -r requirements-ci.txt
+
+      - name: Run Recovery Agent tests
+        working-directory: "${{ github.workspace }}/agentic-ai"
+        run: |
+          python -m pytest tests/test_recovery_agent.py \
+            --tb=short \
+            --no-header \
+            -v
+
+  # ── 4. Flutter: static analysis ─────────────────────────────────────────────
   flutter-analyze:
     name: Flutter Lint & Analyze
     runs-on: ubuntu-latest
@@ -178,7 +217,7 @@ jobs:
         working-directory: "${{ github.workspace }}/flutter"
         run: flutter analyze --no-fatal-infos
 
-  # ── 4. Flutter: unit & widget tests ─────────────────────────────────────────
+  # ── 5. Flutter: unit & widget tests ─────────────────────────────────────────
   flutter-test:
     name: Flutter Tests
     runs-on: ubuntu-latest
@@ -214,7 +253,7 @@ jobs:
         # so it runs cleanly on headless Linux without a system keyring.
         run: flutter test --reporter expanded
 
-  # ── 5. React: build ─────────────────────────────────────────────────────────
+  # ── 6. React: build ─────────────────────────────────────────────────────────
   react-build:
     name: React Build
     runs-on: ubuntu-latest

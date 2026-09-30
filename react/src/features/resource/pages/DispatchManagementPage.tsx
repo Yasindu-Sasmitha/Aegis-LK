@@ -3,8 +3,45 @@ import { approveDispatchPlan, createDispatchPlan, fetchDispatchPlans, fetchInven
 import type { DispatchPlan, InventoryItem, Warehouse } from '../types/resourceTypes';
 
 const DISTRICTS = [
-  'Colombo', 'Kandy', 'Galle', 'Matara', 'Anuradhapura', 'Jaffna', 'Batticaloa', 'Kurunegala', 'Ratnapura', 'Badulla'
+  'Ampara',
+  'Anuradhapura',
+  'Badulla',
+  'Batticaloa',
+  'Colombo',
+  'Galle',
+  'Gampaha',
+  'Hambantota',
+  'Jaffna',
+  'Kalutara',
+  'Kandy',
+  'Kegalle',
+  'Kilinochchi',
+  'Kurunegala',
+  'Mannar',
+  'Matale',
+  'Matara',
+  'Monaragala',
+  'Mullaitivu',
+  'Nuwara Eliya',
+  'Polonnaruwa',
+  'Puttalam',
+  'Ratnapura',
+  'Trincomalee',
+  'Vavuniya',
 ];
+
+/**
+ * Generate a fresh Guid v4 for each mission. The backend DTO expects
+ * MissionId to be a valid System.Guid, so the UI auto-generates one per
+ * submission to avoid accidental collisions between missions.
+ */
+const generateMissionId = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 export const DispatchManagementPage: React.FC = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -13,18 +50,8 @@ export const DispatchManagementPage: React.FC = () => {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('Colombo');
   const [teamsRequired, setTeamsRequired] = useState(2);
-// Add this helper at the top of the file, after imports
-const generateMissionId = () => {
-  // Simple Guid v4 generator — browsers don't have one built-in
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
-
-// In the component state:
-const [missionId, setMissionId] = useState(generateMissionId());  const [plans, setPlans] = useState<DispatchPlan[]>([]);
+  const [missionId, setMissionId] = useState(generateMissionId());
+  const [plans, setPlans] = useState<DispatchPlan[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -76,29 +103,29 @@ const [missionId, setMissionId] = useState(generateMissionId());  const [plans, 
       return;
     }
 
+    // Coordinates come from the selected warehouse — the agent will pick
+    // its own warehouse based on stock + proximity, but the UI needs to
+    // send the mission location (lat/lng) to seed the planner.
+    const refWarehouse = warehouses.find((w) => w.id === selectedWarehouseId);
+    if (!refWarehouse) {
+      alert('Please select a warehouse first.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const items = allocatableItems.slice(0, 4).map((item) => ({
-        itemName: item.itemName,
-        quantity: Math.max(1, Math.min(item.quantityAvailable, Math.ceil(item.quantityAvailable / 2))),
-      }));
-
-            // Coordinates come from the selected warehouse
-      const selectedWarehouse = warehouses.find(w => w.id === selectedWarehouseId);
-      if (!selectedWarehouse) {
-        alert('Please select a warehouse first.');
-        return;
-      }
-
       const plan = await createDispatchPlan({
         missionId,
         district: selectedDistrict,
         teamsRequired: teamsRequired,
-        latitude: Number(selectedWarehouse.latitude),
-        longitude: Number(selectedWarehouse.longitude),
+        latitude: Number(refWarehouse.latitude),
+        longitude: Number(refWarehouse.longitude),
       });
 
       setPlans((prev) => [plan, ...prev]);
+
+      // Generate a fresh mission Guid for the next dispatch
+      setMissionId(generateMissionId());
     } catch (error: any) {
       alert(error.message || 'Failed to generate dispatch plan.');
     } finally {
@@ -109,7 +136,11 @@ const [missionId, setMissionId] = useState(generateMissionId());  const [plans, 
   const approvePlan = async (id: string) => {
     try {
       const approved = await approveDispatchPlan(id);
-      setPlans((prev) => prev.map((plan) => plan.id === id ? { ...plan, ...approved, approvalStatus: 'Approved' } : plan));
+      setPlans((prev) =>
+        prev.map((plan) =>
+          plan.id === id ? { ...plan, ...approved, approvalStatus: 'Approved' } : plan
+        )
+      );
     } catch (error: any) {
       alert(error.message || 'Failed to approve dispatch plan.');
     }
@@ -126,7 +157,7 @@ const [missionId, setMissionId] = useState(generateMissionId());  const [plans, 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
               <div style={{ fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Resource Allocation</div>
-              <h2 style={{ margin: '0.35rem 0 0', fontSize: '1.8rem' }}>Dispatch & Allocation Planner</h2>
+              <h2 style={{ margin: '0.35rem 0 0', fontSize: '1.8rem' }}>Dispatch &amp; Allocation Planner</h2>
             </div>
             <span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '0.45rem 0.7rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700 }}>Live plan</span>
           </div>
@@ -148,11 +179,11 @@ const [missionId, setMissionId] = useState(generateMissionId());  const [plans, 
 
             <label style={fieldStyle}>
               <span>Teams required</span>
-              <input type="number" min={1} max={12} value={teamsRequired} onChange={(e) => setTeamsRequired(Number(e.target.value) || 1)} style={inputStyle} />
+              <input type="number" min={1} max={20} value={teamsRequired} onChange={(e) => setTeamsRequired(Number(e.target.value) || 1)} style={inputStyle} />
             </label>
 
             <label style={fieldStyle}>
-              <span>Warehouse</span>
+              <span>Reference Warehouse (agent may select a different one)</span>
               <select value={selectedWarehouseId} onChange={(e) => setSelectedWarehouseId(e.target.value)} style={inputStyle}>
                 {warehouses.map((warehouse) => (
                   <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>
@@ -207,7 +238,7 @@ const [missionId, setMissionId] = useState(generateMissionId());  const [plans, 
               {plans.map((plan) => (
                 <div key={plan.id} style={{ border: '1px solid #e2e8f0', borderRadius: '14px', padding: '0.95rem', background: '#f8fafc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
-                    <strong>{plan.missionId}</strong>
+                    <strong style={{ fontSize: '0.85rem' }}>{plan.missionId}</strong>
                     <span style={{
                       padding: '0.3rem 0.55rem',
                       borderRadius: '999px',
@@ -225,6 +256,11 @@ const [missionId, setMissionId] = useState(generateMissionId());  const [plans, 
                     <div><strong>Warehouse:</strong> {plan.warehouseName}</div>
                     <div><strong>Teams:</strong> {plan.teamsRequired}</div>
                     <div><strong>ETA:</strong> {plan.estimatedArrivalMinutes} min</div>
+                    {plan.routeSummary && (
+                      <div style={{ marginTop: '0.35rem', color: '#64748b', fontStyle: 'italic' }}>
+                        {plan.routeSummary}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ marginTop: '0.75rem' }}>

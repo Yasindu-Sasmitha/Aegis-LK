@@ -207,11 +207,12 @@ vehicle.UpdatedAt = DateTime.UtcNow;
                 WarehouseId = d.WarehouseId,
                 WarehouseName = d.Warehouse?.Name ?? string.Empty,
                 District = req?.District ?? string.Empty,
+                TeamsRequired = req?.TeamsRequired ?? 0,           
                 VehicleCount = plan?.VehicleCount
                     ?? Math.Max(1, d.ItemsAllocated.Count / 2),
                 EstimatedArrivalMinutes = d.EstimatedArrivalMinutes,
                 ApprovalStatus = d.ApprovalStatus.ToString(),
-                RouteSummary = d.AgentReasoning ?? string.Empty,
+                RouteSummary = plan?.RouteSummary ?? d.AgentReasoning ?? string.Empty,  
                 Items = d.ItemsAllocated
                     .Select(i => new DispatchItemDto
                     {
@@ -223,6 +224,18 @@ vehicle.UpdatedAt = DateTime.UtcNow;
                 Error = agentResult?.Error,
                 CreatedAt = d.CreatedAt,
             };
+        }
+
+                public async Task<List<DispatchResponseDto>> GetAllAsync()
+        {
+            var dispatches = await _db.Dispatches
+                .Include(d => d.Warehouse)
+                .Include(d => d.ResourceRequest)
+                .OrderByDescending(d => d.CreatedAt)
+                .Take(50)
+                .ToListAsync();
+
+            return dispatches.Select(d => ToDto(d, d.ResourceRequest, null, null)).ToList();
         }
     }
 }

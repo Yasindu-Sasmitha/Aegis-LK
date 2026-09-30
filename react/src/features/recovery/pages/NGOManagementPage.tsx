@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchNGOs, createNGO } from '../api/recoveryApi';
 import { NGO } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
+import { Pagination } from '../components/Pagination';
 
 const SRI_LANKA_DISTRICTS = [
   'All Districts', 'Islandwide', 'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa',
@@ -28,13 +29,14 @@ const SECTOR_OPTIONS = [
 export const NGOManagementPage: React.FC = () => {
   const { user } = useAuth();
   const isOfficer = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
-  const isCitizen = user?.role === 'Citizen';
 
   const [ngos, setNgos] = useState<NGO[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -155,13 +157,16 @@ export const NGOManagementPage: React.FC = () => {
 
   const totalBudget = ngos.reduce((acc, curr) => acc + (curr.assignedBudget || 0), 0);
 
+  const totalPages = Math.ceil(filteredNGOs.length / pageSize);
+  const safePage = Math.min(currentPage, Math.max(1, totalPages));
+  const paginatedNGOs = filteredNGOs.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
       {/* ── HEADER & AUTH ROLE BADGE ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>🏢</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Partner Organizations (NGO Registry)
             </h1>
@@ -186,7 +191,7 @@ export const NGOManagementPage: React.FC = () => {
               textTransform: 'uppercase',
               letterSpacing: '0.04em'
             }}>
-              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+              {user?.role === 'Admin' ? 'System Admin' : user?.role === 'DisasterOfficer' ? 'Disaster Officer' : user?.role === 'Responder' ? 'Field Responder' : 'Citizen'}
             </span>
           </div>
 
@@ -209,36 +214,13 @@ export const NGOManagementPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              <span>➕</span>
               <span>Register Partner NGO</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Citizen Informational Banner */}
-      {isCitizen && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#eff6ff',
-          border: '1px solid #dbeafe',
-          borderLeft: '4px solid #2563eb',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#1e40af',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>ℹ️</span>
-          <div>
-            <strong>Accredited Disaster Relief Registry:</strong> These vetted humanitarian organizations are partnered with the Ministry of Disaster Management to provide relief, rebuilding, and specialized support during emergencies.
-          </div>
-        </div>
-      )}
-
-      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      {/* ── METRICS SUMMARY CARDS ── */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
@@ -254,7 +236,6 @@ export const NGOManagementPage: React.FC = () => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Accredited Partners</span>
-            <span style={{ fontSize: '1.25rem' }}>🏢</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>{ngos.length} NGOs</div>
           <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>Verified Relief Agencies</div>
@@ -269,7 +250,6 @@ export const NGOManagementPage: React.FC = () => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Active in Operations</span>
-            <span style={{ fontSize: '1.25rem' }}>✅</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
             {ngos.filter(n => n.status === 'Active').length} Active
@@ -286,7 +266,6 @@ export const NGOManagementPage: React.FC = () => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#1e40af', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Capacity Budgets</span>
-            <span style={{ fontSize: '1.25rem' }}>💰</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8' }}>
             Rs. {totalBudget.toLocaleString()}
@@ -303,7 +282,6 @@ export const NGOManagementPage: React.FC = () => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#7e22ce', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>District Coverage</span>
-            <span style={{ fontSize: '1.25rem' }}>📍</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7e22ce' }}>25 / 25</div>
           <div style={{ fontSize: '0.8rem', color: '#7e22ce', marginTop: '0.25rem' }}>Islandwide deployment</div>
@@ -326,9 +304,9 @@ export const NGOManagementPage: React.FC = () => {
         <div style={{ flex: '1 1 260px', minWidth: '220px' }}>
           <input
             type="text"
-            placeholder="🔍 Search organization name, sector, or district..."
+            placeholder="Search organization name, sector, or district..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             style={{
               width: '100%',
               boxSizing: 'border-box',
@@ -346,7 +324,7 @@ export const NGOManagementPage: React.FC = () => {
         <div style={{ flex: '0 0 auto' }}>
           <select
             value={selectedSector}
-            onChange={e => setSelectedSector(e.target.value)}
+            onChange={e => { setSelectedSector(e.target.value); setCurrentPage(1); }}
             style={{
               padding: '0.6rem 0.85rem',
               backgroundColor: '#f8fafc',
@@ -357,7 +335,7 @@ export const NGOManagementPage: React.FC = () => {
               outline: 'none',
             }}
           >
-            <option value="all">🌐 All Sectors</option>
+            <option value="all">All Sectors</option>
             {SECTOR_OPTIONS.map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
@@ -367,7 +345,7 @@ export const NGOManagementPage: React.FC = () => {
         <div style={{ flex: '0 0 auto' }}>
           <select
             value={selectedDistrict}
-            onChange={e => setSelectedDistrict(e.target.value)}
+            onChange={e => { setSelectedDistrict(e.target.value); setCurrentPage(1); }}
             style={{
               padding: '0.6rem 0.85rem',
               backgroundColor: '#f8fafc',
@@ -378,7 +356,7 @@ export const NGOManagementPage: React.FC = () => {
               outline: 'none',
             }}
           >
-            <option value="all">📍 All Districts</option>
+            <option value="all">All Districts</option>
             {SRI_LANKA_DISTRICTS.map(d => (
               <option key={d} value={d}>{d}</option>
             ))}
@@ -389,7 +367,6 @@ export const NGOManagementPage: React.FC = () => {
       {/* ── NGO CARDS GRID ── */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem 0', color: '#64748b' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
           <p>Loading accredited NGO partner organizations...</p>
         </div>
       ) : filteredNGOs.length === 0 ? (
@@ -401,7 +378,6 @@ export const NGOManagementPage: React.FC = () => {
           border: '1px dashed #cbd5e1',
           color: '#64748b',
         }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🏢</div>
           <h3 style={{ color: '#0f172a', margin: '0 0 0.25rem' }}>No Partner Organizations Found</h3>
           <p style={{ margin: 0, fontSize: '0.875rem' }}>Try adjusting your search query or sector filters.</p>
         </div>
@@ -410,8 +386,9 @@ export const NGOManagementPage: React.FC = () => {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
           gap: '1.25rem',
+          marginBottom: '1.5rem',
         }}>
-          {filteredNGOs.map(ngo => {
+          {paginatedNGOs.map(ngo => {
             const sectorsList = ngo.sectors.split(',').map(s => s.trim()).filter(Boolean);
             const districtsList = ngo.operatingDistricts.split(',').map(d => d.trim()).filter(Boolean);
 
@@ -438,7 +415,6 @@ export const NGOManagementPage: React.FC = () => {
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
                       padding: '3px 8px',
                       borderRadius: '6px',
                       fontSize: '0.725rem',
@@ -456,12 +432,12 @@ export const NGOManagementPage: React.FC = () => {
                   <div style={{ fontSize: '0.825rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '1rem' }}>
                     {ngo.contactEmail && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>✉️</span> <span>{ngo.contactEmail}</span>
+                        <span>Email:</span> <span>{ngo.contactEmail}</span>
                       </div>
                     )}
                     {ngo.contactPhone && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>📞</span> <span>{ngo.contactPhone}</span>
+                        <span>Phone:</span> <span>{ngo.contactPhone}</span>
                       </div>
                     )}
                   </div>
@@ -497,7 +473,7 @@ export const NGOManagementPage: React.FC = () => {
                       Operating Districts
                     </div>
                     <div style={{ fontSize: '0.825rem', color: '#64748b', lineHeight: 1.4 }}>
-                      📍 {districtsList.join(', ')}
+                      {districtsList.join(', ')}
                     </div>
                   </div>
                 </div>
@@ -534,6 +510,17 @@ export const NGOManagementPage: React.FC = () => {
         </div>
       )}
 
+      {filteredNGOs.length > 0 && (
+        <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <Pagination
+            currentPage={safePage}
+            totalItems={filteredNGOs.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
       {/* ── REGISTER PARTNER MODAL ── */}
       {showModal && (
         <div style={{
@@ -562,8 +549,8 @@ export const NGOManagementPage: React.FC = () => {
             border: '1px solid #e2e8f0',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🏢</span> Register Humanitarian Partner (NGO)
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                Register Humanitarian Partner (NGO)
               </h2>
               <button
                 onClick={() => setShowModal(false)}
