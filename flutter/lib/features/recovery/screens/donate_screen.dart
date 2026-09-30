@@ -323,11 +323,18 @@ class _DonateScreenState extends State<DonateScreen> with SingleTickerProviderSt
                         const SizedBox(height: 12),
 
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: _selectedShelterId,
                           decoration: const InputDecoration(labelText: 'Target Evacuation Center (Optional)', border: OutlineInputBorder()),
                           items: [
-                            const DropdownMenuItem(value: null, child: Text('General Community Relief (Unallocated)')),
-                            ..._shelters.map((s) => DropdownMenuItem(value: s.id, child: Text('${s.name} (${s.district})'))),
+                            const DropdownMenuItem(
+                              value: null, 
+                              child: Text('General Community Relief (Unallocated)', overflow: TextOverflow.ellipsis),
+                            ),
+                            ..._shelters.map((s) => DropdownMenuItem(
+                              value: s.id, 
+                              child: Text('${s.name} (${s.district})', overflow: TextOverflow.ellipsis),
+                            )),
                           ],
                           onChanged: (v) => setState(() => _selectedShelterId = v),
                         ),
