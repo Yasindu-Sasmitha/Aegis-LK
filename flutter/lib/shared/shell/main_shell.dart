@@ -14,6 +14,7 @@ import '../../features/recovery/screens/donate_screen.dart';
 import '../../features/recovery/screens/citizen_damage_report_screen.dart';
 import '../../features/recovery/screens/recovery_plan_status_screen.dart';
 import '../../features/recovery/screens/recovery_reports_screen.dart';
+import '../../features/recovery/screens/compensation_claim_screen.dart';
 
 class MainShell extends StatefulWidget {
   final int initialPrimaryIndex;
@@ -520,6 +521,8 @@ class _MainShellState extends State<MainShell> {
           return const RecoveryPlanStatusScreen(showAppBar: false);
         case 7:
           return const RecoveryReportsScreen(showAppBar: false);
+        case 8:
+          return const CompensationClaimScreen(showAppBar: false);
         default:
           return RecoveryHomeScreen(
             showAppBar: false,
