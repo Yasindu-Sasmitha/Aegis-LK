@@ -336,7 +336,7 @@ public static class RecoveryEndpoints
             if (!string.IsNullOrWhiteSpace(status)) query = query.Where(n => n.Status.ToLower() == status.ToLower());
             var ngos = await query.OrderBy(n => n.Name).ToListAsync();
             return Results.Ok(ngos.Select(MapNGODto));
-        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder));
+        }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer, Roles.Responder, Roles.Citizen));
 
         group.MapPost("/ngos", async (CreateNGORequest request, RecoveryDbContext db) =>
         {
