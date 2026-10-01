@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
@@ -29,6 +30,9 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   double? _longitude;
   bool _locating = false;
   String? _locationError;
+  bool _manualEntry = false;
+  final _latController = TextEditingController();
+  final _lngController = TextEditingController();
 
   File? _photo;
   bool _submitting = false;
@@ -45,7 +49,25 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   @override
   void dispose() {
     _descriptionController.dispose();
+    _latController.dispose();
+    _lngController.dispose();
     super.dispose();
+  }
+
+  void _applyManualCoordinates() {
+    final lat = double.tryParse(_latController.text.trim());
+    final lng = double.tryParse(_lngController.text.trim());
+    if (lat == null || lng == null || lat.abs() > 90 || lng.abs() > 180) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid latitude (-90 to 90) and longitude (-180 to 180).')),
+      );
+      return;
+    }
+    setState(() {
+      _latitude = lat;
+      _longitude = lng;
+      _locationError = null;
+    });
   }
 
   Future<void> _captureLocation() async {
@@ -198,7 +220,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
             ),
             const SizedBox(height: 14),
 
-            // Location card
+            // Location card — GPS first, with a manual fallback and a small
+            // static map preview once coordinates exist either way.
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -206,27 +229,83 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: kBorder),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    _latitude != null ? Icons.location_on : Icons.location_off,
-                    color: _latitude != null ? kSuccess : kWarning,
+                  Row(
+                    children: [
+                      Icon(
+                        _latitude != null ? Icons.location_on : Icons.location_off,
+                        color: _latitude != null ? kSuccess : kWarning,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _locating
+                            ? const Text('Getting your location…', style: TextStyle(color: kTextSecondary))
+                            : _latitude != null
+                                ? Text(
+                                    'Location: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
+                                    style: const TextStyle(color: kTextPrimary, fontSize: 13),
+                                  )
+                                : Text(
+                                    _locationError ?? 'Location not available',
+                                    style: const TextStyle(color: kDanger, fontSize: 13),
+                                  ),
+                      ),
+                      if (!_manualEntry)
+                        TextButton(onPressed: _locating ? null : _captureLocation, child: const Text('Retry')),
+                      TextButton(
+                        onPressed: () => setState(() => _manualEntry = !_manualEntry),
+                        child: Text(_manualEntry ? 'Use GPS instead' : 'Enter manually'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _locating
-                        ? const Text('Getting your location…', style: TextStyle(color: kTextSecondary))
-                        : _latitude != null
-                            ? Text(
-                                'Location captured: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
-                                style: const TextStyle(color: kTextPrimary, fontSize: 13),
-                              )
-                            : Text(
-                                _locationError ?? 'Location not available',
-                                style: const TextStyle(color: kDanger, fontSize: 13),
-                              ),
-                  ),
-                  TextButton(onPressed: _locating ? null : _captureLocation, child: const Text('Retry')),
+                  if (_manualEntry) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _latController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                            decoration: const InputDecoration(labelText: 'Latitude', isDense: true, border: OutlineInputBorder()),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: _lngController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                            decoration: const InputDecoration(labelText: 'Longitude', isDense: true, border: OutlineInputBorder()),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(onPressed: _applyManualCoordinates, child: const Text('Set')),
+                      ],
+                    ),
+                  ],
+                  if (_latitude != null && _longitude != null) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      // Free, no-API-key static map image — same provider family
+                      // as the OSM iframe already used on the officer dashboard.
+                      child: Image.network(
+                        'https://staticmap.openstreetmap.de/staticmap.php'
+                        '?center=$_latitude,$_longitude&zoom=14&size=600x200'
+                        '&markers=$_latitude,$_longitude,red-pushpin',
+                        height: 140,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 140,
+                          color: kSurface,
+                          alignment: Alignment.center,
+                          child: const Text('Map preview unavailable', style: TextStyle(color: kTextSecondary, fontSize: 12)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -238,7 +317,20 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.file(_photo!, height: 180, width: double.infinity, fit: BoxFit.cover),
+                    // Image.file throws on web — it can only read real
+                    // filesystem paths, which the web platform doesn't expose.
+                    child: kIsWeb
+                        ? Container(
+                            height: 180,
+                            width: double.infinity,
+                            color: kCardBg,
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'Photo attached (preview not available on web)',
+                              style: TextStyle(color: kTextSecondary, fontSize: 13),
+                            ),
+                          )
+                        : Image.file(_photo!, height: 180, width: double.infinity, fit: BoxFit.cover),
                   ),
                   Positioned(
                     top: 6,
