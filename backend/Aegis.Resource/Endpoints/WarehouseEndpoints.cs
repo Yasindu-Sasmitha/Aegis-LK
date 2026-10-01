@@ -42,13 +42,13 @@ namespace Aegis.Resource.Endpoints
             {
                 var created = await warehouseService.CreateAsync(dto);
                 return Results.Created($"/api/resource/warehouses/{created.Id}", created);
-            }).RequireAuthorization(policy => policy.RequireRole("ResourceManager", "Admin"));
+            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
 
             group.MapPut("/{id:guid}", async (Guid id, UpdateWarehouseDto dto, IWarehouseService warehouseService) =>
             {
                 var updated = await warehouseService.UpdateAsync(id, dto);
                 return updated is null ? Results.NotFound() : Results.Ok(updated);
-            }).RequireAuthorization(policy => policy.RequireRole("ResourceManager", "Admin"));
+            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
 
             group.MapDelete("/{id:guid}", async (Guid id, IWarehouseService warehouseService) =>
             {
