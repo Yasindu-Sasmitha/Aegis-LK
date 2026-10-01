@@ -19,11 +19,14 @@ namespace Aegis.Resource.Entities
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Warehouse -> Vehicle (1-to-many)
+            // Cascade: when a warehouse is removed, its vehicles go with it. This
+            // keeps the delete-warehouse operation atomic from the UI without leaving
+            // orphaned vehicle records behind.
             modelBuilder.Entity<Vehicle>()
                 .HasOne(v => v.Warehouse)
                 .WithMany(w => w.Vehicles)
                 .HasForeignKey(v => v.WarehouseId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Vehicle -> Fuel (1-to-1)
             modelBuilder.Entity<Vehicle>()
@@ -42,7 +45,7 @@ namespace Aegis.Resource.Entities
                 .HasOne(d => d.Warehouse)
                 .WithMany()
                 .HasForeignKey(d => d.WarehouseId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Dispatch>()
                 .HasOne(d => d.Vehicle)
