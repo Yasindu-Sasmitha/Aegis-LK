@@ -61,13 +61,20 @@ namespace Aegis.Resource.Entities
 
             // Store ItemsAllocated as a PostgreSQL jsonb column instead of a
             // separate join table.
+            var allocatedItemComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<System.Collections.Generic.List<AllocatedItem>>(
+                (c1, c2) => JsonSerializer.Serialize(c1, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(c2, (JsonSerializerOptions?)null),
+                c => c == null ? 0 : JsonSerializer.Serialize(c, (JsonSerializerOptions?)null).GetHashCode(),
+                c => JsonSerializer.Deserialize<System.Collections.Generic.List<AllocatedItem>>(JsonSerializer.Serialize(c, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new()
+            );
+
             modelBuilder.Entity<Dispatch>()
                 .Property(d => d.ItemsAllocated)
                 .HasColumnType("jsonb")
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                     v => JsonSerializer.Deserialize<System.Collections.Generic.List<AllocatedItem>>(
-                        v, (JsonSerializerOptions?)null) ?? new()
+                        v, (JsonSerializerOptions?)null) ?? new(),
+                    allocatedItemComparer
                 );
 
             // Helpful index — you'll query "does any warehouse have stock of

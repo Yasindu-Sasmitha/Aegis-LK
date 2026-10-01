@@ -87,10 +87,113 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
 
   bool _isSubmitting = false;
   bool _initializedUser = false;
+  String? _generatingPlanReportId;
 
   // Submissions list state
   List<DamageReportModel> _submissions = [];
   bool _loadingSubmissions = false;
+
+  Future<void> _generatePlanForReport(DamageReportModel report, {String? revisionGuidance}) async {
+    setState(() => _generatingPlanReportId = report.id);
+    try {
+      final intake = DamageIntakeModel(
+        district: report.district,
+        disasterType: report.disasterType,
+        location: report.location,
+        housesDamaged: report.housesDamaged,
+        displacedFamilies: report.displacedFamilies,
+        reportedBy: report.reporterName,
+        reporterContact: report.reporterContact,
+        notes: report.additionalNotes,
+        infrastructureDamage: report.infrastructureDamage.map((infra) => InfrastructureDamageItem(
+          assetName: infra.assetName,
+          assetType: infra.assetType,
+          damageLevel: infra.damageLevel,
+          estimatedCost: infra.estimatedCost,
+        )).toList(),
+      );
+
+      final plan = await _service.submitDamageIntake(
+        intake,
+        damageReportId: report.id,
+        revisionGuidance: revisionGuidance,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('AI Recovery Plan generated for ${report.district}! Budget: LKR ${plan.estimatedTotalBudget.toStringAsFixed(0)}'),
+            backgroundColor: kSuccess,
+          ),
+        );
+        _loadSubmissions();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RecoveryPlanStatusScreen(
+              initialPlanId: plan.id,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate AI plan: $e'), backgroundColor: kDanger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _generatingPlanReportId = null);
+    }
+  }
+
+  Future<void> _showRegenerateDialog(DamageReportModel report) async {
+    final guidanceController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.refresh, color: Color(0xFF2563EB), size: 22),
+            SizedBox(width: 8),
+            Text('Regenerate AI Strategy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Re-run the 4-agent pipeline for ${report.district} with updated benchmarks or custom guidance:',
+                style: const TextStyle(fontSize: 13, color: kTextSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: guidanceController,
+              decoration: const InputDecoration(
+                hintText: 'e.g., Prioritize housing repair over public utility restoration; scale budget.',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Run Multi-Agent Engine', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _generatePlanForReport(report, revisionGuidance: guidanceController.text.trim());
+    }
+  }
 
   final List<String> _districts = [
     'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 'Galle',
@@ -347,7 +450,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
       final activeDisaster = _disasterType == 'Other' ? _otherDisasterController.text.trim() : _disasterType;
       final compiled = _compileStructuredNotes();
 
-      await _service.submitCitizenDamageReport(
+      final newReport = await _service.submitCitizenDamageReport(
         district: _district,
         location: _affectedVillageController.text.trim().isNotEmpty
             ? '${_affectedVillageController.text.trim()}, $_district'
@@ -370,6 +473,10 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
         _resetForm();
         _loadSubmissions();
         _tabController.animateTo(1); // switch to submissions ledger tab
+
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final isOfficer = auth.isOfficerOrAdmin;
+
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -383,16 +490,30 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary)),
               ],
             ),
-            content: const Text(
-              'Your disaster damage & impact assessment has been logged into the Aegis-LK national registry. Disaster officers will review your submission and initiate the 4-agent recovery engine.',
-              style: TextStyle(fontSize: 13, color: kTextSecondary),
+            content: Text(
+              isOfficer
+                  ? 'Your damage assessment has been registered. As an administrator / disaster officer, you can now immediately trigger the 4-agent autonomous recovery strategy to decompose phases, assign NGOs, and approve tasks.'
+                  : 'Your disaster damage & impact assessment has been logged into the Aegis-LK national registry. Disaster officers will review your submission and initiate the 4-agent recovery engine.',
+              style: const TextStyle(fontSize: 13, color: kTextSecondary),
             ),
             actions: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+              TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('View Submissions', style: TextStyle(color: Colors.white)),
+                child: const Text('View Submissions'),
               ),
+              if (isOfficer)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _generatePlanForReport(newReport);
+                  },
+                  icon: const Icon(Icons.bolt, size: 16, color: Colors.white),
+                  label: const Text('Generate AI Plan Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
             ],
           ),
         );
@@ -900,26 +1021,87 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                                       _buildStatChip(Icons.domain, '${item.infrastructureDamage.length} Lifelines'),
                                     ],
                                   ),
+                                  const SizedBox(height: 12),
+                                  // Action Controls
                                   if (item.status == 'PlanGenerated' && item.recoveryPlanId != null) ...[
-                                    const SizedBox(height: 10),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF10B981),
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => RecoveryPlanStatusScreen(
+                                                  initialPlanId: item.recoveryPlanId,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.visibility, size: 16, color: Colors.white),
+                                          label: const Text('View AI Recovery Plan', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ),
+                                        if (isOfficer)
+                                          OutlinedButton.icon(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: const Color(0xFF2563EB),
+                                              side: const BorderSide(color: Color(0xFFBFDBFE)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            onPressed: _generatingPlanReportId == item.id
+                                                ? null
+                                                : () => _showRegenerateDialog(item),
+                                            icon: _generatingPlanReportId == item.id
+                                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                                : const Icon(Icons.refresh, size: 16),
+                                            label: const Text('Regenerate Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                          ),
+                                      ],
+                                    ),
+                                  ] else if (isOfficer) ...[
                                     ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF10B981),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        backgroundColor: const Color(0xFF2563EB),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                       ),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => RecoveryPlanStatusScreen(
-                                              initialPlanId: item.recoveryPlanId,
-                                            ),
+                                      onPressed: _generatingPlanReportId == item.id
+                                          ? null
+                                          : () => _generatePlanForReport(item),
+                                      icon: _generatingPlanReportId == item.id
+                                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                          : const Icon(Icons.bolt, size: 16, color: Colors.white),
+                                      label: Text(
+                                        _generatingPlanReportId == item.id ? 'Synthesizing 4-Agent Strategy...' : '⚡ Generate AI Recovery Plan',
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.hourglass_empty, size: 13, color: Color(0xFF64748B)),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Submitted • Awaiting Disaster Officer Review & AI Planning',
+                                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                                           ),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.visibility, size: 16, color: Colors.white),
-                                      label: const Text('View AI Recovery Plan', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ],
