@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 
@@ -98,20 +99,17 @@ builder.Services.AddCors(options =>
 });
 
 // ── Database Contexts ─────────────────────────────────────────────────────────
-builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+Action<DbContextOptionsBuilder> configureDbContext = options =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+};
 
-builder.Services.AddDbContext<IncidentDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-builder.Services.AddDbContext<WeatherDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-builder.Services.AddDbContext<RecoveryDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-builder.Services.AddDbContext<ResourceDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<AuthDbContext>(configureDbContext);
+builder.Services.AddDbContext<IncidentDbContext>(configureDbContext);
+builder.Services.AddDbContext<WeatherDbContext>(configureDbContext);
+builder.Services.AddDbContext<RecoveryDbContext>(configureDbContext);
+builder.Services.AddDbContext<ResourceDbContext>(configureDbContext);
 
 // ── Resource Module Services ──────────────────────────────────────────────────
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();

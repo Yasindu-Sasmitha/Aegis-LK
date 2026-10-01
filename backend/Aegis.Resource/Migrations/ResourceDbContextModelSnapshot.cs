@@ -304,7 +304,7 @@ namespace Aegis.Resource.Migrations
                     b.HasOne("Aegis.Resource.Entities.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("ResourceRequest");
