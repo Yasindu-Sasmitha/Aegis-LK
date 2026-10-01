@@ -136,6 +136,7 @@ public class RecoveryAgentClientService
                 reasons.Add("Input contained flagged safety patterns.");
 
             var requiresHumanApproval = reasons.Count > 0;
+            AlignAgent4Summary(run, tasks.Count, computedBudget, requiresHumanApproval);
             var planStatus = requiresHumanApproval ? "PendingApproval" : "Approved";
             var taskStatus = requiresHumanApproval ? "Pending" : "InProgress";
 
@@ -214,7 +215,18 @@ public class RecoveryAgentClientService
                 stipendData = stipend
             };
 
-            using var response = await _httpClient.PostAsJsonAsync(run.AgentServiceUrl, payload, JsonOptions, run.Ct);
+            using var req = new HttpRequestMessage(HttpMethod.Post, run.AgentServiceUrl)
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions)
+            };
+            var agentKey = Environment.GetEnvironmentVariable("AEGIS_AGENT_KEY")
+                ?? _configuration?["AgenticAi:AgentKey"];
+            if (!string.IsNullOrWhiteSpace(agentKey) && !_httpClient.DefaultRequestHeaders.Contains("X-Aegis-Agent-Key"))
+            {
+                req.Headers.Add("X-Aegis-Agent-Key", agentKey);
+            }
+
+            using var response = await _httpClient.SendAsync(req, run.Ct);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<PythonWorkflowResponse>(JsonOptions, run.Ct);
@@ -575,6 +587,19 @@ public class RecoveryAgentClientService
         run.Steps[agent3Index] = step with
         {
             OutputSummary = $"Created {taskCount} actionable tasks with final computed budget: LKR {computedBudget:N2}"
+        };
+    }
+
+    private static void AlignAgent4Summary(RunState run, int taskCount, decimal computedBudget, bool requiresHumanApproval)
+    {
+        var agent4Index = run.Steps.FindIndex(step => step.AgentName.Contains("Agent 4", StringComparison.OrdinalIgnoreCase));
+        if (agent4Index < 0) return;
+
+        var step = run.Steps[agent4Index];
+        run.Steps[agent4Index] = step with
+        {
+            InputSummary = $"Validation Scope: {taskCount} drafted recovery tasks (Total: LKR {computedBudget:N0}), safety rules",
+            OutputSummary = $"Policy validation completed. Requires approval: {requiresHumanApproval}"
         };
     }
 

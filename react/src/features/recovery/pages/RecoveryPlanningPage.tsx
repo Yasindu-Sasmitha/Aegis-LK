@@ -20,6 +20,7 @@ import {
   OriginatingIntake,
 } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
+import { Pagination } from '../components/Pagination';
 
 const SRI_LANKA_DISTRICTS = [
   'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Matale', 'Nuwara Eliya',
@@ -228,6 +229,8 @@ export const RecoveryPlanningPage: React.FC = () => {
   const [reportFilterDistrict, setReportFilterDistrict] = useState<string>('all');
   const [reportFilterStatus, setReportFilterStatus] = useState<string>('all');
   const [selectedReportDetail, setSelectedReportDetail] = useState<DamageReportItem | null>(null);
+  const [submissionsPage, setSubmissionsPage] = useState<number>(1);
+  const [historyPage, setHistoryPage] = useState<number>(1);
 
   const loadWorkflowHistory = useCallback(async () => {
     try {
@@ -296,6 +299,9 @@ export const RecoveryPlanningPage: React.FC = () => {
   };
 
   const displayedWorkflowList = workflowList.filter(isUserWorkflowPlan);
+
+  const paginatedDamageReports = displayedDamageReports.slice((submissionsPage - 1) * 5, submissionsPage * 5);
+  const paginatedWorkflowList = displayedWorkflowList.slice((historyPage - 1) * 5, historyPage * 5);
 
   // Validate Intake Form
   const validateForm = (): boolean => {
@@ -432,7 +438,7 @@ export const RecoveryPlanningPage: React.FC = () => {
       });
 
       setSubmissionSuccessMsg(
-        '✅ Your Disaster Damage & Impact Assessment Form has been submitted successfully! Disaster officers will review the submission and generate the multi-agent recovery strategy.'
+        'Your Disaster Damage & Impact Assessment Form has been submitted successfully! Disaster officers will review the submission and generate the multi-agent recovery strategy.'
       );
       resetForm();
       loadDamageReports();
@@ -1099,7 +1105,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                     <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{step.agentName}</strong>
                   </div>
                   <span style={{ fontSize: '0.8rem', color: '#64748b', background: '#f8fafc', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                    ⏱️ {step.durationMs}ms • Status: {step.status}
+                    {step.durationMs}ms • Status: {step.status}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.5rem' }}>
@@ -1170,7 +1176,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                                           {prio}
                                         </span>
                                       </div>
-                                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>⏱️ Target: {days} days</div>
+                                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Target: {days} days</div>
                                       {obj && <div style={{ color: '#334155', fontSize: '0.75rem', fontStyle: 'italic' }}>"{obj}"</div>}
                                     </div>
                                   );
@@ -1320,7 +1326,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              Field Damage Assessment
+              Damage Report &amp; Plan Intake
             </button>
             <button
               onClick={() => {
@@ -2142,7 +2148,10 @@ export const RecoveryPlanningPage: React.FC = () => {
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <select
                 value={reportFilterDistrict}
-                onChange={(e) => setReportFilterDistrict(e.target.value)}
+                onChange={(e) => {
+                  setReportFilterDistrict(e.target.value);
+                  setSubmissionsPage(1);
+                }}
                 style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff' }}
               >
                 <option value="all">All Districts</option>
@@ -2151,7 +2160,10 @@ export const RecoveryPlanningPage: React.FC = () => {
 
               <select
                 value={reportFilterStatus}
-                onChange={(e) => setReportFilterStatus(e.target.value)}
+                onChange={(e) => {
+                  setReportFilterStatus(e.target.value);
+                  setSubmissionsPage(1);
+                }}
                 style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff' }}
               >
                 <option value="all">All Statuses</option>
@@ -2172,11 +2184,12 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <p style={{ margin: 0, fontSize: '0.9rem' }}>
                   {isOfficer
                     ? 'No citizen damage reports match your filter criteria.'
-                    : 'You have not submitted any disaster impact assessments yet. Submit your report from the Field Damage Assessment tab.'}
+                    : 'You have not submitted any disaster impact assessments yet. Submit your report from the Damage Report & Plan Intake tab.'}
                 </p>
               </div>
             ) : (
-              displayedDamageReports.map((report) => (
+              <>
+                {paginatedDamageReports.map((report) => (
                 <div
                   key={report.id}
                   style={{
@@ -2372,7 +2385,14 @@ export const RecoveryPlanningPage: React.FC = () => {
                   );
                 })()}
                 </div>
-              ))
+              ))}
+              <Pagination
+                currentPage={submissionsPage}
+                totalItems={displayedDamageReports.length}
+                pageSize={5}
+                onPageChange={setSubmissionsPage}
+              />
+            </>
             )}
           </div>
         </div>
@@ -2409,7 +2429,10 @@ export const RecoveryPlanningPage: React.FC = () => {
 
                 <select
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                  onChange={(e) => {
+                    setFilterStatus(e.target.value);
+                    setHistoryPage(1);
+                  }}
                   style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff' }}
                 >
                   <option value="all">All Plan Statuses</option>
@@ -2432,7 +2455,8 @@ export const RecoveryPlanningPage: React.FC = () => {
                     </p>
                   </div>
                 ) : (
-                  displayedWorkflowList.map((plan) => (
+                  <>
+                    {paginatedWorkflowList.map((plan) => (
                     <div
                       key={plan.id}
                       onClick={() => handleSelectWorkflow(plan.id)}
@@ -2495,7 +2519,14 @@ export const RecoveryPlanningPage: React.FC = () => {
                         Inspect Full Audit Trace →
                       </button>
                     </div>
-                  ))
+                  ))}
+                  <Pagination
+                    currentPage={historyPage}
+                    totalItems={displayedWorkflowList.length}
+                    pageSize={5}
+                    onPageChange={setHistoryPage}
+                  />
+                </>
                 )}
               </div>
             </div>

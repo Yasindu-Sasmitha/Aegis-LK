@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'auth_models.dart';
+import '../api/api_config.dart';
 
 /// Secure token storage contract complying with SE3090 Section 8 requirement
 abstract class SecureTokenStorage {
@@ -38,7 +39,7 @@ class AuthService {
   static String? currentToken;
 
   AuthService({
-    this.baseUrl = 'http://localhost:5012/api/auth',
+    this.baseUrl = ApiConfig.authBase,
     SecureTokenStorage? storage,
   }) : storage = storage ?? DefaultSecureTokenStorage();
 

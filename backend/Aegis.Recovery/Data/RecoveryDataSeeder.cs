@@ -211,10 +211,18 @@ public static class RecoveryDataSeeder
                 "InfrastructureJson" text NOT NULL DEFAULT '[]',
                 "Status" text NOT NULL DEFAULT 'Submitted',
                 "RecoveryPlanId" uuid NULL,
+                "SubmittedByUserId" uuid NULL,
                 "CreatedAt" timestamp with time zone NOT NULL DEFAULT NOW(),
                 "ProcessedAt" timestamp with time zone NULL
             );
-            """
+            """,
+            "ALTER TABLE recovery.\"AidRequests\" ADD COLUMN IF NOT EXISTS \"SubmittedByUserId\" uuid NULL;",
+            "ALTER TABLE recovery.\"Compensations\" ADD COLUMN IF NOT EXISTS \"SubmittedByUserId\" uuid NULL;",
+            "ALTER TABLE recovery.\"DamageReports\" ADD COLUMN IF NOT EXISTS \"SubmittedByUserId\" uuid NULL;",
+            "UPDATE recovery.\"AidRequests\" SET \"ShelterId\" = '11111111-1111-1111-1111-111111111111' WHERE \"District\" = 'Kalutara' AND \"ShelterId\" IS NULL;",
+            "UPDATE recovery.\"AidRequests\" SET \"ShelterId\" = '22222222-2222-2222-2222-222222222222' WHERE \"District\" = 'Ratnapura' AND \"ShelterId\" IS NULL;",
+            "UPDATE recovery.\"AidRequests\" SET \"ShelterId\" = '33333333-3333-3333-3333-333333333333' WHERE \"District\" = 'Matara' AND \"ShelterId\" IS NULL;",
+            "UPDATE recovery.\"AidRequests\" SET \"ShelterId\" = '11111111-1111-1111-1111-111111111111' WHERE \"District\" = 'Batticaloa' AND \"ShelterId\" IS NULL;"
         };
 
         foreach (var stmt in statements)
@@ -342,6 +350,7 @@ public static class RecoveryDataSeeder
                     FamilySize = 4,
                     Urgency = "High",
                     Status = "Pending",
+                    ShelterId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                     Notes = "Ground floor flooded, requiring 1-week dry rations pack for 4 family members.",
                     CreatedAt = DateTime.UtcNow.AddHours(-6)
                 },
@@ -355,6 +364,7 @@ public static class RecoveryDataSeeder
                     FamilySize = 5,
                     Urgency = "Critical",
                     Status = "Approved",
+                    ShelterId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                     Notes = "Elderly diabetic patient needing insulin supply and basic antiseptic wound dressings.",
                     CreatedAt = DateTime.UtcNow.AddHours(-18)
                 },
@@ -368,6 +378,7 @@ public static class RecoveryDataSeeder
                     FamilySize = 3,
                     Urgency = "High",
                     Status = "Fulfilled",
+                    ShelterId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
                     Notes = "Relocated to Ratnapura Community Relief Center. Mats and hygiene kits delivered.",
                     CreatedAt = DateTime.UtcNow.AddDays(-2)
                 },
@@ -381,6 +392,7 @@ public static class RecoveryDataSeeder
                     FamilySize = 6,
                     Urgency = "Medium",
                     Status = "Pending",
+                    ShelterId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
                     Notes = "Daily wage laborer unable to work due to coastal inundation.",
                     CreatedAt = DateTime.UtcNow.AddHours(-3)
                 }

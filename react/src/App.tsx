@@ -4,6 +4,27 @@ import { LoginPage } from './shared/auth/LoginPage';
 import { RegisterPage } from './shared/auth/RegisterPage';
 import { AegisLogo } from './shared/components/AegisLogo';
 import {
+  AlertTriangleIcon,
+  ShieldIcon,
+  UsersIcon,
+  PackageIcon,
+  BookOpenIcon,
+  BarChartIcon,
+  BellIcon,
+  MapPinIcon,
+  CompassIcon,
+  HomeIcon,
+  PhoneIcon,
+  InfoIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  CloudRainIcon,
+  MountainIcon,
+  WindIcon,
+  ArrowRightIcon,
+  ArrowUpIcon,
+} from './shared/components/Icons';
+import {
   RecoveryDashboardPage,
   ShelterManagementPage,
   AidRequestsPage,
@@ -38,10 +59,10 @@ import {
 type NavView = 'home' | 'weather' | 'recovery' | 'resource' | 'incident';
 
 const ROLE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
-  Admin: { label: '⚙️ Admin', color: '#c084fc', bg: 'rgba(192,132,252,0.15)' },
-  DisasterOfficer: { label: '🛡️ Disaster Officer', color: '#60a5fa', bg: 'rgba(96,165,250,0.15)' },
-  Responder: { label: '🚨 Responder', color: '#fcd34d', bg: 'rgba(252,211,77,0.15)' },
-  Citizen: { label: '👥 Citizen', color: '#6ee7b7', bg: 'rgba(110,231,183,0.15)' },
+  Admin: { label: 'Admin', color: '#c084fc', bg: 'rgba(192,132,252,0.15)' },
+  DisasterOfficer: { label: 'Disaster Officer', color: '#60a5fa', bg: 'rgba(96,165,250,0.15)' },
+  Responder: { label: 'Responder', color: '#fcd34d', bg: 'rgba(252,211,77,0.15)' },
+  Citizen: { label: 'Citizen', color: '#6ee7b7', bg: 'rgba(110,231,183,0.15)' },
 };
 
 /**
@@ -83,6 +104,19 @@ const MainPlatform: React.FC = () => {
     return () => { active = false; };
   }, [currentView]);
 
+  // Support direct hash scrolling (e.g. #about-aegis)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (currentView === 'home' && window.location.hash === '#about-aegis') {
+      timer = setTimeout(() => {
+        document.getElementById('about-aegis')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [currentView]);
+
   const isOfficerOrAdmin = user?.role === 'DisasterOfficer' || user?.role === 'Admin';
   const canAccessResources = RESOURCE_ALLOWED_ROLES.includes(user?.role ?? '');
 
@@ -95,42 +129,42 @@ const MainPlatform: React.FC = () => {
 
   // Role-filtered tabs for Weather module
   const WEATHER_TABS = [
-    { id: 'dashboard', label: '🌦️ Forecast & Live Risk' },
-    ...(isOfficerOrAdmin ? [{ id: 'review', label: '🔔 Alert Review Queue' }] : []),
-    { id: 'predictions', label: '📈 Prediction History' },
-    { id: 'history', label: '📜 Alert History' },
-    ...(isOfficerOrAdmin ? [{ id: 'analytics', label: '📊 Accuracy Analytics' }] : []),
+    { id: 'dashboard', label: 'Forecast & Live Risk' },
+    ...(isOfficerOrAdmin ? [{ id: 'review', label: 'Alert Review Queue' }] : []),
+    { id: 'predictions', label: 'Prediction History' },
+    { id: 'history', label: 'Alert History' },
+    ...(isOfficerOrAdmin ? [{ id: 'analytics', label: 'Accuracy Analytics' }] : []),
   ];
 
   // Navigation tabs for Incident module
   const INCIDENT_TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'all', label: '📋 All Incidents' },
-    { id: 'Reported', label: '📥 Reported' },
-    { id: 'Assessed', label: '🔍 Assessed' },
-    { id: 'OnHold', label: '⏸️ On Hold' },
-    { id: 'Rejected', label: '🚫 Rejected' },
-    { id: 'MissionApproved', label: '✅ Approved' },
-    { id: 'Closed', label: '📁 Closed' },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'all', label: 'All Incidents' },
+    { id: 'Reported', label: 'Reported' },
+    { id: 'Assessed', label: 'Assessed' },
+    { id: 'OnHold', label: 'On Hold' },
+    { id: 'Rejected', label: 'Rejected' },
+    { id: 'MissionApproved', label: 'Approved' },
+    { id: 'Closed', label: 'Closed' },
   ];
 
   // Navigation tabs for Recovery module (available across roles)
   const RECOVERY_TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'shelters', label: '⛺ Emergency Shelters' },
-    { id: 'aid', label: '🤝 Aid Applications' },
-    { id: 'donations', label: '📦 Donations' },
-    { id: 'compensation', label: '💳 Compensation' },
-    { id: 'ngos', label: '🏢 Partner NGOs' },
-    { id: 'planning', label: '🤖 Agentic AI Planning' },
-    { id: 'reports', label: '📜 Audit Reports' },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'shelters', label: 'Emergency Shelters' },
+    { id: 'aid', label: 'Aid Applications' },
+    { id: 'donations', label: 'Donations' },
+    { id: 'compensation', label: 'Compensation' },
+    { id: 'ngos', label: 'Partner NGOs' },
+    { id: 'planning', label: 'Agentic AI Planning' },
+    { id: 'reports', label: 'Audit Reports' },
   ];
 
   const RESOURCE_TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'warehouses', label: '🏬 Warehouses' },
-    { id: 'inventory', label: '📦 Inventory' },
-    { id: 'dispatch', label: '🚚 Dispatch & Allocation' },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'warehouses', label: 'Warehouses' },
+    { id: 'inventory', label: 'Inventory' },
+    { id: 'dispatch', label: 'Dispatch & Allocation' },
   ];
 
   const roleBadge = ROLE_BADGES[user?.role ?? 'Citizen'] ?? ROLE_BADGES.Citizen;
@@ -155,6 +189,13 @@ const MainPlatform: React.FC = () => {
     }
     setCurrentView('resource');
     setResourceTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateToIncident = (tab = 'dashboard') => {
+    setCurrentView('incident');
+    setIncidentTab(tab);
+    setSelectedIncidentId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -196,8 +237,12 @@ const MainPlatform: React.FC = () => {
           <button
             onClick={() => setCurrentView('home')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 8,
+              border: 'none',
               background: currentView === 'home' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
               color: currentView === 'home' ? '#38bdf8' : '#cbd5e1',
               fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -205,15 +250,19 @@ const MainPlatform: React.FC = () => {
               transition: 'all 0.15s ease'
             }}
           >
-            <span>🏠</span>
+            <HomeIcon size={16} />
             <span>Home</span>
           </button>
 
           <button
             onClick={() => navigateToWeather('dashboard')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 8,
+              border: 'none',
               background: currentView === 'weather' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
               color: currentView === 'weather' ? '#38bdf8' : '#cbd5e1',
               fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -221,15 +270,19 @@ const MainPlatform: React.FC = () => {
               transition: 'all 0.15s ease'
             }}
           >
-            <span>🌦️</span>
+            <CloudRainIcon size={16} />
             <span>Weather Intelligence</span>
           </button>
 
           <button
             onClick={() => navigateToRecovery('dashboard')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 8,
+              border: 'none',
               background: currentView === 'recovery' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
               color: currentView === 'recovery' ? '#38bdf8' : '#cbd5e1',
               fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -237,7 +290,7 @@ const MainPlatform: React.FC = () => {
               transition: 'all 0.15s ease'
             }}
           >
-            <span>🏥</span>
+            <ShieldIcon size={16} />
             <span>Recovery & Relief</span>
           </button>
 
@@ -246,25 +299,35 @@ const MainPlatform: React.FC = () => {
             <button
               onClick={() => navigateToResource('dashboard')}
               style={{
-                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 1rem',
+                borderRadius: 8,
+                border: 'none',
                 background: currentView === 'resource' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
                 color: currentView === 'resource' ? '#38bdf8' : '#cbd5e1',
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
             >
-              <span>📦</span>
+              <PackageIcon size={16} />
               <span>Resources</span>
             </button>
           )}
 
           <button
-            onClick={() => setCurrentView('incident')}
+            onClick={() => navigateToIncident('dashboard')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 8,
+              border: 'none',
               background: currentView === 'incident' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
               color: currentView === 'incident' ? '#38bdf8' : '#cbd5e1',
               fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -272,21 +335,26 @@ const MainPlatform: React.FC = () => {
               transition: 'all 0.15s ease'
             }}
           >
-            <span>🚨</span>
+            <AlertTriangleIcon size={16} />
             <span>Incidents</span>
           </button>
 
           <button
             onClick={() => navigateToWeather(isOfficerOrAdmin ? 'analytics' : 'history')}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
-              background: 'transparent', color: '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1rem',
+              borderRadius: 8,
+              border: 'none',
+              background: 'transparent',
+              color: '#94a3b8',
               fontFamily: "'Plus Jakarta Sans', sans-serif",
               fontWeight: 500, fontSize: '0.9rem', cursor: 'pointer',
             }}
           >
-            <span>📊</span>
+            <BarChartIcon size={16} />
             <span>Reports</span>
           </button>
         </nav>
@@ -308,7 +376,10 @@ const MainPlatform: React.FC = () => {
                 {roleBadge.label}
               </span>
               {user?.district && (
-                <span style={{ color: '#94a3b8', fontSize: '0.725rem' }}>📍 {user.district}</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.725rem', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <MapPinIcon size={12} color="#94a3b8" />
+                  {user.district}
+                </span>
               )}
             </div>
           </div>
@@ -383,17 +454,33 @@ const MainPlatform: React.FC = () => {
                   </p>
 
                   <div className="ae-hero-actions">
-                    <button className="ae-hero-btn-primary" onClick={() => navigateToWeather('dashboard')}>
-                      <span>🛡️ Report an Emergency</span>
-                      <span>→</span>
+                    <button
+                      className="ae-hero-btn-primary"
+                      onClick={() => navigateToIncident('dashboard')}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      <AlertTriangleIcon size={18} color="#ffffff" />
+                      <span>Report an Emergency</span>
+                      <ArrowRightIcon size={16} color="#ffffff" />
                     </button>
 
-                    <button className="ae-hero-btn-outline" onClick={() => navigateToWeather('dashboard')}>
-                      <span>📖 Learn More</span>
+                    <button
+                      className="ae-hero-btn-outline"
+                      onClick={() => {
+                        const el = document.getElementById('about-aegis');
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      <BookOpenIcon size={18} />
+                      <span>Learn More</span>
                     </button>
                   </div>
                 </div>
 
+                {/* Right Decorative Badge */}
                 <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', alignSelf: 'flex-end' }}>
                   <div style={{
                     textAlign: 'right', background: 'rgba(7, 23, 46, 0.75)',
@@ -421,72 +508,101 @@ const MainPlatform: React.FC = () => {
               </div>
             </div>
 
-            {/* Feature Cards */}
+            {/* 6 Feature Cards Row */}
             <div className="ae-feature-cards-grid">
               <div className="ae-feature-card" onClick={() => navigateToWeather('dashboard')}>
                 <div>
-                  <div className="ae-feature-card-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>🚨</div>
+                  <div className="ae-feature-card-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                    <AlertTriangleIcon size={22} color="#dc2626" />
+                  </div>
                   <div className="ae-feature-card-title">Emergency Alerts</div>
                   <div className="ae-feature-card-desc">Get real-time alerts for natural hazards, flash floods, and severe weather emergencies.</div>
                 </div>
-                <div className="ae-feature-card-link">→</div>
+                <div className="ae-feature-card-link">
+                  <ArrowRightIcon size={16} />
+                </div>
               </div>
 
               <div className="ae-feature-card" onClick={() => navigateToRecovery('aid')}>
                 <div>
-                  <div className="ae-feature-card-icon" style={{ background: '#d1fae5', color: '#059669' }}>👥</div>
+                  <div className="ae-feature-card-icon" style={{ background: '#d1fae5', color: '#059669' }}>
+                    <UsersIcon size={22} color="#059669" />
+                  </div>
                   <div className="ae-feature-card-title">Community Support</div>
                   <div className="ae-feature-card-desc">Connect with nearby volunteers, aid programs, and local community support networks.</div>
                 </div>
-                <div className="ae-feature-card-link">→</div>
+                <div className="ae-feature-card-link">
+                  <ArrowRightIcon size={16} />
+                </div>
               </div>
 
               <div className="ae-feature-card" onClick={() => navigateToRecovery('donations')}>
                 <div>
-                  <div className="ae-feature-card-icon" style={{ background: '#dbeafe', color: '#2563eb' }}>🛡️</div>
+                  <div className="ae-feature-card-icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+                    <ShieldIcon size={22} color="#2563eb" />
+                  </div>
                   <div className="ae-feature-card-title">Recovery Management</div>
                   <div className="ae-feature-card-desc">Coordinate post-disaster recovery efforts, track reconstruction progress, and manage long-term rehabilitation plans.</div>
                 </div>
-                <div className="ae-feature-card-link">→</div>
+                <div className="ae-feature-card-link">
+                  <ArrowRightIcon size={16} />
+                </div>
               </div>
 
-              {/* Resources card — only shown to roles with access */}
-              {canAccessResources && (
-                <div className="ae-feature-card" onClick={() => navigateToResource('dashboard')}>
-                  <div>
-                    <div className="ae-feature-card-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>🔄</div>
-                    <div className="ae-feature-card-title">Resource Management</div>
-                    <div className="ae-feature-card-desc">Track emergency resources, ration supplies, relief warehouses, and distribution routes.</div>
+              {/* Card 4: Resource Management */}
+              <div
+                className="ae-feature-card"
+                onClick={() => navigateToResource('dashboard')} 
+              >
+                <div>
+                  <div className="ae-feature-card-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+                    <PackageIcon size={22} color="#16a34a" />
+                  </div>
+                  <div className="ae-feature-card-title">Resource Management</div>
+                  <div className="ae-feature-card-desc">
+                    Track emergency resources, ration supplies, relief warehouses, and distribution routes.
                   </div>
                   <div className="ae-feature-card-link">→</div>
                 </div>
-              )}
+                <div className="ae-feature-card-link">
+                  <ArrowRightIcon size={16} />
+                </div>
+              </div>
 
               <div className="ae-feature-card" onClick={() => navigateToWeather('history')}>
                 <div>
-                  <div className="ae-feature-card-icon" style={{ background: '#ede9fe', color: '#7c3aed' }}>📖</div>
+                  <div className="ae-feature-card-icon" style={{ background: '#ede9fe', color: '#7c3aed' }}>
+                    <BookOpenIcon size={22} color="#7c3aed" />
+                  </div>
                   <div className="ae-feature-card-title">Disaster Information</div>
                   <div className="ae-feature-card-desc">Access early warnings, safety tips, historical logs, and disaster preparedness guides.</div>
                 </div>
-                <div className="ae-feature-card-link">→</div>
+                <div className="ae-feature-card-link">
+                  <ArrowRightIcon size={16} />
+                </div>
               </div>
 
               <div className="ae-feature-card" onClick={() => navigateToWeather(isOfficerOrAdmin ? 'analytics' : 'history')}>
                 <div>
-                  <div className="ae-feature-card-icon" style={{ background: '#ffedd5', color: '#ea580c' }}>📊</div>
+                  <div className="ae-feature-card-icon" style={{ background: '#ffedd5', color: '#ea580c' }}>
+                    <BarChartIcon size={22} color="#ea580c" />
+                  </div>
                   <div className="ae-feature-card-title">Reports & Analytics</div>
                   <div className="ae-feature-card-desc">View verified sensor telemetry and AI prediction accuracy metrics for informed decisions.</div>
                 </div>
-                <div className="ae-feature-card-link">→</div>
+                <div className="ae-feature-card-link">
+                  <ArrowRightIcon size={16} />
+                </div>
               </div>
             </div>
 
             {/* Bottom Grid */}
             <div className="ae-dashboard-bottom-grid">
-              <div className="ae-panel-card">
+              {/* Left Column: Latest Alerts */}
+              <div className="ae-panel-card" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div className="ae-panel-header">
                   <div className="ae-panel-title">
-                    <span>🔔</span>
+                    <BellIcon size={18} color="#0284c7" />
                     <span>Latest Alerts</span>
                   </div>
                   <span className="ae-panel-action" onClick={() => navigateToWeather('history')}>
@@ -495,17 +611,26 @@ const MainPlatform: React.FC = () => {
                 </div>
 
                 {alertsLoading ? (
-                  <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
-                    ⏳ Loading latest published alerts…
+                  <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    <ClockIcon size={16} color="#64748b" />
+                    <span>Loading latest published alerts…</span>
                   </div>
                 ) : latestAlerts.length === 0 ? (
                   <div style={{
-                    textAlign: 'center', padding: '2rem 1rem',
-                    background: '#f8fafc', borderRadius: 12,
-                    border: '1px dashed #cbd5e1', color: '#64748b'
+                    textAlign: 'center',
+                    padding: '2rem 1rem',
+                    background: '#f8fafc',
+                    borderRadius: 12,
+                    border: '1px dashed #cbd5e1',
+                    color: '#64748b',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}>
-                    <div style={{ fontSize: '1.5rem', marginBottom: '0.35rem' }}>✅</div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.2rem' }}>
+                    <CheckCircleIcon size={32} color="#10b981" />
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', marginTop: '0.5rem', marginBottom: '0.2rem' }}>
                       No Active Published Alerts
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -515,7 +640,11 @@ const MainPlatform: React.FC = () => {
                 ) : (
                   latestAlerts.map(alert => {
                     const isHigh = alert.severity === 'High';
-                    const hIcon = alert.hazardType === 'Flood' ? '🌊' : alert.hazardType === 'Landslide' ? '⛰️' : '💨';
+                    const HazardIconComponent = alert.hazardType === 'Flood'
+                      ? CloudRainIcon
+                      : alert.hazardType === 'Landslide'
+                        ? MountainIcon
+                        : WindIcon;
                     const issuedDate = alert.publishedAt ?? alert.createdAt;
 
                     return (
@@ -530,7 +659,7 @@ const MainPlatform: React.FC = () => {
                             }}>
                               {alert.severity}
                             </span>
-                            <span style={{ fontSize: '0.85rem' }}>{hIcon}</span>
+                            <HazardIconComponent size={14} color="#64748b" />
                             <strong style={{
                               fontSize: '0.875rem', color: '#0f172a',
                               whiteSpace: 'nowrap', overflow: 'hidden',
@@ -557,48 +686,66 @@ const MainPlatform: React.FC = () => {
                 )}
               </div>
 
+              {/* Center Column: Quick Access (Compact, Professional Dark Card) */}
               <div className="ae-quick-access-panel">
                 <div>
-                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '1.15rem', fontWeight: 800, marginBottom: '1.15rem', color: '#ffffff' }}>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '1.05rem', fontWeight: 800, marginBottom: '0.85rem', color: '#ffffff' }}>
                     Quick Access
                   </div>
 
-                  <div className="ae-quick-access-item" onClick={() => navigateToWeather('dashboard')}>
-                    <span>⚠️ Report a Disaster</span>
-                    <span>→</span>
+                  <div className="ae-quick-access-item" onClick={() => navigateToIncident('dashboard')}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <AlertTriangleIcon size={15} color="#fca5a5" />
+                      <span>Report a Disaster</span>
+                    </span>
+                    <ArrowRightIcon size={14} color="#94a3b8" />
                   </div>
 
                   <div className="ae-quick-access-item" onClick={() => navigateToRecovery('shelters')}>
-                    <span>⛺ Find Nearest Safe Shelter</span>
-                    <span>→</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <HomeIcon size={15} color="#93c5fd" />
+                      <span>Find Nearest Safe Shelter</span>
+                    </span>
+                    <ArrowRightIcon size={14} color="#94a3b8" />
                   </div>
 
                   <div className="ae-quick-access-item" onClick={() => navigateToRecovery('aid')}>
-                    <span>🛣️ View Evacuation Routes</span>
-                    <span>→</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CompassIcon size={15} color="#a7f3d0" />
+                      <span>View Evacuation Routes</span>
+                    </span>
+                    <ArrowRightIcon size={14} color="#94a3b8" />
                   </div>
 
-                  <div className="ae-quick-access-item" onClick={() => alert('Emergency hotline: 117 (Disaster Management Centre) or 119 (Police Emergency)')}>
-                    <span>📞 Contact Emergency Services</span>
-                    <span>→</span>
+                  <div className="ae-quick-access-item" onClick={() => alert('Emergency hotlines: 117 (Disaster Management Centre) or 119 (Police Emergency)')}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <PhoneIcon size={15} color="#fde68a" />
+                      <span>Contact Emergency Services</span>
+                    </span>
+                    <ArrowRightIcon size={14} color="#94a3b8" />
                   </div>
                 </div>
 
                 <div style={{
                   borderTop: '1px solid rgba(255,255,255,0.12)',
-                  paddingTop: '0.85rem', marginTop: '1rem',
-                  fontSize: '0.75rem', color: '#93c5fd',
-                  display: 'flex', alignItems: 'center', gap: '0.5rem'
+                  paddingTop: '0.65rem',
+                  marginTop: '0.75rem',
+                  fontSize: '0.725rem',
+                  color: '#93c5fd',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
                 }}>
-                  <span>📞</span>
-                  <span><strong>Emergency Hotline: 117</strong> | Disaster Management Centre</span>
+                  <PhoneIcon size={13} color="#93c5fd" />
+                  <span><strong>Emergency Hotline: 117</strong> | DMC</span>
                 </div>
               </div>
 
-              <div className="ae-panel-card">
+              {/* Right Column: Dominant Large Hazard Map Preview */}
+              <div className="ae-panel-card ae-hazard-map-panel" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div className="ae-panel-header">
                   <div className="ae-panel-title">
-                    <span>🗺️</span>
+                    <MapPinIcon size={18} color="#0284c7" />
                     <span>Hazard Map</span>
                   </div>
                   <span className="ae-panel-action" onClick={() => navigateToWeather('dashboard')}>
@@ -606,19 +753,23 @@ const MainPlatform: React.FC = () => {
                   </span>
                 </div>
 
+                {/* Live wind/hazard map — Windy embed centered on Sri Lanka */}
                 <div style={{
                   borderRadius: 14, overflow: 'hidden',
                   border: '1px solid #e2e8f0',
-                  marginBottom: '1rem', height: 220,
+                  marginBottom: '0.85rem',
+                  flex: 1,
+                  minHeight: 380,
+                  boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.06)'
                 }}>
                   <iframe
-                    title="Sri Lanka live wind map"
+                    title="Sri Lanka live weather and hazard map"
                     src="https://embed.windy.com/embed2.html?lat=7.87&lon=80.77&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=&calendar=now&pressure=&type=map&location=coordinates&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1"
                     width="100%"
                     height="100%"
                     frameBorder="0"
                     loading="lazy"
-                    style={{ display: 'block' }}
+                    style={{ display: 'block', minHeight: 380, width: '100%' }}
                   />
                 </div>
 
@@ -628,11 +779,229 @@ const MainPlatform: React.FC = () => {
                   display: 'flex', alignItems: 'center', gap: '0.5rem',
                   fontSize: '0.775rem', color: '#1e40af'
                 }}>
-                  <span>ℹ️</span>
+                  <InfoIcon size={16} color="#2563eb" />
                   <span>Stay informed, stay safe. Live satellite sensor telemetry refreshed every 30m.</span>
                 </div>
               </div>
             </div>
+
+            {/* =========================================================================
+                ABOUT AEGIS-LK / HOW THE SYSTEM WORKS (Anchor: #about-aegis)
+               ========================================================================= */}
+            <section
+              id="about-aegis"
+              style={{
+                marginTop: '3.5rem',
+                marginBottom: '1rem',
+                background: '#ffffff',
+                borderRadius: 20,
+                border: '1px solid #e2e8f0',
+                padding: '2.5rem',
+                boxShadow: '0 4px 20px rgba(15, 23, 42, 0.05)',
+              }}
+            >
+              <div style={{ maxWidth: 880, marginBottom: '2rem' }}>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  background: 'rgba(2, 132, 199, 0.08)',
+                  color: '#0284c7',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '4px 12px',
+                  borderRadius: 20,
+                  marginBottom: '0.85rem'
+                }}>
+                  <ShieldIcon size={13} color="#0284c7" />
+                  <span>System Architecture & Overview</span>
+                </div>
+
+                <h2 style={{
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  fontSize: '1.85rem',
+                  fontWeight: 800,
+                  color: '#07162c',
+                  letterSpacing: '-0.02em',
+                  marginBottom: '0.75rem'
+                }}>
+                  About Aegis-LK — National Disaster Management Platform
+                </h2>
+
+                <p style={{
+                  color: '#475569',
+                  fontSize: '0.975rem',
+                  lineHeight: 1.6,
+                  margin: 0
+                }}>
+                  Aegis-LK is Sri Lanka's unified, intelligence-driven emergency management platform developed to interconnect citizens, local authorities, and national response agencies. By integrating multi-hazard meteorological forecasts, community incident verification, emergency supply logistics, and post-disaster recovery workflows into a single system, Aegis-LK accelerates emergency response times, protects vulnerable populations, and strengthens nationwide disaster resilience.
+                </p>
+              </div>
+
+              {/* 4 Core Pillars Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '1.25rem',
+                marginBottom: '2rem'
+              }}>
+                {/* Pillar 1 */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: '1.35rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}>
+                  <div style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#e0f2fe',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <CloudRainIcon size={20} color="#0284c7" />
+                  </div>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>
+                    Meteorological Intelligence
+                  </div>
+                  <div style={{ fontSize: '0.825rem', color: '#64748b', lineHeight: 1.5 }}>
+                    Aggregates live weather telemetry from Open-Meteo, satellite sensors, and rainfall indices across all 25 districts with machine-learning hazard prediction and human-in-the-loop review.
+                  </div>
+                </div>
+
+                {/* Pillar 2 */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: '1.35rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}>
+                  <div style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#fee2e2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <AlertTriangleIcon size={20} color="#dc2626" />
+                  </div>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>
+                    Incident Verification & Triage
+                  </div>
+                  <div style={{ fontSize: '0.825rem', color: '#64748b', lineHeight: 1.5 }}>
+                    Empowers citizens to submit geo-tagged incident reports with photo verification. AI agent pipelines conduct automated plausibility checks and deduplication to triage legitimate threats.
+                  </div>
+                </div>
+
+                {/* Pillar 3 */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: '1.35rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}>
+                  <div style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#dcfce7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <PackageIcon size={20} color="#16a34a" />
+                  </div>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>
+                    Resource Logistics & Safe Shelters
+                  </div>
+                  <div style={{ fontSize: '0.825rem', color: '#64748b', lineHeight: 1.5 }}>
+                    Provides real-time visibility across regional relief warehouses, automated supply rationing, dispatch convoy tracking, and evacuation shelter capacity coordination.
+                  </div>
+                </div>
+
+                {/* Pillar 4 */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: '1.35rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}>
+                  <div style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#f3e8ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <ShieldIcon size={20} color="#7c3aed" />
+                  </div>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>
+                    Recovery & Citizen Rehabilitation
+                  </div>
+                  <div style={{ fontSize: '0.825rem', color: '#64748b', lineHeight: 1.5 }}>
+                    Coordinates post-disaster financial compensation claims, public donations, and partner NGO relief programs to ensure equitable, transparent community rehabilitation.
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Bar inside Section */}
+              <div style={{
+                borderTop: '1px solid #e2e8f0',
+                paddingTop: '1.25rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem',
+                fontSize: '0.8rem',
+                color: '#64748b'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <AegisLogo size={24} lightText={false} />
+                  <span>Democratic Socialist Republic of Sri Lanka • Disaster Management Centre</span>
+                </div>
+
+                <button
+                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    background: 'none',
+                    border: 'none',
+                    color: '#0284c7',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    padding: '4px 8px',
+                    borderRadius: 6
+                  }}
+                >
+                  <span>Back to top</span>
+                  <ArrowUpIcon size={14} color="#0284c7" />
+                </button>
+              </div>
+            </section>
           </div>
         )}
 
@@ -661,7 +1030,7 @@ const MainPlatform: React.FC = () => {
 
         {/* ============ RECOVERY MODULE ============ */}
         {currentView === 'recovery' && (
-          <main>
+          <main key={recoveryTab} style={{ animation: 'fadeIn 0.18s ease-in-out' }}>
             {recoveryTab === 'dashboard' && <RecoveryDashboardPage onNavigate={(tab) => setRecoveryTab(tab)} />}
             {recoveryTab === 'shelters' && <ShelterManagementPage />}
             {recoveryTab === 'aid' && <AidRequestsPage />}
@@ -768,7 +1137,7 @@ const MainPlatform: React.FC = () => {
         )}
       </div>
 
-      {/* Footer */}
+      {/* Main Footer */}
       <footer style={{
         backgroundColor: '#07162c',
         borderTop: '1px solid rgba(255,255,255,0.08)',
