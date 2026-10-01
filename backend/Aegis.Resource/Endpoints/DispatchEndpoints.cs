@@ -31,7 +31,7 @@ namespace Aegis.Resource.Endpoints
                     return Results.UnprocessableEntity(result);
                 return Results.Ok(result);
             }).RequireAuthorization(p => p.RequireRole(
-                "ResourceManager", "Admin", "DisasterOfficer"));
+                "Admin", "DisasterOfficer"));
 
             group.MapGet("/{id:guid}", async (Guid id, IDispatchService svc) =>
             {
@@ -55,7 +55,7 @@ namespace Aegis.Resource.Endpoints
                     return Results.BadRequest(new { message = ex.Message });
                 }
             }).RequireAuthorization(p => p.RequireRole(
-                "ResourceManager", "Admin"));
+                "Admin", "DisasterOfficer"));
         }
     }
 }

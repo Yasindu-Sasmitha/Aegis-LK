@@ -25,6 +25,7 @@ google-generativeai>=0.8.0
 # ── LangChain + LangGraph — used by weather, incident, resource agents ────────
 langchain-google-genai>=2.0.0
 langgraph>=0.2.0
+langgraph-checkpoint-postgres>=1.0.0
 
 # ── HTTP client — used by incident_dedup_agent.py ────────────────────────────
 requests>=2.31.0
