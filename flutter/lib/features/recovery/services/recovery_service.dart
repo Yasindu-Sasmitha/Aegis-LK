@@ -199,14 +199,25 @@ class RecoveryService {
 
   // ── 5. Autonomous Multi-Agent Workflows & Damage Intake ─────────────────────
 
-  Future<RecoveryPlanModel> submitDamageIntake(DamageIntakeModel intake) async {
+  Future<RecoveryPlanModel> submitDamageIntake(
+    DamageIntakeModel intake, {
+    String? damageReportId,
+    String? revisionGuidance,
+  }) async {
     final headers = await _getAuthHeaders();
+    final Map<String, dynamic> payload = {
+      'directDamageIntake': intake.toJson(),
+    };
+    if (damageReportId != null && damageReportId.isNotEmpty) {
+      payload['damageReportId'] = damageReportId;
+    }
+    if (revisionGuidance != null && revisionGuidance.isNotEmpty) {
+      payload['revisionGuidance'] = revisionGuidance;
+    }
     final response = await http.post(
       Uri.parse('$baseUrl/workflows/start'),
       headers: headers,
-      body: jsonEncode({
-        'directDamageIntake': intake.toJson(),
-      }),
+      body: jsonEncode(payload),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
       return RecoveryPlanModel.fromJson(jsonDecode(response.body));

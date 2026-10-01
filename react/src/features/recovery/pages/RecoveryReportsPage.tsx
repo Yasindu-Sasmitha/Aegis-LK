@@ -350,7 +350,7 @@ export const RecoveryReportsPage: React.FC = () => {
         fulfilledAid: fulAid,
         totalAidRequests: aList.length,
         activeNGOs: nList.length,
-        totalBudgetSpent: totalBudget > 0 ? totalBudget : 20760000,
+        totalBudgetSpent: totalBudget,
       });
     } catch (err) {
       console.error('Failed to load recovery reports data:', err);
