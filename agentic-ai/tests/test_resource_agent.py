@@ -50,7 +50,7 @@ class TestCheckpointerInjection(unittest.TestCase):
         from resource_agent import build_resource_graph
 
         cp = InMemorySaver()
-        graph = build_resource_graph(checkpointer=cp)
+        graph = build_resource_graph(checkpointer=cp)  #type: ignore
 
         result = graph.invoke(
             {
@@ -80,7 +80,7 @@ class TestCheckpointerInjection(unittest.TestCase):
 
     def test_build_checkpointer_falls_back_to_memory_when_no_db_url(self):
         """_build_checkpointer must return InMemorySaver when no DB URL is set."""
-        from resource_agent import _build_checkpointer
+        from resource_agent import _build_checkpointer #type: ignore
 
         with patch.dict(os.environ, {}, clear=False):
             # Make sure both env vars are absent for this test
@@ -98,7 +98,7 @@ class TestCheckpointerInjection(unittest.TestCase):
 
     def test_build_checkpointer_raises_when_package_missing_but_url_set(self):
         """If the DB URL is configured but the package isn't installed, fail-closed."""
-        from resource_agent import _build_checkpointer
+        from resource_agent import _build_checkpointer #type: ignore
 
         with patch.dict(
             os.environ,
@@ -137,10 +137,10 @@ class TestPostgresSaverIntegration(unittest.TestCase):
         db_url = (
             os.getenv("RESOURCE_AGENT_DATABASE_URL") or os.getenv("DATABASE_URL")
         )
-        saver = PostgresSaver.from_conn_string(db_url)
-        saver.setup()
+        saver = PostgresSaver.from_conn_string(db_url) #type: ignore
+        saver.setup() #type: ignore
 
-        graph = build_resource_graph(checkpointer=saver)
+        graph = build_resource_graph(checkpointer=saver) #type: ignore
         thread_cfg = {"configurable": {"thread_id": "durable-test-001"}}
 
         initial_state = {
@@ -165,7 +165,7 @@ class TestPostgresSaverIntegration(unittest.TestCase):
 
         result1 = graph.invoke(initial_state, thread_cfg)
         # Second invocation retrieves checkpointed state
-        saved = saver.get(thread_cfg["configurable"])
+        saved = saver.get(thread_cfg["configurable"]) #type: ignore
         self.assertIsNotNone(saved, "Checkpoint must exist after first invocation.")
         self.assertIn(result1["approval_status"], ("PendingApproval", "SafeFailure"))
 
