@@ -7,7 +7,7 @@ Four distinct agents (per SE3090 §9.1):
   4. validation_safety     — deterministic gate + retry policy
 
 Human approval is enforced downstream by the .NET backend, which stores
-the plan with approval_status = PendingApproval until a DisasterOfficer or Admin
+the plan with approval_status = PendingApproval until a ResourceManager
 approves it. This keeps the LLM out of the authorisation decision.
 """
 import logging
@@ -31,33 +31,7 @@ from resource_tools import (
 
 load_dotenv()
 
-log = logging.getLogger(__name__)
 MAX_RETRIES = 2
-
-
-def _build_checkpointer():
-    """Return a PostgresSaver if RESOURCE_AGENT_DATABASE_URL (or DATABASE_URL)
-    is configured, otherwise fall back to InMemorySaver.
-    Fail-closed: if the env var is set but psycopg2 / langgraph-checkpoint-postgres
-    is not installed, raise immediately so ops notice the misconfiguration.
-    """
-    db_url = os.getenv("RESOURCE_AGENT_DATABASE_URL") or os.getenv("DATABASE_URL")
-    if not db_url:
-        log.warning(
-            "RESOURCE_AGENT_DATABASE_URL not set — resource workflow state is ephemeral."
-        )
-        return InMemorySaver()
-    try:
-        from langgraph.checkpoint.postgres import PostgresSaver  # noqa: PLC0415
-        saver = PostgresSaver.from_conn_string(db_url)
-        saver.setup()  # creates checkpoint tables if they don't exist
-        log.info("ResourceAgent: using PostgresSaver for durable workflow state.")
-        return saver
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError(
-            "langgraph-checkpoint-postgres is not installed. "
-            "Add it to requirements-prod.txt or unset RESOURCE_AGENT_DATABASE_URL."
-        ) from exc
 
 
 class State(TypedDict):
@@ -120,7 +94,7 @@ def dispatch_coordinator(state: State) -> Dict[str, Any]:
         f"Available warehouses: {len(state.get('warehouses') or [])}, "
         f"inventory rows: {len(state.get('inventory') or [])}."
     )
-    raw = llm.with_structured_output(Plan).invoke(
+    raw: Plan = llm.with_structured_output(Plan).invoke(   #type:ignore
         [SystemMessage(system), HumanMessage(user)]
     )
     plan_steps = [raw.step_1, raw.step_2, raw.step_3, raw.step_4]
@@ -274,16 +248,32 @@ def route_after_validation(state: State) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Routing functions
+# ---------------------------------------------------------------------------
+def route_after_analyst(state: State) -> str:
+    """Fast-fail: if the analyst couldn't find stock, end the graph
+    immediately instead of passing control to the planner, which would
+    also fail and create a long fail-loop."""
+    if state.get("selected_warehouse") is None:
+        return "fail"
+    if state.get("validation_errors") and state.get("approval_status") == "SafeFailure":
+        return "fail"
+    return "planner"
+
+
+def route_after_validation(state: State) -> str:
+    if state["validation_errors"]:
+        if state["retries"] < MAX_RETRIES:
+            return "retry"
+        return "fail"
+    return "approve"
+
+
+# ---------------------------------------------------------------------------
 # Graph wiring
 # ---------------------------------------------------------------------------
-def build_resource_graph(checkpointer=None):
-    """Build and compile the resource allocation LangGraph.
-
-    Args:
-        checkpointer: Optional LangGraph checkpoint saver.  If None, the
-            module-level default (PostgresSaver or InMemorySaver) is used.
-    """
-    g = StateGraph(State)
+def build_resource_graph():
+    g = StateGraph(State)   #type: ignore
     g.add_node("coordinator", dispatch_coordinator)
     g.add_node("analyst", warehouse_analyst)
     g.add_node("planner", dispatch_planner)
@@ -291,20 +281,26 @@ def build_resource_graph(checkpointer=None):
 
     g.add_edge(START, "coordinator")
     g.add_edge("coordinator", "analyst")
-    g.add_edge("analyst", "planner")
+
+    # Analyst → Planner (normal) OR → END (fast-fail on no stock)
+    g.add_conditional_edges(
+        "analyst",
+        route_after_analyst,
+        {"planner": "planner", "fail": END},
+    )
+
     g.add_edge("planner", "validator")
+
     g.add_conditional_edges(
         "validator",
         route_after_validation,
         {"retry": "analyst", "fail": END, "approve": END},
     )
-    cp = checkpointer if checkpointer is not None else _DEFAULT_CHECKPOINTER
-    return g.compile(checkpointer=cp)
+
+    return g.compile(checkpointer=InMemorySaver())
 
 
-_DEFAULT_CHECKPOINTER = _build_checkpointer()
 GRAPH = build_resource_graph()
-
 
 def run_resource_workflow(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Entry point called by the FastAPI service."""
