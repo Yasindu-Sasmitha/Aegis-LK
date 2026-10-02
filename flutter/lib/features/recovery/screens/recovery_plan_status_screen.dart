@@ -139,7 +139,7 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen>
 
     if (!auth.isOfficerOrAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unauthorized: Only Disaster Officers can approve/reject plans.'), backgroundColor: kDanger),
+        const SnackBar(content: Text('Unauthorized: Only Disaster Officers or Administrators can approve/reject plans.'), backgroundColor: kDanger),
       );
       return;
     }
@@ -169,6 +169,153 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen>
       }
     } finally {
       if (mounted) setState(() => _isLoadingDetail = false);
+    }
+  }
+
+  Future<void> _showApproveDialog() async {
+    final notesController = TextEditingController(text: 'Statutory verification completed. Plan authorized for immediate community relief dispatch.');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 24),
+            SizedBox(width: 8),
+            Text('Approve Recovery Plan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Authorize "${_selectedPlan!.planName}" for field execution? This approves the budget of LKR ${_selectedPlan!.estimatedTotalBudget.toStringAsFixed(0)} and dispatches tasks to accredited NGOs.',
+                style: const TextStyle(fontSize: 13, color: kTextSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: notesController,
+              decoration: const InputDecoration(
+                labelText: 'Reviewer Notes / Authorization ID',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm Approval', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      _handleDecision('Approve', notes: notesController.text.trim());
+    }
+  }
+
+  Future<void> _showRevisionDialog() async {
+    final guidanceController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.rate_review, color: Color(0xFFC2410C), size: 24),
+            SizedBox(width: 8),
+            Text('Request Plan Revision', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter specific revision notes for the multi-agent AI pipeline to modify phase schedules, re-allocate NGO tasks, or adjust stipend parameters:',
+                style: TextStyle(fontSize: 13, color: kTextSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: guidanceController,
+              decoration: const InputDecoration(
+                hintText: 'e.g., Increase temporary shelter allocation; reduce non-critical infrastructure cost by 15%.',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC2410C)),
+            onPressed: () {
+              if (guidanceController.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Request Revision', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      _handleDecision('RevisionRequested', notes: guidanceController.text.trim());
+    }
+  }
+
+  Future<void> _showRejectDialog() async {
+    final reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.cancel, color: kDanger, size: 24),
+            SizedBox(width: 8),
+            Text('Reject Recovery Plan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter the justification for rejecting this recovery master plan. The decision will be permanently recorded in the disaster audit ledger.',
+                style: TextStyle(fontSize: 13, color: kTextSecondary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                hintText: 'e.g., Unverified disaster report; conflicting field damage assessment.',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: kDanger),
+            onPressed: () {
+              if (reasonController.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Reject Plan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      _handleDecision('Reject', notes: reasonController.text.trim());
     }
   }
 
@@ -627,37 +774,88 @@ class _RecoveryPlanStatusScreenState extends State<RecoveryPlanStatusScreen>
             ),
           ),
 
-          // Officer Action Buttons
-          if (isOfficer && (plan.status == 'PendingApproval' || plan.status == 'RevisionRequested'))
+          // Officer Review & Decision Action Bar
+          if (isOfficer)
             Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kDanger,
-                        side: const BorderSide(color: kDanger),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: () => _handleDecision('Reject'),
-                      child: const Text('Reject Plan'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: () => _handleDecision('Approve'),
-                      child: const Text('Approve Plan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
               ),
+              child: plan.status == 'Approved'
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(8)),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.verified, color: Color(0xFF16A34A), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Plan Approved by ${plan.reviewedBy ?? "Disaster Officer"} • Dispatched to Field NGOs',
+                              style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : plan.status == 'Rejected'
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(8)),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cancel, color: Color(0xFFDC2626), size: 18),
+                              SizedBox(width: 8),
+                              Text('Plan Rejected • Strategy Terminated',
+                                  style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
+                          ),
+                        )
+                      : Row(
+                          children: [
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: kDanger,
+                                side: const BorderSide(color: Color(0xFFFECACA)),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: _isLoadingDetail ? null : _showRejectDialog,
+                              child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFFC2410C),
+                                  side: const BorderSide(color: Color(0xFFFED7AA)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: _isLoadingDetail ? null : _showRevisionDialog,
+                                icon: const Icon(Icons.rate_review, size: 16),
+                                label: const Text('Revision', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF16A34A),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: _isLoadingDetail ? null : _showApproveDialog,
+                                icon: const Icon(Icons.check_circle, size: 16, color: Colors.white),
+                                label: const Text('Approve Plan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                              ),
+                            ),
+                          ],
+                        ),
             ),
         ],
       ),

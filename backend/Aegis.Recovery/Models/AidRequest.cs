@@ -15,6 +15,7 @@ public class AidRequest
     public Guid? ShelterId { get; set; }
     public Shelter? Shelter { get; set; }
     public string Notes { get; set; } = string.Empty;
+    public Guid? SubmittedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 }

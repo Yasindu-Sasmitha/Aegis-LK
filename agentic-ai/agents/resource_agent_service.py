@@ -3,9 +3,10 @@
 Loopback-only: this service is called by the .NET backend, never by
 React/Flutter directly (SE3090 §2 mandatory backend rule).
 """
+import os
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException, Header
 from pydantic import BaseModel
 
 from resource_agent import run_resource_workflow
@@ -13,6 +14,18 @@ from resource_agent import run_resource_workflow
 app = FastAPI(
     title="Resource Agent Service (internal only — not for client use)"
 )
+
+# ── Service-to-service secret validation ─────────────────────────────────────
+_AGENT_KEY = os.getenv("AEGIS_AGENT_KEY", "")
+
+
+def _require_agent_key(key: Optional[str] = None) -> None:
+    """Reject requests that do not carry the correct X-Aegis-Agent-Key header.
+    No-op when AEGIS_AGENT_KEY is not configured (local development)."""
+    if not _AGENT_KEY:
+        return
+    if key != _AGENT_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized: invalid agent key")
 
 
 class DispatchLocation(BaseModel):
@@ -39,7 +52,8 @@ class DispatchResponse(BaseModel):
 
 
 @app.post("/dispatch", response_model=DispatchResponse)
-def dispatch(req: DispatchRequest):
+def dispatch(req: DispatchRequest, x_aegis_agent_key: Optional[str] = Header(None, alias="X-Aegis-Agent-Key")):
+    _require_agent_key(x_aegis_agent_key)
     payload = {
         "mission_id": req.missionId,
         "teams_required": req.teamsRequired,
@@ -63,4 +77,9 @@ def dispatch(req: DispatchRequest):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "resource-agent", "port": 8003}
+    return {"status": "ok", "service": "resource-agent"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", "8003"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

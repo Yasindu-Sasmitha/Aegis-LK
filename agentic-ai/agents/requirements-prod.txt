@@ -1,0 +1,31 @@
+# Production runtime dependencies for all Aegis-LK Python agent services:
+#   weather_agent_service.py  (Port 8001)
+#   incident_agent_service.py (Port 8002)
+#   resource_agent_service.py (Port 8003)
+#   recovery_agent.py         (Port 8004)
+#
+# Start command (each service):
+#   uvicorn <module>:app --host 0.0.0.0 --port $PORT
+#
+# Do NOT remove requirements-ci.txt (used by the CI pipeline for offline tests).
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi>=0.100.0,<1.0
+uvicorn[standard]>=0.30.0
+
+# ── Data validation ───────────────────────────────────────────────────────────
+pydantic>=2.0,<3
+
+# ── Environment / config ──────────────────────────────────────────────────────
+python-dotenv>=1.0
+
+# ── Google Generative AI (Gemini) — used by recovery_agent.py ────────────────
+google-generativeai>=0.8.0
+
+# ── LangChain + LangGraph — used by weather, incident, resource agents ────────
+langchain-google-genai>=2.0.0
+langgraph>=0.2.0
+langgraph-checkpoint-postgres>=1.0.0
+
+# ── HTTP client — used by incident_dedup_agent.py ────────────────────────────
+requests>=2.31.0

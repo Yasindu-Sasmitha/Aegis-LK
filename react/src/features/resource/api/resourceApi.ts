@@ -113,6 +113,15 @@ export async function updateWarehouse(
   return res.json();
 }
 
+export async function deleteWarehouse(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/warehouses/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await readError(res, 'Failed to delete warehouse'));
+  }
+}
 // ---------------------------------------------------------------------------
 // Inventory
 // ---------------------------------------------------------------------------

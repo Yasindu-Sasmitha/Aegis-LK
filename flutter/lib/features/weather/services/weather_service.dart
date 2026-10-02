@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../../shared/auth/auth_service.dart';
+import '../../../shared/api/api_config.dart';
 import '../models/weather_models.dart';
 
 class WeatherService {
@@ -10,7 +11,7 @@ class WeatherService {
   final AuthService _authService;
 
   WeatherService({
-    this.baseUrl = 'http://localhost:5012/api/weather',
+    this.baseUrl = ApiConfig.weatherBase,
     AuthService? authService,
   }) : _authService = authService ?? AuthService();
 

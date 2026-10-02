@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { createWarehouse, fetchWarehouses, updateWarehouse } from '../api/resourceApi';
+import { createWarehouse, deleteWarehouse, fetchWarehouses, updateWarehouse } from '../api/resourceApi';
 import type { CreateWarehouseDto, Warehouse } from '../types/resourceTypes';
 
 const SRI_LANKA_DISTRICTS = [
@@ -20,8 +20,6 @@ const emptyForm = (): CreateWarehouseDto => ({
   latitude: 6.9271,
   longitude: 79.8612,
   contactPhone: '',
-  inventoryItemCount: 0,
-  vehicleCount: 0,
 });
 
 interface WarehouseManagementPageProps {
@@ -35,6 +33,7 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateWarehouseDto>(emptyForm());
 
   const loadData = async () => {
@@ -67,8 +66,6 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
       latitude: Number(warehouse.latitude),
       longitude: Number(warehouse.longitude),
       contactPhone: warehouse.contactPhone ?? '',
-      inventoryItemCount: warehouse.inventoryItemCount ?? 0,
-      vehicleCount: warehouse.vehicleCount ?? 0,
     });
     setShowModal(true);
   };
@@ -83,19 +80,6 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
 
     if (!form.district.trim()) {
       alert('District is required.');
-      return;
-    }
-
-    const inventoryCount = Number(form.inventoryItemCount ?? 0);
-    const vehicleCount = Number(form.vehicleCount ?? 0);
-
-    if (!Number.isFinite(inventoryCount) || inventoryCount < 0) {
-      alert('Inventory count must be a valid non-negative number.');
-      return;
-    }
-
-    if (!Number.isFinite(vehicleCount) || vehicleCount < 0) {
-      alert('Vehicle count must be a valid non-negative number.');
       return;
     }
 
@@ -120,19 +104,12 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
       return;
     }
 
-    setForm({
-      ...form,
-      contactPhone: phone,
-      inventoryItemCount: inventoryCount,
-      vehicleCount: vehicleCount,
-    });
+    setForm({ ...form, contactPhone: phone });
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: CreateWarehouseDto = {
         ...form,
         contactPhone: phone,
-        inventoryItemCount: inventoryCount,
-        vehicleCount: vehicleCount,
       };
 
       if (editingId) {
@@ -150,6 +127,26 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
       alert(error.message || 'Failed to save warehouse.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (warehouse: Warehouse) => {
+    const confirmed = window.confirm(
+      `Delete warehouse "${warehouse.name}"?\n\n` +
+      `This will also remove any associated inventory and vehicles. ` +
+      `Existing dispatch records will be retained for audit.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(warehouse.id);
+    try {
+      await deleteWarehouse(warehouse.id);
+      onDataChange?.();
+      await loadData();
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete warehouse.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -196,12 +193,38 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
                   <td style={cellStyle}>{warehouse.latitude}, {warehouse.longitude}</td>
                   <td style={cellStyle}>{warehouse.contactPhone ?? '—'}</td>
                   <td style={cellStyle}>
-                    <button
-                      onClick={() => openEditModal(warehouse)}
-                      style={{ background: '#e0f2fe', border: 'none', borderRadius: 8, color: '#0c4a6e', fontWeight: 700, padding: '0.45rem 0.7rem', cursor: 'pointer' }}
-                    >
-                      Edit
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button
+                        onClick={() => openEditModal(warehouse)}
+                        style={{
+                          background: '#e0f2fe',
+                          border: 'none',
+                          borderRadius: 8,
+                          color: '#0c4a6e',
+                          fontWeight: 700,
+                          padding: '0.45rem 0.7rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(warehouse)}
+                        disabled={deletingId === warehouse.id}
+                        style={{
+                          background: '#fee2e2',
+                          border: 'none',
+                          borderRadius: 8,
+                          color: '#991b1b',
+                          fontWeight: 700,
+                          padding: '0.45rem 0.7rem',
+                          cursor: deletingId === warehouse.id ? 'wait' : 'pointer',
+                          opacity: deletingId === warehouse.id ? 0.6 : 1,
+                        }}
+                      >
+                        {deletingId === warehouse.id ? '…' : 'Delete'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -246,30 +269,6 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
                   <input type="number" step="0.0001" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: Number(e.target.value) })} style={inputStyle} required />
                 </label>
 
-                <label style={fieldLabelStyle}>
-                  <span>Inventory items</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.inventoryItemCount ?? 0}
-                    onChange={(e) => setForm({ ...form, inventoryItemCount: Number(e.target.value) })}
-                    style={inputStyle}
-                  />
-                </label>
-
-                <label style={fieldLabelStyle}>
-                  <span>Vehicles</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.vehicleCount ?? 0}
-                    onChange={(e) => setForm({ ...form, vehicleCount: Number(e.target.value) })}
-                    style={inputStyle}
-                  />
-                </label>
-
                 <label style={{ ...fieldLabelStyle, gridColumn: '1 / -1' }}>
                   <span>Contact phone</span>
                   <input
@@ -283,6 +282,10 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
                     placeholder="0771234567"
                   />
                 </label>
+
+                <div style={{ gridColumn: '1 / -1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '0.75rem 0.9rem', color: '#0369a1', fontSize: '0.82rem', fontWeight: 600 }}>
+                  ℹ️ Inventory items and vehicles are managed on their own pages. The counts shown in the table update automatically.
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
