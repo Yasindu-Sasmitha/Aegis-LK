@@ -12,7 +12,7 @@ public class ResourceAgentClient
         _http.Timeout = TimeSpan.FromSeconds(30);
     }
 
-    public async Task<ResourceDispatchResponse?> DispatchAsync(ResourceDispatchRequest request)
+    public virtual async Task<ResourceDispatchResponse?> DispatchAsync(ResourceDispatchRequest request)
     {
         try
         {
@@ -27,4 +27,5 @@ public class ResourceAgentClient
             return null;
         }
     }
+    
 }
