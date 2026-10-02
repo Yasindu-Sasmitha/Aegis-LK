@@ -126,7 +126,6 @@ export const CompensationPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>💳</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Disaster Damage Compensation &amp; Loss Grants
             </h1>
@@ -151,7 +150,7 @@ export const CompensationPage: React.FC = () => {
               textTransform: 'uppercase',
               letterSpacing: '0.04em'
             }}>
-              {isAdmin ? '⚙️ System Admin' : isDisasterOfficer ? '🛡️ Disaster Officer' : isResponder ? '🚨 Field Responder' : '👥 Citizen Claimant'}
+              {isAdmin ? 'System Admin' : isDisasterOfficer ? 'Disaster Officer' : isResponder ? 'Field Responder' : 'Citizen Claimant'}
             </span>
           </div>
 
@@ -173,65 +172,16 @@ export const CompensationPage: React.FC = () => {
               transition: 'all 0.15s ease',
             }}
           >
-            <span>➕</span>
             <span>File Damage Compensation Claim</span>
           </button>
         </div>
       </div>
 
-      {/* ── ROLE INFORMATIONAL BANNER ── */}
-      {isCitizen ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#faf5ff',
-          border: '1px solid #e9d5ff',
-          borderLeft: '4px solid #7e22ce',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#7e22ce',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>📋</span>
-          <div>
-            <strong>Citizen Claimant Portal</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#6b21a8', fontWeight: 400 }}>
-              You can <strong>file a new compensation claim</strong> for property damage or livelihood loss. Once submitted, a Grama Niladhari officer will conduct a field verification. Official claim approvals and payouts are authorized by the DMC Recovery Officer.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#eff6ff',
-          border: '1px solid #dbeafe',
-          borderLeft: '4px solid #2563eb',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#1e40af',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
-          <div>
-            <strong>DMC Officer Verification &amp; Payout Audit</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
-              Review submitted claims, adjust approved grant amounts according to statutory damage appraisal ceilings, and disburse relief funds to claimant accounts.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      {/* ── METRICS SUMMARY CARDS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Claims Filed</span>
-            <span style={{ fontSize: '1.25rem' }}>📄</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
             {claims.length} Claims
@@ -244,7 +194,6 @@ export const CompensationPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Approved Payout Funds</span>
-            <span style={{ fontSize: '1.25rem' }}>💵</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
             Rs. {totalApproved.toLocaleString()}
@@ -257,7 +206,6 @@ export const CompensationPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Under Field Verification</span>
-            <span style={{ fontSize: '1.25rem' }}>⏳</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
             {pendingCount} Pending

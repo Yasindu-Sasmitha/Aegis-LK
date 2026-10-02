@@ -2,7 +2,7 @@ import os
 import json
 import re
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pathlib import Path
@@ -20,13 +20,30 @@ def _load_env_file():
                 os.environ.setdefault(k.strip(), v.strip())
 
 _load_env_file()
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 app = FastAPI(
     title="Aegis-LK Member 4 Recovery Agentic-AI Service",
     version="1.0.0",
     description="4-Agent Collaborative Pipeline for Post-Disaster Recovery & Community Support"
 )
+
+# ── Service-to-service secret validation ─────────────────────────────────────
+# Set AEGIS_AGENT_KEY on both the .NET API (sender) and each Python service
+# (receiver). When the key is empty/unset, auth is skipped for local dev.
+_AGENT_KEY = os.getenv("AEGIS_AGENT_KEY", "")
+
+
+def _require_agent_key(key: Optional[str] = None) -> None:
+    """Reject requests that do not carry the correct X-Aegis-Agent-Key header.
+    No-op when AEGIS_AGENT_KEY is not configured (local development)."""
+    if not _AGENT_KEY:
+        return
+    if key != _AGENT_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized: invalid agent key")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,8 +57,11 @@ app.add_middleware(
 API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("Gemini__ApiKey") or ""
 MODEL_NAME = os.getenv("GEMINI_MODEL") or os.getenv("CHAT_MODEL") or "gemini-3.1-flash-lite"
 
-if API_KEY:
-    genai.configure(api_key=API_KEY)
+if API_KEY and genai is not None:
+    try:
+        genai.configure(api_key=API_KEY)
+    except Exception:
+        pass
 
 # ── Pydantic Request & Response Contracts ────────────────────────────────────
 
@@ -130,6 +150,11 @@ class WorkflowResponse(BaseModel):
 # ── Gemini LLM Call Helper ──────────────────────────────────────────────────
 
 def call_gemini_json(prompt: str) -> Dict[str, Any]:
+    if genai is None:
+        raise RuntimeError(
+            "The 'google-generativeai' package is not installed. "
+            "Please run: pip install google-generativeai (or pip install -r requirements-prod.txt)"
+        )
     if not API_KEY:
         raise ValueError("GEMINI_API_KEY environment variable is not configured.")
     
@@ -259,7 +284,20 @@ def run_agent_3_matching(payload: AgentRequestPayload, agent2: Agent2Output) -> 
     """
     try:
         data = call_gemini_json(prompt)
-        return Agent3Output(**data)
+        output = Agent3Output(**data)
+        has_family_stipend = any("family" in t.title.lower() or "stipend" in t.title.lower() or "displaced" in t.title.lower() for t in output.tasks)
+        if payload.displacedFamilies > 0 and not has_family_stipend:
+            stipend_cost = float(payload.displacedFamilies * 30 * 1500)
+            output.tasks.append(TaskDraft(
+                title=f"Emergency Family Living Stipend ({payload.displacedFamilies} Families)",
+                description=f"Disburse daily living stipend of LKR 1,500/day for 30 days to {payload.displacedFamilies} displaced families.",
+                assignedNgoName=payload.qualifiedNgos[0]["name"] if payload.qualifiedNgos else None,
+                sector="Social Welfare",
+                priority="High",
+                estimatedCost=stipend_cost
+            ))
+        output.estimatedTotalBudget = sum(t.estimatedCost for t in output.tasks)
+        return output
     except Exception:
         tasks = []
         total = 0.0
@@ -338,7 +376,11 @@ def run_agent_4_validation(payload: AgentRequestPayload, agent3: Agent3Output) -
 # ── FastAPI Main Route ───────────────────────────────────────────────────────
 
 @app.post("/api/recovery/agent/run", response_model=WorkflowResponse)
-async def run_recovery_workflow(payload: AgentRequestPayload):
+async def run_recovery_workflow(
+    payload: AgentRequestPayload,
+    x_aegis_agent_key: Optional[str] = Header(None, alias="X-Aegis-Agent-Key")
+):
+    _require_agent_key(x_aegis_agent_key)
     agent1 = run_agent_1_planner(payload)
     agent2 = run_agent_2_analysis(payload)
     agent3 = run_agent_3_matching(payload, agent2)
@@ -394,4 +436,5 @@ async def run_recovery_workflow(payload: AgentRequestPayload):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8004)
+    port = int(os.getenv("PORT", "8004"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

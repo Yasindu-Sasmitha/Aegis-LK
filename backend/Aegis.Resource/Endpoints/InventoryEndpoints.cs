@@ -55,13 +55,13 @@ namespace Aegis.Resource.Endpoints
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }
-            }).RequireAuthorization(policy => policy.RequireRole("ResourceManager", "Admin"));
+            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
 
             group.MapPut("/{id:guid}", async (Guid id, UpdateInventoryDto dto, IInventoryService inventoryService) =>
             {
                 var updated = await inventoryService.UpdateAsync(id, dto);
                 return updated is null ? Results.NotFound() : Results.Ok(updated);
-            }).RequireAuthorization(policy => policy.RequireRole("ResourceManager", "Admin"));
+            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
 
             group.MapDelete("/{id:guid}", async (Guid id, IInventoryService inventoryService) =>
             {
@@ -82,7 +82,7 @@ namespace Aegis.Resource.Endpoints
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }
-            }).RequireAuthorization(policy => policy.RequireRole("ResourceManager", "Admin"));
+            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
         }
     }
 }

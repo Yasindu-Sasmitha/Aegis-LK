@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Compensation } from '../types/recoveryTypes';
+import { Pagination } from './Pagination';
 
 interface Props {
   claims: Compensation[];
@@ -12,6 +13,8 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
   const [approvedAmount, setApprovedAmount] = useState<number>(0);
   const [status, setStatus] = useState<string>('Approved');
   const [notes, setNotes] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
 
   const handleOpenApprove = (c: Compensation) => {
     setSelectedClaim(c);
@@ -30,7 +33,6 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
   if (claims.length === 0) {
     return (
       <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📑</div>
         <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Compensation Claims Found</h3>
         <p style={{ margin: 0, fontSize: '0.9rem' }}>
           {isOfficer
@@ -40,6 +42,10 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
       </div>
     );
   }
+
+  const totalPages = Math.ceil(claims.length / pageSize);
+  const safePage = Math.min(currentPage, Math.max(1, totalPages));
+  const paginatedClaims = claims.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div>
@@ -59,7 +65,7 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
               </tr>
             </thead>
             <tbody>
-              {claims.map((c, idx) => (
+              {paginatedClaims.map((c, idx) => (
                 <tr
                   key={c.id}
                   style={{
@@ -81,7 +87,7 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#334155', fontWeight: 600 }}>
                     <span style={{ background: '#f1f5f9', padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem' }}>
-                      🏠 {c.damageCategory}
+                      {c.damageCategory}
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: '#0f172a' }}>
@@ -115,7 +121,7 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#475569', fontSize: '0.8rem' }}>
-                    {c.approvedBy ? `🛡️ ${c.approvedBy}` : '—'}
+                    {c.approvedBy || '—'}
                   </td>
                   <td style={{ padding: '0.85rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
                     {new Date(c.createdAt).toLocaleDateString()}
@@ -136,7 +142,7 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
                             fontSize: '0.75rem',
                           }}
                         >
-                          Review & Payout →
+                          Review & Payout
                         </button>
                       ) : (
                         <button
@@ -162,6 +168,13 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={safePage}
+          totalItems={claims.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* ── OFFICER REVIEW MODAL ── */}
@@ -233,7 +246,7 @@ export const CompensationTable: React.FC<Props> = ({ claims, isOfficer, onApprov
                 onClick={handleConfirm}
                 style={{ padding: '0.65rem 1.5rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
               >
-                ✓ Save Decision
+                Save Decision
               </button>
             </div>
           </div>

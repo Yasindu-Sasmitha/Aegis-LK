@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from incident_agent import incident_agent, IncidentAgentState
@@ -6,6 +7,18 @@ from incident_plausibility_agent import assess_plausibility
 from incident_dedup_agent import check_for_duplicate
 
 app = FastAPI(title="Incident Agent Service (internal only — not for direct client use)")
+
+# ── Service-to-service secret validation ─────────────────────────────────────
+_AGENT_KEY = os.getenv("AEGIS_AGENT_KEY", "")
+
+
+def _require_agent_key(key: Optional[str] = None) -> None:
+    """Reject requests that do not carry the correct X-Aegis-Agent-Key header.
+    No-op when AEGIS_AGENT_KEY is not configured (local development)."""
+    if not _AGENT_KEY:
+        return
+    if key != _AGENT_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized: invalid agent key")
 
 
 class AssessRequest(BaseModel):
@@ -57,7 +70,8 @@ class DedupResponse(BaseModel):
 
 
 @app.post("/assess", response_model=AssessResponse)
-def assess(req: AssessRequest):
+def assess(req: AssessRequest, x_aegis_agent_key: Optional[str] = Header(None, alias="X-Aegis-Agent-Key")):
+    _require_agent_key(x_aegis_agent_key)
     initial_state: IncidentAgentState = {
         "disaster_type": req.disaster_type,
         "severity_reported": req.severity_reported,
@@ -79,7 +93,8 @@ def assess(req: AssessRequest):
     )
 
 @app.post("/plausibility", response_model=PlausibilityResponse)
-def plausibility(req: PlausibilityRequest):
+def plausibility(req: PlausibilityRequest, x_aegis_agent_key: Optional[str] = Header(None, alias="X-Aegis-Agent-Key")):
+    _require_agent_key(x_aegis_agent_key)
     result = assess_plausibility(
         disaster_type=req.disaster_type,
         description=req.description,
@@ -90,7 +105,8 @@ def plausibility(req: PlausibilityRequest):
     return PlausibilityResponse(**result)
 
 @app.post("/dedup", response_model=DedupResponse)
-def dedup(req: DedupRequest):
+def dedup(req: DedupRequest, x_aegis_agent_key: Optional[str] = Header(None, alias="X-Aegis-Agent-Key")):
+    _require_agent_key(x_aegis_agent_key)
     result = check_for_duplicate(
         incident_id=req.incident_id,
         disaster_type=req.disaster_type,
@@ -103,3 +119,8 @@ def dedup(req: DedupRequest):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", "8002"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

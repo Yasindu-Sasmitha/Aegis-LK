@@ -39,13 +39,19 @@ namespace Aegis.Resource.Services
             var warehouses = await _db.Warehouses
                 .Select(w => new
                 {
-                    w.Id, w.Name, w.District, w.Latitude, w.Longitude
+                    w.Id,
+                    w.Name,
+                    w.District,
+                    w.Latitude,
+                    w.Longitude
                 }).ToListAsync();
 
             var inventory = await _db.Inventory
                 .Select(i => new
                 {
-                    i.WarehouseId, i.ItemName, i.QuantityAvailable
+                    i.WarehouseId,
+                    i.ItemName,
+                    i.QuantityAvailable
                 }).ToListAsync();
 
             var payload = new ResourceDispatchRequest
@@ -97,37 +103,74 @@ namespace Aegis.Resource.Services
 
             // 4. Persist the plan
             var plan = agentResult.DispatchPlan;
-            // Pick an available vehicle at the chosen warehouse
             var chosenWarehouseId = Guid.TryParse(plan.WarehouseId, out var wid)
-                ? wid : warehouses.First().Id;
+                ? wid
+                : warehouses.First().Id;
 
+            // ── Vehicle resolution ─────────────────────────────────────────
+            // Strategy (Option A — two-tier fallback):
+            //   1. Prefer a vehicle physically located at the chosen warehouse.
+            //      Among those, prefer an Available one over Dispatched.
+            //   2. If the chosen warehouse has no vehicles at all, fall back to
+            //      ANY available vehicle system-wide so the dispatch can still
+            //      be planned. The plan is only rejected when the entire fleet
+            //      is exhausted.
             var vehicle = await _db.Vehicles
                 .Where(v => v.WarehouseId == chosenWarehouseId)
-                .OrderBy(v => v.Status)   // Available (0) comes before Dispatched (1)
+                .OrderBy(v => v.Status) // Available (0) before Dispatched (1) etc.
                 .FirstOrDefaultAsync();
+
+            var usedFallbackVehicle = false;
 
             if (vehicle is null)
             {
-                // No vehicle at this warehouse — mark as safe failure
+                vehicle = await _db.Vehicles
+                    .Where(v => v.Status == VehicleStatus.Available)
+                    .OrderBy(v => v.WarehouseId)
+                    .FirstOrDefaultAsync();
+                usedFallbackVehicle = vehicle is not null;
+            }
+
+            if (vehicle is null)
+            {
+                // Truly no vehicles anywhere in the fleet — safe failure.
                 request.Status = ResourceRequestStatus.Rejected;
                 await _db.SaveChangesAsync();
+
                 return new DispatchResponseDto
                 {
                     Id = Guid.Empty,
                     MissionId = dto.MissionId,
                     OverallStatus = "Failed",
                     ApprovalStatus = "SafeFailure",
-                    Error = $"No vehicle available at warehouse {plan.WarehouseName}.",
+                    Error = "No vehicles available system-wide. " +
+                            "Add a vehicle to a warehouse before planning a dispatch.",
                     Steps = agentResult.Steps,
                     CreatedAt = DateTime.UtcNow,
                 };
+            }
+
+            // Build the route summary. If we had to borrow a vehicle from a
+            // different warehouse, say so — this is user-visible context that
+            // explains why the assigned warehouse and vehicle may differ.
+            var routeSummary = plan.RouteSummary;
+            if (usedFallbackVehicle && vehicle.WarehouseId != chosenWarehouseId)
+            {
+                var sourceWarehouseName = await _db.Warehouses
+                    .Where(w => w.Id == vehicle.WarehouseId)
+                    .Select(w => w.Name)
+                    .FirstOrDefaultAsync() ?? "another depot";
+
+                routeSummary =
+                    $"{plan.RouteSummary} " +
+                    $"(Vehicle {vehicle.RegistrationNumber} borrowed from {sourceWarehouseName}.)";
             }
 
             var dispatch = new Dispatch
             {
                 ResourceRequestId = request.Id,
                 WarehouseId = chosenWarehouseId,
-                VehicleId = vehicle.Id,                  // <-- THE FIX
+                VehicleId = vehicle.Id,
                 ItemsAllocated = plan.Items.Select(i => new AllocatedItem
                 {
                     ItemName = i.ItemName,
@@ -135,14 +178,14 @@ namespace Aegis.Resource.Services
                 }).ToList(),
                 EstimatedArrivalMinutes = agentResult.EstimatedArrival,
                 ApprovalStatus = DispatchApprovalStatus.PendingApproval,
-                AgentReasoning = plan.RouteSummary,
+                AgentReasoning = routeSummary,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
 
-// Mark the vehicle as dispatched
-vehicle.Status = VehicleStatus.Dispatched;
-vehicle.UpdatedAt = DateTime.UtcNow;
+            // Mark the vehicle as dispatched
+            vehicle.Status = VehicleStatus.Dispatched;
+            vehicle.UpdatedAt = DateTime.UtcNow;
 
             _db.Dispatches.Add(dispatch);
             await _db.SaveChangesAsync();
@@ -194,6 +237,18 @@ vehicle.UpdatedAt = DateTime.UtcNow;
             return ToDto(d, d.ResourceRequest, null, null);
         }
 
+        public async Task<List<DispatchResponseDto>> GetAllAsync()
+        {
+            var dispatches = await _db.Dispatches
+                .Include(d => d.Warehouse)
+                .Include(d => d.ResourceRequest)
+                .OrderByDescending(d => d.CreatedAt)
+                .Take(50)
+                .ToListAsync();
+
+            return dispatches.Select(d => ToDto(d, d.ResourceRequest, null, null)).ToList();
+        }
+
         private static DispatchResponseDto ToDto(
             Dispatch d,
             ResourceRequest? req,
@@ -207,12 +262,12 @@ vehicle.UpdatedAt = DateTime.UtcNow;
                 WarehouseId = d.WarehouseId,
                 WarehouseName = d.Warehouse?.Name ?? string.Empty,
                 District = req?.District ?? string.Empty,
-                TeamsRequired = req?.TeamsRequired ?? 0,           
+                TeamsRequired = req?.TeamsRequired ?? 0,
                 VehicleCount = plan?.VehicleCount
                     ?? Math.Max(1, d.ItemsAllocated.Count / 2),
                 EstimatedArrivalMinutes = d.EstimatedArrivalMinutes,
                 ApprovalStatus = d.ApprovalStatus.ToString(),
-                RouteSummary = plan?.RouteSummary ?? d.AgentReasoning ?? string.Empty,  
+                RouteSummary = plan?.RouteSummary ?? d.AgentReasoning ?? string.Empty,
                 Items = d.ItemsAllocated
                     .Select(i => new DispatchItemDto
                     {
@@ -224,18 +279,6 @@ vehicle.UpdatedAt = DateTime.UtcNow;
                 Error = agentResult?.Error,
                 CreatedAt = d.CreatedAt,
             };
-        }
-
-                public async Task<List<DispatchResponseDto>> GetAllAsync()
-        {
-            var dispatches = await _db.Dispatches
-                .Include(d => d.Warehouse)
-                .Include(d => d.ResourceRequest)
-                .OrderByDescending(d => d.CreatedAt)
-                .Take(50)
-                .ToListAsync();
-
-            return dispatches.Select(d => ToDto(d, d.ResourceRequest, null, null)).ToList();
         }
     }
 }

@@ -58,6 +58,9 @@ namespace Aegis.Recovery.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -76,6 +79,8 @@ namespace Aegis.Recovery.Migrations
                     b.HasIndex("ShelterId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("SubmittedByUserId");
 
                     b.ToTable("AidRequests", "recovery");
                 });
@@ -119,6 +124,9 @@ namespace Aegis.Recovery.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("VerificationNotes")
                         .IsRequired()
                         .HasColumnType("text");
@@ -128,6 +136,8 @@ namespace Aegis.Recovery.Migrations
                     b.HasIndex("NIC");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("SubmittedByUserId");
 
                     b.ToTable("Compensations", "recovery");
                 });
@@ -188,11 +198,16 @@ namespace Aegis.Recovery.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("District");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("SubmittedByUserId");
 
                     b.ToTable("DamageReports", "recovery");
                 });

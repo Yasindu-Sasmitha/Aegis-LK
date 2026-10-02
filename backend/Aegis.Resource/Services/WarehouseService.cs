@@ -96,6 +96,40 @@ namespace Aegis.Resource.Services
             var warehouse = await _db.Warehouses.FindAsync(id);
             if (warehouse is null) return false;
 
+            // 1. Delete dispatches (they reference the warehouse and its vehicles).
+            var dispatches = await _db.Dispatches
+                .Where(d => d.WarehouseId == id)
+                .ToListAsync();
+
+            // 2. Delete associated deliveries first (they reference dispatches).
+            var dispatchIds = dispatches.Select(d => d.Id).ToList();
+            var deliveries = await _db.Deliveries
+                .Where(del => dispatchIds.Contains(del.DispatchId))
+                .ToListAsync();
+            _db.Deliveries.RemoveRange(deliveries);
+
+            _db.Dispatches.RemoveRange(dispatches);
+
+            // 3. Delete resource requests tied to those dispatches.
+            var requestIds = dispatches.Select(d => d.ResourceRequestId).ToList();
+            var requests = await _db.ResourceRequests
+                .Where(r => requestIds.Contains(r.Id))
+                .ToListAsync();
+            _db.ResourceRequests.RemoveRange(requests);
+
+            // 4. Delete vehicles + their fuel records.
+            var vehicles = await _db.Vehicles
+                .Where(v => v.WarehouseId == id)
+                .ToListAsync();
+            _db.Vehicles.RemoveRange(vehicles);
+
+            // 5. Delete inventory items.
+            var inventory = await _db.Inventory
+                .Where(i => i.WarehouseId == id)
+                .ToListAsync();
+            _db.Inventory.RemoveRange(inventory);
+
+            // 6. Finally, the warehouse itself.
             _db.Warehouses.Remove(warehouse);
             await _db.SaveChangesAsync();
             return true;

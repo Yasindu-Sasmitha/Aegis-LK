@@ -13,6 +13,7 @@ public class Compensation
     public string Status { get; set; } = "Submitted"; // Submitted | UnderReview | Approved | Disbursed | Rejected
     public string VerificationNotes { get; set; } = string.Empty;
     public string? ApprovedBy { get; set; }
+    public Guid? SubmittedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ApprovedAt { get; set; }
 }

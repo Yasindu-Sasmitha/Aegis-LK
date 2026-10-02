@@ -10,6 +10,7 @@ Human approval is enforced downstream by the .NET backend, which stores
 the plan with approval_status = PendingApproval until a ResourceManager
 approves it. This keeps the LLM out of the authorisation decision.
 """
+import logging
 import os
 from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
@@ -93,7 +94,7 @@ def dispatch_coordinator(state: State) -> Dict[str, Any]:
         f"Available warehouses: {len(state.get('warehouses') or [])}, "
         f"inventory rows: {len(state.get('inventory') or [])}."
     )
-    raw = llm.with_structured_output(Plan).invoke(
+    raw: Plan = llm.with_structured_output(Plan).invoke(   #type:ignore
         [SystemMessage(system), HumanMessage(user)]
     )
     plan_steps = [raw.step_1, raw.step_2, raw.step_3, raw.step_4]
@@ -247,10 +248,32 @@ def route_after_validation(state: State) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Routing functions
+# ---------------------------------------------------------------------------
+def route_after_analyst(state: State) -> str:
+    """Fast-fail: if the analyst couldn't find stock, end the graph
+    immediately instead of passing control to the planner, which would
+    also fail and create a long fail-loop."""
+    if state.get("selected_warehouse") is None:
+        return "fail"
+    if state.get("validation_errors") and state.get("approval_status") == "SafeFailure":
+        return "fail"
+    return "planner"
+
+
+def route_after_validation(state: State) -> str:
+    if state["validation_errors"]:
+        if state["retries"] < MAX_RETRIES:
+            return "retry"
+        return "fail"
+    return "approve"
+
+
+# ---------------------------------------------------------------------------
 # Graph wiring
 # ---------------------------------------------------------------------------
 def build_resource_graph():
-    g = StateGraph(State)
+    g = StateGraph(State)   #type: ignore
     g.add_node("coordinator", dispatch_coordinator)
     g.add_node("analyst", warehouse_analyst)
     g.add_node("planner", dispatch_planner)
@@ -258,18 +281,26 @@ def build_resource_graph():
 
     g.add_edge(START, "coordinator")
     g.add_edge("coordinator", "analyst")
-    g.add_edge("analyst", "planner")
+
+    # Analyst → Planner (normal) OR → END (fast-fail on no stock)
+    g.add_conditional_edges(
+        "analyst",
+        route_after_analyst,
+        {"planner": "planner", "fail": END},
+    )
+
     g.add_edge("planner", "validator")
+
     g.add_conditional_edges(
         "validator",
         route_after_validation,
         {"retry": "analyst", "fail": END, "approve": END},
     )
+
     return g.compile(checkpointer=InMemorySaver())
 
 
 GRAPH = build_resource_graph()
-
 
 def run_resource_workflow(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Entry point called by the FastAPI service."""
