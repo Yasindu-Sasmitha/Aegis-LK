@@ -30,6 +30,9 @@ dependencies:
   provider: ^6.1.2
   google_fonts: ^6.1.0
   flutter_secure_storage: ^9.0.0
+  geolocator: ^13.0.0
+  image_picker: ^1.1.2
+  mobile_scanner: ^5.2.3
 
 dev_dependencies:
   flutter_test:

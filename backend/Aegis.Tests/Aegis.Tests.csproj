@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Aegis.Weather\Aegis.Weather.csproj" />
     <ProjectReference Include="..\Aegis.Api\Aegis.Api.csproj" />
     <ProjectReference Include="..\Aegis.Shared\Aegis.Shared.csproj" />
+    <ProjectReference Include="..\Aegis.Resource\Aegis.Resource.csproj" />
   </ItemGroup>
 
   <ItemGroup>

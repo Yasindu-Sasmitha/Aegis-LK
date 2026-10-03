@@ -21,6 +21,11 @@ namespace Aegis.Resource.Entities
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        // [INCIDENT-LINK] Snapshot of the incident context at dispatch time
+        public string? IncidentDisasterType { get; set; }  // "Flood"
+        public string? IncidentSeverity { get; set; }       // "High"
+        public DateTime? IncidentCreatedAt { get; set; }
+
         // Navigation
         public Dispatch? Dispatch { get; set; }
     }

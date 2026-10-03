@@ -151,7 +151,153 @@ public static class AuthEndpoints
             return Results.Created($"/api/auth/users/{user.Id}", MapToProfile(user));
         }).RequireAuthorization(policy => policy.RequireRole(Roles.Admin));
 
-        // ── 5. System Roles List ────────────────────────────────────────────
+        // ── 5. Admin List Users (Admin Only) ────────────────────────────────
+        group.MapGet("/admin/users", async (
+            string? search,
+            string? role,
+            bool? isActive,
+            AuthDbContext db) =>
+        {
+            var query = db.Users.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                query = query.Where(u => u.FullName.ToLower().Contains(s) || u.Email.ToLower().Contains(s));
+            }
+
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                query = query.Where(u => u.Role == role);
+            }
+
+            if (isActive.HasValue)
+            {
+                query = query.Where(u => u.IsActive == isActive.Value);
+            }
+
+            var users = await query
+                .OrderByDescending(u => u.CreatedAt)
+                .Select(u => new UserProfileResponse
+                {
+                    Id = u.Id,
+                    Email = u.Email,
+                    FullName = u.FullName,
+                    Role = u.Role,
+                    District = u.District,
+                    PhoneNumber = u.PhoneNumber,
+                    IsActive = u.IsActive,
+                    CreatedAt = u.CreatedAt,
+                    UpdatedAt = u.UpdatedAt
+                })
+                .ToListAsync();
+
+            return Results.Ok(users);
+        }).RequireAuthorization(policy => policy.RequireRole(Roles.Admin));
+
+        // ── 6. Admin Update User Profile/Role (Admin Only) ───────────────────
+        group.MapPut("/admin/users/{id:guid}", async (
+            Guid id,
+            UpdateAdminUserRequest req,
+            ClaimsPrincipal principal,
+            AuthDbContext db,
+            IPasswordHasher<User> hasher) =>
+        {
+            var user = await db.Users.FindAsync(id);
+            if (user == null)
+            {
+                return Results.NotFound(new { error = "User not found." });
+            }
+
+            if (!Roles.IsValid(req.Role))
+            {
+                return Results.BadRequest(new { error = $"Invalid role. Allowed roles: {string.Join(", ", Roles.All)}" });
+            }
+
+            var normalizedEmail = req.Email.Trim().ToLowerInvariant();
+            var emailInUse = await db.Users.AnyAsync(u => u.Id != id && u.Email.ToLower() == normalizedEmail);
+            if (emailInUse)
+            {
+                return Results.BadRequest(new { error = "An account with this email address already exists." });
+            }
+
+            var currentUserIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                ?? principal.FindFirst("sub")?.Value;
+            Guid.TryParse(currentUserIdClaim, out var currentUserId);
+
+            if (currentUserId == id && user.Role == Roles.Admin && req.Role != Roles.Admin)
+            {
+                return Results.BadRequest(new { error = "Administrators cannot revoke their own Administrator role." });
+            }
+
+            if (user.Role == Roles.Admin && req.Role != Roles.Admin)
+            {
+                var activeAdminCount = await db.Users.CountAsync(u => u.Role == Roles.Admin && u.IsActive);
+                if (activeAdminCount <= 1)
+                {
+                    return Results.BadRequest(new { error = "Cannot change the role of the last active Administrator." });
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(req.NewPassword))
+            {
+                if (req.NewPassword.Length < 6)
+                {
+                    return Results.BadRequest(new { error = "Password must be at least 6 characters." });
+                }
+                user.PasswordHash = hasher.HashPassword(user, req.NewPassword);
+            }
+
+            user.FullName = req.FullName.Trim();
+            user.Email = normalizedEmail;
+            user.Role = req.Role;
+            user.District = req.District?.Trim();
+            user.PhoneNumber = req.PhoneNumber?.Trim();
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(MapToProfile(user));
+        }).RequireAuthorization(policy => policy.RequireRole(Roles.Admin));
+
+        // ── 7. Admin Update User Active Status (Admin Only) ──────────────────
+        group.MapPatch("/admin/users/{id:guid}/status", async (
+            Guid id,
+            SetUserStatusRequest req,
+            ClaimsPrincipal principal,
+            AuthDbContext db) =>
+        {
+            var user = await db.Users.FindAsync(id);
+            if (user == null)
+            {
+                return Results.NotFound(new { error = "User not found." });
+            }
+
+            var currentUserIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                ?? principal.FindFirst("sub")?.Value;
+            if (Guid.TryParse(currentUserIdClaim, out var currentUserId) && currentUserId == id && !req.IsActive)
+            {
+                return Results.BadRequest(new { error = "Administrators cannot deactivate their own account." });
+            }
+
+            if (!req.IsActive && user.Role == Roles.Admin)
+            {
+                var activeAdminCount = await db.Users.CountAsync(u => u.Role == Roles.Admin && u.IsActive);
+                if (activeAdminCount <= 1)
+                {
+                    return Results.BadRequest(new { error = "Cannot deactivate the last active Administrator account." });
+                }
+            }
+
+            user.IsActive = req.IsActive;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(MapToProfile(user));
+        }).RequireAuthorization(policy => policy.RequireRole(Roles.Admin));
+
+        // ── 8. System Roles List ────────────────────────────────────────────
         group.MapGet("/roles", () => Results.Ok(Roles.All));
 
         return app;
@@ -165,6 +311,8 @@ public static class AuthEndpoints
         Role = user.Role,
         District = user.District,
         PhoneNumber = user.PhoneNumber,
-        CreatedAt = user.CreatedAt
+        IsActive = user.IsActive,
+        CreatedAt = user.CreatedAt,
+        UpdatedAt = user.UpdatedAt
     };
 }

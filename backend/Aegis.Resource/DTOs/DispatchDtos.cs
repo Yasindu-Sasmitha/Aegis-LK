@@ -11,6 +11,12 @@ namespace Aegis.Resource.DTOs
         [Required, MaxLength(100)] public string District { get; set; } = string.Empty;
         [Required] public decimal Latitude { get; set; }
         [Required] public decimal Longitude { get; set; }
+
+        // [INCIDENT-LINK] Optional incident snapshot — sent by the Incident module
+        // when the mission originated from a citizen report. Null for manual plans.
+        [MaxLength(50)] public string? IncidentDisasterType { get; set; }
+        [MaxLength(50)] public string? IncidentSeverity { get; set; }
+        public DateTime? IncidentCreatedAt { get; set; }
     }
 
     public class DispatchItemDto
@@ -36,6 +42,11 @@ namespace Aegis.Resource.DTOs
         public string? Error { get; set; }
         public DateTime CreatedAt { get; set; }
         public int TeamsRequired { get; set; }
-                   
+
+        // [INCIDENT-LINK] Echo the incident snapshot back to the UI.
+        public string? IncidentDisasterType { get; set; }
+        public string? IncidentSeverity { get; set; }
+        public DateTime? IncidentCreatedAt { get; set; }
+        public bool IsIncidentLinked => !string.IsNullOrWhiteSpace(IncidentDisasterType);
     }
 }
