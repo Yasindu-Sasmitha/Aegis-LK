@@ -699,3 +699,82 @@ class RecoveryReportModel {
     );
   }
 }
+
+class ApprovedIncidentModel {
+  final String id;
+  final String disasterType;
+  final String description;
+  final String severityReported;
+  final double latitude;
+  final double longitude;
+  final String status;
+  final String createdAt;
+
+  ApprovedIncidentModel({
+    required this.id,
+    required this.disasterType,
+    required this.description,
+    required this.severityReported,
+    required this.latitude,
+    required this.longitude,
+    required this.status,
+    required this.createdAt,
+  });
+
+  String get nearestDistrict {
+    const districtCoords = [
+      ('Colombo', 6.9271, 79.8612),
+      ('Gampaha', 7.0917, 79.9997),
+      ('Kalutara', 6.5854, 79.9607),
+      ('Kandy', 7.2906, 80.6337),
+      ('Nuwara Eliya', 6.9497, 80.7891),
+      ('Ratnapura', 6.6828, 80.3992),
+      ('Galle', 6.0535, 80.2210),
+      ('Matara', 5.9549, 80.5550),
+      ('Kegalle', 7.2513, 80.3464),
+      ('Kurunegala', 7.4863, 80.3623),
+      ('Badulla', 6.9934, 81.0550),
+      ('Anuradhapura', 8.3114, 80.4037),
+      ('Polonnaruwa', 7.9403, 81.0188),
+      ('Trincomalee', 8.5874, 81.2152),
+      ('Batticaloa', 7.7310, 81.6747),
+      ('Ampara', 7.2912, 81.6724),
+      ('Jaffna', 9.6615, 80.0255),
+      ('Kilinochchi', 9.3803, 80.3770),
+      ('Mannar', 8.9810, 79.9044),
+      ('Vavuniya', 8.7542, 80.4982),
+      ('Mullaitivu', 9.2671, 80.8142),
+      ('Matale', 7.4675, 80.6234),
+      ('Hambantota', 6.1429, 81.1212),
+      ('Monaragala', 6.8728, 81.3507),
+      ('Puttalam', 8.0362, 79.8283),
+    ];
+
+    if (latitude == 0.0 && longitude == 0.0) return 'Kalutara';
+
+    String best = 'Colombo';
+    double bestDist = double.maxFinite;
+    for (final (name, dLat, dLng) in districtCoords) {
+      final dist = (latitude - dLat) * (latitude - dLat) + (longitude - dLng) * (longitude - dLng);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = name;
+      }
+    }
+    return best;
+  }
+
+  factory ApprovedIncidentModel.fromJson(Map<String, dynamic> json) {
+    return ApprovedIncidentModel(
+      id: json['id']?.toString() ?? '',
+      disasterType: json['disasterType']?.toString() ?? 'Flood',
+      description: json['description']?.toString() ?? '',
+      severityReported: json['severityReported']?.toString() ?? 'High',
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'MissionApproved',
+      createdAt: json['createdAt']?.toString() ?? '',
+    );
+  }
+}
+
