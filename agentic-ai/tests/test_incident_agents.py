@@ -181,3 +181,86 @@ def test_agent_key_noop_when_not_configured(monkeypatch):
     import incident_agent_service as svc
     monkeypatch.setattr(svc, "_AGENT_KEY", "")
     svc._require_agent_key(None)
+
+# ── Weather module thresholds tool (additive) ────────────────────────────────
+def _fake_weather_api(monkeypatch, districts, history, fail_on=None):
+    class R:
+        def __init__(self, data): self._d = data
+        def raise_for_status(self): pass
+        def json(self): return self._d
+
+    def fake_get(url, **kwargs):
+        if fail_on and fail_on in url:
+            raise ConnectionError("weather module down")
+        if url.endswith("/api/weather/districts"):
+            return R(districts)
+        if url.endswith("/historical"):
+            return R(history)
+        raise AssertionError(f"unexpected url {url}")
+
+    monkeypatch.setattr(pa.requests, "get", fake_get)
+
+
+GUID = "11111111-2222-3333-4444-555555555555"
+
+
+def test_thresholds_matches_district_name_with_space_and_picks_current_month(monkeypatch):
+    month = pa.datetime.now(pa.timezone.utc).month
+    other = 1 if month != 1 else 2
+    _fake_weather_api(
+        monkeypatch,
+        districts=[{"id": GUID, "name": "Nuwara Eliya"}],
+        history=[
+            {"month": other, "avgRainfallMm": 1, "floodThresholdMm": 1, "landslideThresholdMm": 1},
+            {"month": month, "avgRainfallMm": 210.5, "floodThresholdMm": 120, "landslideThresholdMm": 90},
+        ],
+    )
+    out = json.loads(pa.get_weather_thresholds.invoke({"district": "NuwaraEliya"}))
+    assert out["month"] == month
+    assert out["flood_threshold_mm"] == 120 and out["landslide_threshold_mm"] == 90
+
+
+def test_thresholds_unknown_district_makes_no_network_call(monkeypatch):
+    def boom(*a, **k): raise AssertionError("network must not be called")
+    monkeypatch.setattr(pa.requests, "get", boom)
+    assert "error" in json.loads(pa.get_weather_thresholds.invoke({"district": "Atlantis"}))
+
+
+def test_thresholds_weather_module_down_returns_structured_error(monkeypatch):
+    _fake_weather_api(monkeypatch, [], [], fail_on="/api/weather/districts")
+    assert "error" in json.loads(pa.get_weather_thresholds.invoke({"district": "Colombo"}))
+
+
+def test_thresholds_rejects_non_guid_district_id(monkeypatch):
+    _fake_weather_api(monkeypatch, [{"id": "../../admin", "name": "Colombo"}], [])
+    assert "error" in json.loads(pa.get_weather_thresholds.invoke({"district": "Colombo"}))
+
+
+def test_thresholds_missing_month_row_returns_error(monkeypatch):
+    month = pa.datetime.now(pa.timezone.utc).month
+    other = 1 if month != 1 else 2
+    _fake_weather_api(monkeypatch, [{"id": GUID, "name": "Colombo"}], [{"month": other}])
+    assert "error" in json.loads(pa.get_weather_thresholds.invoke({"district": "Colombo"}))
+
+
+def test_thresholds_tool_is_added_and_existing_tools_are_kept(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(pa, "ChatGoogleGenerativeAI", lambda **k: object())
+    monkeypatch.setattr(pa, "create_react_agent", lambda llm, tools: captured.setdefault("t", [t.name for t in tools]))
+    pa.build_plausibility_agent(has_photo=False)
+    assert {"get_weather", "get_upstream_districts", "get_weather_thresholds"} <= set(captured["t"])
+
+
+def test_thresholds_prompt_keeps_original_steps_and_adds_optional_step(monkeypatch):
+    seen = {}
+    class Spy(FakeAgent):
+        def invoke(self, payload):
+            seen["p"] = payload["messages"][0]["content"]
+            return super().invoke(payload)
+    monkeypatch.setattr(pa, "build_plausibility_agent", lambda h: Spy("PLAUSIBILITY_SCORE: 60\nREASONING: x"))
+    pa.assess_plausibility("Flood", "d", 6.9, 79.8)
+    p = seen["p"]
+    assert "1. Call get_weather for the nearest district first." in p
+    assert "1b. OPTIONAL" in p and "get_weather_thresholds" in p
+    assert "never a hard accept/reject" in p
+    assert "PLAUSIBILITY_SCORE: <0-100>" in p
