@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,9 @@ namespace Aegis.Incident.Endpoints;
 
 public static class IncidentEndpoints
 {
+    private static Guid? CallerId(ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
+
     public static void MapIncidentEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/incidents").WithTags("Incidents");
@@ -85,8 +89,10 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents — citizen creates a report
-        group.MapPost("/", async (CreateIncidentRequest request, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
+        group.MapPost("/", [Authorize] async (CreateIncidentRequest request, IncidentDbContext db, IServiceScopeFactory scopeFactory, ClaimsPrincipal principal) =>
         {
+            var callerId = CallerId(principal);
+            if (callerId is null) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(request.DisasterType))
                 return Results.BadRequest("disasterType is required.");
             if (string.IsNullOrWhiteSpace(request.SeverityReported))
@@ -100,7 +106,7 @@ public static class IncidentEndpoints
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 PhotoUrl = request.PhotoUrl,
-                ReportedByUserId = request.ReportedByUserId,
+                ReportedByUserId = callerId.Value, // never trust the client-supplied id
                 Status = "Reported"
             };
 
@@ -353,10 +359,15 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents/{id}/photo - citizen (or officer) attaches a photo after creation
-        group.MapPost("/{id:guid}/photo", async (Guid id, HttpRequest request, IncidentDbContext db, CloudinaryService cloudinaryService) =>
+        group.MapPost("/{id:guid}/photo", [Authorize] async (Guid id, HttpRequest request, IncidentDbContext db, CloudinaryService cloudinaryService, ClaimsPrincipal principal) =>
         {
             var incident = await db.Incidents.FindAsync(id);
             if (incident is null) return Results.NotFound();
+
+            var callerId = CallerId(principal);
+            if (callerId is null) return Results.Unauthorized();
+            if (incident.ReportedByUserId != callerId.Value && !principal.IsInRole("DisasterOfficer") && !principal.IsInRole("Admin"))
+                return Results.Forbid();
 
             if (!request.HasFormContentType)
                 return Results.BadRequest("Expected multipart/form-data with a 'file' field.");
@@ -393,8 +404,12 @@ public static class IncidentEndpoints
         // display status: a report merged as a duplicate never gets its own
         // lifecycle, so we surface that explicitly instead of leaving it stuck
         // on "Reported" forever, indistinguishable from an ignored report.
-        group.MapGet("/my-reports", async (Guid reportedByUserId, IncidentDbContext db) =>
+        group.MapGet("/my-reports", [Authorize] async (Guid reportedByUserId, IncidentDbContext db, ClaimsPrincipal principal) =>
         {
+            var callerId = CallerId(principal);
+            if (callerId is null) return Results.Unauthorized();
+            if (callerId.Value != reportedByUserId && !principal.IsInRole("DisasterOfficer") && !principal.IsInRole("Admin"))
+                return Results.Forbid();
             var reports = await db.Incidents
                 .Where(i => i.ReportedByUserId == reportedByUserId)
                 .OrderByDescending(i => i.CreatedAt)
