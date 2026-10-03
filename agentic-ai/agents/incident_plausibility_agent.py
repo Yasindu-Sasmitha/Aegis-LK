@@ -100,7 +100,7 @@ def _normalize_name(name: str) -> str:
 
 @tool
 def get_weather_thresholds(district: str) -> str:
-    """OPTIONAL extra corroboration. Get the Weather module's stored baseline for a Sri
+    """Extra corroboration. Get the Weather module's stored baseline for a Sri
     Lankan district for the CURRENT month: average rainfall plus the flood and landslide
     rainfall thresholds (mm). Use it together with get_weather (not instead of it) to judge
     whether the recent rainfall you measured is unusually high for this district and month.
@@ -217,9 +217,9 @@ Nearest district: {district}{photo_line}
 
 Steps to follow:
 1. Call get_weather for the nearest district first.
-1b. OPTIONAL: also call get_weather_thresholds for the same district. Compare the 48h
-   rainfall to the stored flood/landslide thresholds as extra corroboration. If it returns an
-   error, ignore it and continue - never lower the score just because this extra check failed.
+1b. Also call get_weather_thresholds for the same district, and compare the 48h rainfall to
+   the stored flood/landslide thresholds as extra corroboration. If it returns an error, say the
+   extra check was unavailable and continue - never lower the score just because it failed.
 2. If disaster type is Flood AND local rainfall is low (under ~10mm in 48h), call
    get_upstream_districts, then call get_weather again for any upstream district(s) returned —
    Sri Lankan floods are frequently river-driven from upstream rain with no local rainfall.

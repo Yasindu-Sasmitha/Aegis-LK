@@ -261,6 +261,6 @@ def test_thresholds_prompt_keeps_original_steps_and_adds_optional_step(monkeypat
     pa.assess_plausibility("Flood", "d", 6.9, 79.8)
     p = seen["p"]
     assert "1. Call get_weather for the nearest district first." in p
-    assert "1b. OPTIONAL" in p and "get_weather_thresholds" in p
+    assert "1b. Also call get_weather_thresholds" in p
     assert "never a hard accept/reject" in p
     assert "PLAUSIBILITY_SCORE: <0-100>" in p
