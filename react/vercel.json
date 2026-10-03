@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://aegis-api.onrender.com/api/:path*"
+      "destination": "https://aegis-lk.onrender.com/api/:path*"
     }
   ]
 }
