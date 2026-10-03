@@ -1,0 +1,91 @@
+# render.yaml — Aegis-LK Agent Services Blueprint
+#
+# Declares all four Python agent microservices as Render Web Services.
+# They share the same Git repo but each has a different start command.
+#
+# To use:
+#   1. Push this file to the repo root.
+#   2. In Render Dashboard → "New" → "Blueprint" → connect this repo.
+#   3. Set secret environment variables (GOOGLE_API_KEY, AEGIS_AGENT_KEY, etc.)
+#      in each service's "Environment" tab — do NOT commit secrets here.
+#
+# Free-tier note: Free services spin down after 15 min of inactivity.
+# Upgrade to Starter ($7/mo) for always-on agents.
+
+services:
+
+  # ── 1. Weather Agent ────────────────────────────────────────────────────────
+  - type: web
+    name: aegis-weather-agent
+    runtime: python
+    plan: free          # change to "free" to use the free tier
+    region: oregon         # match your existing backend region
+    rootDir: agentic-ai/agents
+    buildCommand: pip install -r requirements-prod.txt
+    startCommand: uvicorn weather_agent_service:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false        # set manually in Render dashboard
+      - key: CHAT_MODEL
+        value: gemini-3.1-flash-lite
+      - key: AEGIS_AGENT_KEY
+        sync: false        # must match the value set on the .NET backend
+
+  # ── 2. Incident Agent ───────────────────────────────────────────────────────
+  - type: web
+    name: aegis-incident-agent
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: agentic-ai/agents
+    buildCommand: pip install -r requirements-prod.txt
+    startCommand: uvicorn incident_agent_service:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: CHAT_MODEL
+        value: gemini-3.1-flash-lite
+      - key: AEGIS_AGENT_KEY
+        sync: false
+
+  # ── 3. Resource Agent ───────────────────────────────────────────────────────
+  - type: web
+    name: aegis-resource-agent
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: agentic-ai/agents
+    buildCommand: pip install -r requirements-prod.txt
+    startCommand: uvicorn resource_agent_service:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: CHAT_MODEL
+        value: gemini-3.1-flash-lite
+      - key: AEGIS_AGENT_KEY
+        sync: false
+      # PostgresSaver — point to the same Render Postgres instance used by the backend.
+      # Format: postgresql://user:password@host/dbname
+      - key: RESOURCE_AGENT_DATABASE_URL
+        sync: false
+
+  # ── 4. Recovery Agent ───────────────────────────────────────────────────────
+  - type: web
+    name: aegis-recovery-agent
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: agentic-ai/agents
+    buildCommand: pip install -r requirements-prod.txt
+    startCommand: uvicorn recovery_agent:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
+      - key: AEGIS_AGENT_KEY
+        sync: false
