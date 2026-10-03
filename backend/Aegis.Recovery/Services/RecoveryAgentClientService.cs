@@ -889,8 +889,8 @@ public sealed class RecoveryToolbox
         {
             var (min, max) = a.DamageLevel switch
             {
-                "Destroyed" => (300_000m, 800_000m),
-                "Severe" => (150_000m, 400_000m),
+                "Destroyed" => (500_000m, 1_500_000m),
+                "Severe" => (200_000m, 500_000m),
                 "Moderate" => (80_000m, 200_000m),
                 _ => (30_000m, 80_000m)
             };
