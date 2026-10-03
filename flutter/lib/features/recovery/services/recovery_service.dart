@@ -201,6 +201,7 @@ class RecoveryService {
 
   Future<RecoveryPlanModel> submitDamageIntake(
     DamageIntakeModel intake, {
+    String? incidentId,
     String? damageReportId,
     String? revisionGuidance,
   }) async {
@@ -208,6 +209,9 @@ class RecoveryService {
     final Map<String, dynamic> payload = {
       'directDamageIntake': intake.toJson(),
     };
+    if (incidentId != null && incidentId.isNotEmpty) {
+      payload['incidentId'] = incidentId;
+    }
     if (damageReportId != null && damageReportId.isNotEmpty) {
       payload['damageReportId'] = damageReportId;
     }
@@ -312,6 +316,7 @@ class RecoveryService {
   }
 
   Future<DamageReportModel> submitCitizenDamageReport({
+    String? incidentId,
     required String district,
     required String location,
     required String disasterType,
@@ -323,20 +328,25 @@ class RecoveryService {
     List<DamageIntakeInfrastructureItemModel>? infrastructureDamage,
   }) async {
     final headers = await _getAuthHeaders();
+    final Map<String, dynamic> payload = {
+      'district': district,
+      'location': location,
+      'disasterType': disasterType,
+      'housesDamaged': housesDamaged,
+      'displacedFamilies': displacedFamilies,
+      'reporterName': reporterName,
+      'reporterContact': reporterContact,
+      'additionalNotes': additionalNotes,
+      'infrastructureDamage': infrastructureDamage?.map((e) => e.toJson()).toList() ?? [],
+    };
+    if (incidentId != null && incidentId.isNotEmpty) {
+      payload['incidentId'] = incidentId;
+    }
+
     final response = await http.post(
       Uri.parse('$baseUrl/damage-reports'),
       headers: headers,
-      body: jsonEncode({
-        'district': district,
-        'location': location,
-        'disasterType': disasterType,
-        'housesDamaged': housesDamaged,
-        'displacedFamilies': displacedFamilies,
-        'reporterName': reporterName,
-        'reporterContact': reporterContact,
-        'additionalNotes': additionalNotes,
-        'infrastructureDamage': infrastructureDamage?.map((e) => e.toJson()).toList() ?? [],
-      }),
+      body: jsonEncode(payload),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
       return DamageReportModel.fromJson(jsonDecode(response.body));
@@ -344,5 +354,26 @@ class RecoveryService {
     final err = jsonDecode(response.body);
     throw Exception(err['error'] ?? 'Failed to submit citizen damage report');
   }
+
+  // ── 8. Incident Module Integration Queue ────────────────────────────────────
+
+  Future<List<ApprovedIncidentModel>> fetchApprovedIncidents() async {
+    try {
+      final uri = Uri.parse('${ApiConfig.incidentBase}?pageSize=50');
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final List data = decoded is List ? decoded : (decoded['items'] ?? []);
+        final list = data.map((e) => ApprovedIncidentModel.fromJson(e as Map<String, dynamic>)).toList();
+        return list.where((i) {
+          final s = i.status.toLowerCase();
+          return s == 'missionapproved' || s == 'closed' || s == 'assessed' || s == 'approved' || s == 'reported';
+        }).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
 }
+
 

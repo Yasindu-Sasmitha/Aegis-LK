@@ -189,6 +189,7 @@ public class DamageIntakeInfrastructureItem
 // Damage Report DTOs
 public class CreateDamageReportRequest
 {
+    public Guid? IncidentId { get; set; }
     public string District { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
     public string DisasterType { get; set; } = string.Empty;
