@@ -52,7 +52,7 @@ export interface CreateWarehouseDto {
   vehicleCount?: number;
 }
 
-export interface UpdateWarehouseDto extends CreateWarehouseDto {}
+export interface UpdateWarehouseDto extends CreateWarehouseDto { }
 
 export interface CreateInventoryDto {
   warehouseId: string;
@@ -93,6 +93,10 @@ export interface DispatchPlan {
   approvalStatus: 'PendingApproval' | 'Approved' | 'Rejected';
   items: DispatchAllocationItem[];
   createdAt: string;
+  incidentDisasterType?: string | null;
+  incidentSeverity?: string | null;
+  incidentCreatedAt?: string | null;
+  isIncidentLinked?: boolean;
 }
 
 export interface CreateDispatchRequestDto {
@@ -101,6 +105,21 @@ export interface CreateDispatchRequestDto {
   district: string;
   latitude: number;
   longitude: number;
+}
+
+// ─── Incident Integration Types ─────────────────────────────────────────────
+// Used by the Dispatch Planner's "Select Approved Incident" dropdown.
+// Populated from GET /api/incidents?status=MissionApproved.
+
+export interface ApprovedIncidentSummary {
+  id: string;
+  disasterType: string;
+  severityAssessed: string | null;
+  severityReported: string;
+  district: string;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
 }
 
 export const ITEM_TYPE_LABELS: Record<string, string> = {
