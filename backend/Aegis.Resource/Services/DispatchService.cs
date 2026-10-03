@@ -31,6 +31,9 @@ namespace Aegis.Resource.Services
                 Latitude = dto.Latitude,
                 Longitude = dto.Longitude,
                 Status = ResourceRequestStatus.Pending,
+                IncidentDisasterType = dto.IncidentDisasterType, //incident module
+                IncidentSeverity = dto.IncidentSeverity,
+                IncidentCreatedAt = dto.IncidentCreatedAt,
             };
             _db.ResourceRequests.Add(request);
             await _db.SaveChangesAsync();
@@ -278,6 +281,9 @@ namespace Aegis.Resource.Services
                 OverallStatus = agentResult?.OverallStatus ?? "Success",
                 Error = agentResult?.Error,
                 CreatedAt = d.CreatedAt,
+                IncidentDisasterType = req?.IncidentDisasterType, //incident module
+                IncidentSeverity = req?.IncidentSeverity, //incident module
+                IncidentCreatedAt = req?.IncidentCreatedAt, //incident module
             };
         }
     }

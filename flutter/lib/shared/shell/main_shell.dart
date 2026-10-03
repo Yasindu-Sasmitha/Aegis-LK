@@ -14,6 +14,8 @@ import '../../features/recovery/screens/donate_screen.dart';
 import '../../features/recovery/screens/citizen_damage_report_screen.dart';
 import '../../features/recovery/screens/recovery_plan_status_screen.dart';
 import '../../features/recovery/screens/recovery_reports_screen.dart';
+import '../../features/incident/screens/report_incident_screen.dart';
+import '../../features/incident/screens/my_reports_screen.dart';
 import '../../features/recovery/screens/compensation_claim_screen.dart';
 import '../../features/resource/screens/warehouse_inventory_screen.dart';
 import '../../features/resource/screens/dispatch_plan_screen.dart';
@@ -37,6 +39,7 @@ class _MainShellState extends State<MainShell> {
   late int _primaryIndex;
   int _weatherSubIndex = 0;
   int _recoverySubIndex = 0;
+  int _incidentSubIndex = 0;
   int _resourceSubIndex = 0;
 
   @override
@@ -49,6 +52,8 @@ class _MainShellState extends State<MainShell> {
       _recoverySubIndex = widget.initialSubIndex;
     } else if (_primaryIndex == 3) {
       _resourceSubIndex = widget.initialSubIndex;
+    } else if (_primaryIndex == 4) {
+      _incidentSubIndex = widget.initialSubIndex;
     }
   }
 
@@ -71,6 +76,9 @@ class _MainShellState extends State<MainShell> {
       } else if (section == 'resource') {
         _primaryIndex = 3;
         _resourceSubIndex = subIndex ?? 0;
+      } else if (section == 'incident') {
+        _primaryIndex = 4;
+        _incidentSubIndex = subIndex ?? 0;
       }
     });
   }
@@ -88,6 +96,7 @@ class _MainShellState extends State<MainShell> {
           if (_primaryIndex == 1) _buildWeatherSubNav(context, isOfficer),
           if (_primaryIndex == 2) _buildRecoverySubNav(context),
           if (_primaryIndex == 3) _buildResourceSubNav(context),
+          if (_primaryIndex == 4) _buildIncidentSubNav(context),
           Expanded(
             child: _buildCurrentBody(isOfficer),
           ),
@@ -194,6 +203,13 @@ class _MainShellState extends State<MainShell> {
                     icon: Icons.inventory_2_outlined,
                     isActive: _primaryIndex == 3,
                     onTap: () => setState(() => _primaryIndex = 3),
+                  ),
+                  const SizedBox(width: 4),
+                  _buildPrimaryNavItem(
+                    label: 'Report Incident',
+                    icon: Icons.report_problem_outlined,
+                    isActive: _primaryIndex == 4,
+                    onTap: () => setState(() => _primaryIndex = 4),
                   ),
                 ],
               ),
@@ -369,40 +385,40 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildResourceSubNav(BuildContext context) {
-  return Container(
-    height: 44,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: const BoxDecoration(
-      color: kSubNavBg,
-      border: Border(bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1)),
-    ),
-    child: ListView(
-      scrollDirection: Axis.horizontal,
-      children: [
-        _buildSubNavItem(
-          label: 'Warehouse Inventory',
-          icon: Icons.warehouse_outlined,
-          isActive: _resourceSubIndex == 0,
-          onTap: () => setState(() => _resourceSubIndex = 0),
-        ),
-        const SizedBox(width: 6),
-        _buildSubNavItem(
-          label: 'Dispatch Plans',
-          icon: Icons.local_shipping_outlined,
-          isActive: _resourceSubIndex == 1,
-          onTap: () => setState(() => _resourceSubIndex = 1),
-        ),
-        const SizedBox(width: 6),
-        _buildSubNavItem(
-          label: 'Delivery QR',
-          icon: Icons.qr_code_scanner,
-          isActive: _resourceSubIndex == 2,
-          onTap: () => setState(() => _resourceSubIndex = 2),
-        ),
-      ],
-    ),
-  );
-}
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: kSubNavBg,
+        border: Border(bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1)),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _buildSubNavItem(
+            label: 'Warehouse Inventory',
+            icon: Icons.warehouse_outlined,
+            isActive: _resourceSubIndex == 0,
+            onTap: () => setState(() => _resourceSubIndex = 0),
+          ),
+          const SizedBox(width: 6),
+          _buildSubNavItem(
+            label: 'Dispatch Plans',
+            icon: Icons.local_shipping_outlined,
+            isActive: _resourceSubIndex == 1,
+            onTap: () => setState(() => _resourceSubIndex = 1),
+          ),
+          const SizedBox(width: 6),
+          _buildSubNavItem(
+            label: 'Delivery QR',
+            icon: Icons.qr_code_scanner,
+            isActive: _resourceSubIndex == 2,
+            onTap: () => setState(() => _resourceSubIndex = 2),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildRecoverySubNav(BuildContext context) {
     final recoveryTabs = [
@@ -471,6 +487,35 @@ class _MainShellState extends State<MainShell> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIncidentSubNav(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        color: kSubNavBg,
+        border: Border(bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1)),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _buildSubNavItem(
+            label: 'Report',
+            icon: Icons.add_alert_outlined,
+            isActive: _incidentSubIndex == 0,
+            onTap: () => setState(() => _incidentSubIndex = 0),
+          ),
+          const SizedBox(width: 6),
+          _buildSubNavItem(
+            label: 'My Reports',
+            icon: Icons.list_alt_outlined,
+            isActive: _incidentSubIndex == 1,
+            onTap: () => setState(() => _incidentSubIndex = 1),
           ),
         ],
       ),
@@ -718,6 +763,21 @@ class _MainShellState extends State<MainShell> {
           return const DeliveryQrScreen();
         default:
           return const WarehouseInventoryScreen();
+      }
+    }
+
+    if (_primaryIndex == 4) {
+      switch (_incidentSubIndex) {
+        case 1:
+          // key forces a fresh fetch each time the citizen opens this tab,
+          // so a just-merged duplicate shows its new status.
+          return MyReportsScreen(key: UniqueKey(), showAppBar: false);
+        case 0:
+        default:
+          return ReportIncidentScreen(
+            showAppBar: false,
+            onSubmitted: () => setState(() => _incidentSubIndex = 1),
+          );
       }
     }
 

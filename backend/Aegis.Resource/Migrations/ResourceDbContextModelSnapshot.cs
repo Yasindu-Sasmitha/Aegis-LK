@@ -181,6 +181,15 @@ namespace Aegis.Resource.Migrations
                     b.Property<string>("District")
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("IncidentCreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IncidentDisasterType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("IncidentSeverity")
+                        .HasColumnType("text");
+
                     b.Property<decimal>("Latitude")
                         .HasColumnType("numeric");
 

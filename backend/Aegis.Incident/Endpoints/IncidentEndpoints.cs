@@ -7,6 +7,8 @@ using Aegis.Incident.Data;
 using Aegis.Incident.Dtos;
 using Aegis.Incident.Models;
 using Aegis.Incident.Services;
+using Microsoft.Extensions.Logging;      // ← [MEMBER-3 INTEGRATION] NEW
+using System.Net.Http.Json;
 
 namespace Aegis.Incident.Endpoints;
 
@@ -164,8 +166,12 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents/{id}/approve — officer approves, creates RescueMission
-        group.MapPost("/{id:guid}/approve", async (Guid id, ApproveIncidentRequest request, IncidentDbContext db) =>
+        group.MapPost("/{id:guid}/approve", async (Guid id, ApproveIncidentRequest request, IncidentDbContext db, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory) => //added integration for resource module (IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory)     
+
         {
+
+            var logger = loggerFactory.CreateLogger("IncidentApprove"); // [MEMBER-3 INTEGRATION] NEW
+
             var incident = await db.Incidents
                 .Include(i => i.RescueMission)
                 .FirstOrDefaultAsync(i => i.Id == id);
@@ -199,6 +205,71 @@ public static class IncidentEndpoints
 
             // TODO (later branch): fire outbound POST to Resource's /api/resource/dispatch-requests
             // wrapped in try/catch so this endpoint still succeeds if Resource isn't built/running yet.
+
+            // ═════════════════════════════════════════════════════════════════
+            // [MEMBER-3 INTEGRATION] START
+            // This block fires the cross-module contract: Incident → Resource.
+            // If you need to disable this without losing the original behaviour,
+            // simply comment out the whole block between START and END.
+            // The endpoint still returns 200 OK either way.
+            // ═════════════════════════════════════════════════════════════════
+            var district = DistrictHelper.NearestDistrict(incident.Latitude, incident.Longitude);
+
+            var dispatchPayload = new
+            {
+                missionId = incident.Id,
+                teamsRequired,
+                district,
+                latitude = (decimal)incident.Latitude,
+                longitude = (decimal)incident.Longitude,
+                incidentDisasterType = incident.DisasterType,           //incident module
+                incidentSeverity = incident.SeverityAssessed ?? incident.SeverityReported,
+                incidentCreatedAt = incident.CreatedAt, 
+            };
+
+            try
+            {
+                var http = httpClientFactory.CreateClient("ResourceModule");
+                var response = await http.PostAsJsonAsync(
+                    "/api/resource/dispatch/requests",
+                    dispatchPayload);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    db.MissionLogs.Add(new MissionLog
+                    {
+                        IncidentId = id,
+                        Note = $"Dispatch request sent to Resource module. District={district}, Teams={teamsRequired}."
+                    });
+                }
+                else
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    logger.LogWarning(
+                        "Resource dispatch request failed for incident {IncidentId}: {StatusCode} {Body}",
+                        id, response.StatusCode, body);
+                    db.MissionLogs.Add(new MissionLog
+                    {
+                        IncidentId = id,
+                        Note = $"Dispatch request to Resource module FAILED ({response.StatusCode}). Will retry manually."
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Resource dispatch request threw for incident {IncidentId}", id);
+                db.MissionLogs.Add(new MissionLog
+                {
+                    IncidentId = id,
+                    Note = $"Dispatch request to Resource module FAILED (exception: {ex.GetType().Name}). Will retry manually."
+                });
+            }
+
+            await db.SaveChangesAsync();
+            // ═════════════════════════════════════════════════════════════════
+            // [MEMBER-3 INTEGRATION] END
+            // ═══════════════════════════════════════════════════════════════
 
             return Results.Ok(mission);
         });

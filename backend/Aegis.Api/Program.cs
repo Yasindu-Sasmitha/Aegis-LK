@@ -222,6 +222,20 @@ var cloudinarySettings = new Aegis.Incident.Services.CloudinarySettings
     ApiKey = builder.Configuration["Cloudinary:ApiKey"] ?? "",
     ApiSecret = builder.Configuration["Cloudinary:ApiSecret"] ?? ""
 };
+
+// Internal HTTP client — Incident module calls Resource module over loopback.
+// This is the "Incident → Resource" hard border contract from the group README.
+// Uses a named client ("ResourceModule") because the caller is a service
+// (not a typed client), and we don't want to pollute the typed clients above.
+builder.Services.AddHttpClient("ResourceModule", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5012");
+    client.Timeout = TimeSpan.FromSeconds(60);
+    // Internal service-to-service authentication
+    if (!string.IsNullOrWhiteSpace(agentKey))
+        client.DefaultRequestHeaders.Add("X-Aegis-Agent-Key", agentKey);
+});
+
 builder.Services.AddSingleton(cloudinarySettings);
 builder.Services.AddSingleton<Aegis.Incident.Services.CloudinaryService>();
 
