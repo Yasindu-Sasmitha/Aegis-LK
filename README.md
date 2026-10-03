@@ -344,7 +344,7 @@ git push origin --delete feature/<your-IT-ID>-<task>
 
 **Owns, full stop:**
 - Entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`
-- Endpoints: `POST /api/resource/dispatch-requests`, `GET /api/resource/dispatch/{id}`, `POST /api/resource/dispatch/{id}/approve`, `GET /api/resource/inventory`
+- Endpoints: `POST /api/resource/dispatch/requests`, `GET /api/resource/dispatch/{id}`, `POST /api/resource/dispatch/{id}/approve`, `GET /api/resource/inventory`
 - Agent: Resource Allocation Agent — input `{ missionId, teamsRequired, location }`, output `{ dispatchPlan, estimatedArrival }`
 - Third-party call: Maps/routing API for road closures and route calculation — lives here, nowhere else
 - React: warehouse/inventory/dispatch dashboards
@@ -651,4 +651,4 @@ When adding your screens and features to Flutter:
 5. **Running Locally:**
    - Web: `flutter run -d chrome` (connects to `localhost:5012`).
    - Android Emulator: `flutter run -d emulator-5554` (use `10.0.2.2:5012`).
-   - Quick Demo Login: Use the pre-seeded buttons on the login screen (`officer@aegis.lk`, `citizen@aegis.lk`, etc.).
+   - Quick Demo Login: Use the pre-seeded buttons on the login screen (`officer@aegis.lk`, `citizen@aegis.lk`, etc.).

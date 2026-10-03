@@ -8,6 +8,8 @@ import {
   fetchDamageReports,
   submitCitizenDamageReport,
   deleteDamageReport,
+  fetchApprovedIncidents,
+  type ApprovedIncident,
 } from '../api/recoveryApi';
 import {
   RecoveryPlan,
@@ -217,6 +219,11 @@ export const RecoveryPlanningPage: React.FC = () => {
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [revisionGuidance, setRevisionGuidance] = useState('');
 
+  // ── APPROVED INCIDENTS QUEUE ──
+  const [approvedIncidents, setApprovedIncidents] = useState<ApprovedIncident[]>([]);
+  const [approvedIncidentsLoading, setApprovedIncidentsLoading] = useState(false);
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+
   // Workflow History List State
   const [workflowList, setWorkflowList] = useState<WorkflowListItem[]>([]);
   const [totalWorkflowCount, setTotalWorkflowCount] = useState<number>(0);
@@ -255,6 +262,20 @@ export const RecoveryPlanningPage: React.FC = () => {
     }
   }, [reportFilterStatus, reportFilterDistrict]);
 
+  // Load approved incidents queue on mount (officers & admins only)
+  const loadApprovedIncidents = useCallback(async () => {
+    if (!isOfficer) return;
+    setApprovedIncidentsLoading(true);
+    try {
+      const items = await fetchApprovedIncidents();
+      setApprovedIncidents(items);
+    } catch {
+      // silently ignore — queue just won't show
+    } finally {
+      setApprovedIncidentsLoading(false);
+    }
+  }, [isOfficer]);
+
   useEffect(() => {
     loadWorkflowHistory();
   }, [loadWorkflowHistory]);
@@ -262,6 +283,51 @@ export const RecoveryPlanningPage: React.FC = () => {
   useEffect(() => {
     loadDamageReports();
   }, [loadDamageReports]);
+
+  useEffect(() => {
+    loadApprovedIncidents();
+  }, [loadApprovedIncidents]);
+
+  // Auto-fill form from a selected approved incident
+  const applyIncidentToForm = (inc: ApprovedIncident) => {
+    if (inc.district) setDistrict(inc.district);
+    const knownTypes = ['Flood', 'Landslide', 'Tsunami', 'Cyclone', 'Drought', 'Coastal Erosion'];
+    if (knownTypes.includes(inc.disasterType)) {
+      setDisasterType(inc.disasterType);
+    } else {
+      setDisasterType('Other');
+      setOtherDisasterType(inc.disasterType);
+    }
+    // Severity → overall severity mapping
+    const sev = (inc.severityAssessed || inc.severityReported || '').toLowerCase();
+    if (sev === 'critical') setOverallSeverity('Critical');
+    else if (sev === 'high') setOverallSeverity('High');
+    else if (sev === 'medium') setOverallSeverity('Moderate');
+    else if (sev === 'low') setOverallSeverity('Low');
+    // Pre-fill notes with incident description
+    if (inc.description) {
+      setNotes(inc.description);
+    }
+    // Pre-fill damage figures if a damage report is already attached
+    if (inc.damageReport) {
+      setDestroyedHouses(0);
+      setSevereHouses(inc.damageReport.housesDamaged || 0);
+      setDisplacedFamilies(inc.damageReport.displacedFamilies || 0);
+      if (inc.damageReport.infrastructureDamage && inc.damageReport.infrastructureDamage.length > 0) {
+        setInfraItems(
+          inc.damageReport.infrastructureDamage.map((item) => ({
+            assetName: item.assetName,
+            assetType: item.assetType,
+            damageLevel: item.damageLevel,
+            estimatedCost: item.estimatedCost,
+            details: '',
+          }))
+        );
+      }
+    }
+    setSelectedIncidentId(inc.id);
+    setIncidentIdInput(inc.id);
+  };
 
   // ── Role Ownership Filtering (Citizens see only their own reports/plans; Officers/Admins see all) ──
   const userFullName = (user?.fullName || '').trim().toLowerCase();
@@ -494,6 +560,12 @@ export const RecoveryPlanningPage: React.FC = () => {
         setWorkflowTrace(trace);
       }
       if (!isOverride) resetForm();
+      // Remove the processed incident from the queue
+      if (selectedIncidentId) {
+        setApprovedIncidents((prev) => prev.filter((i) => i.id !== selectedIncidentId));
+        setSelectedIncidentId(null);
+        setIncidentIdInput('');
+      }
       loadWorkflowHistory();
       loadDamageReports();
       setActiveTab('intake');
@@ -1390,6 +1462,93 @@ export const RecoveryPlanningPage: React.FC = () => {
          ═════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'intake' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              APPROVED INCIDENTS QUEUE  (officer-only, auto-fills the form)
+             ═══════════════════════════════════════════════════════════════════ */}
+          {isOfficer && (() => {
+            const selectedInc = approvedIncidents.find((i) => i.id === selectedIncidentId) ?? null;
+            const sevColor = (sev: string) =>
+              sev === 'critical' ? '#ef4444' : sev === 'high' ? '#f97316' : sev === 'medium' ? '#eab308' : '#22c55e';
+            const selectedSev = selectedInc ? (selectedInc.severityAssessed || selectedInc.severityReported || '').toLowerCase() : '';
+            return (
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '1.25rem 1.5rem' }}>
+                {/* Header row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                    <span style={{ fontSize: '1rem' }}>🚨</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Approved Incidents Queue</span>
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '6px',
+                      background: approvedIncidents.length > 0 ? '#dcfce7' : '#f1f5f9',
+                      color: approvedIncidents.length > 0 ? '#15803d' : '#64748b',
+                      border: `1px solid ${approvedIncidents.length > 0 ? '#bbf7d0' : '#e2e8f0'}`,
+                    }}>
+                      {approvedIncidents.length} pending
+                    </span>
+                  </div>
+                  <button
+                    onClick={loadApprovedIncidents}
+                    disabled={approvedIncidentsLoading}
+                    style={{ background: 'none', border: '1px solid #cbd5e1', color: '#475569', padding: '0.3rem 0.8rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.775rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    {approvedIncidentsLoading ? '⟳ Loading…' : '↻ Refresh'}
+                  </button>
+                </div>
+
+                {/* Dropdown */}
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '260px' }}>
+                    <label style={{ fontSize: '0.775rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.4rem' }}>
+                      Select Incident to Assess
+                    </label>
+                    <select
+                      value={selectedIncidentId ?? ''}
+                      onChange={(e) => {
+                        const inc = approvedIncidents.find((i) => i.id === e.target.value);
+                        if (inc) applyIncidentToForm(inc);
+                        else { setSelectedIncidentId(null); setIncidentIdInput(''); }
+                      }}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', border: '1.5px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem', fontFamily: 'inherit', background: '#fff', cursor: 'pointer', outline: 'none' }}
+                    >
+                      <option value=''>— Choose an approved incident —</option>
+                      {approvedIncidents.map((inc) => {
+                        const sev = (inc.severityAssessed || inc.severityReported || 'Unknown').toUpperCase();
+                        return (
+                          <option key={inc.id} value={inc.id}>
+                            [{sev}] {inc.disasterType} — {inc.district || 'Unknown'} &nbsp;({new Date(inc.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Inline preview strip for the selected incident */}
+                  {selectedInc && (
+                    <div style={{ flex: 2, minWidth: '280px', background: '#fff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '5px', background: sevColor(selectedSev) + '20', color: sevColor(selectedSev), border: `1px solid ${sevColor(selectedSev)}40`, textTransform: 'uppercase' }}>
+                          {selectedInc.severityAssessed || selectedInc.severityReported || 'Unknown'}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '5px', background: '#ede9fe', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
+                          {selectedInc.disasterType}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#1e40af' }}>📍 {selectedInc.district}</span>
+                        <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginLeft: 'auto' }}>#{selectedInc.id.slice(0, 8)}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {selectedInc.description}
+                      </p>
+                      <div style={{ fontSize: '0.72rem', color: '#22c55e', fontWeight: 700, marginTop: '0.1rem' }}>
+                        ✓ Form auto-filled — complete remaining fields and run the AI recovery plan
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Global scoped styles for form fields */}
           <style>{`
             .rf-section { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
