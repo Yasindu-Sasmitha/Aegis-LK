@@ -93,6 +93,12 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
   List<DamageReportModel> _submissions = [];
   bool _loadingSubmissions = false;
 
+  // Incident Module Integration Queue state
+  List<ApprovedIncidentModel> _approvedIncidents = [];
+  bool _loadingApprovedIncidents = false;
+  String? _selectedIncidentId;
+  ApprovedIncidentModel? _selectedIncident;
+
   Future<void> _generatePlanForReport(DamageReportModel report, {String? revisionGuidance}) async {
     setState(() => _generatingPlanReportId = report.id);
     try {
@@ -115,6 +121,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
 
       final plan = await _service.submitDamageIntake(
         intake,
+        incidentId: report.incidentId ?? _selectedIncidentId,
         damageReportId: report.id,
         revisionGuidance: revisionGuidance,
       );
@@ -210,7 +217,8 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+    _loadApprovedIncidents();
     _loadSubmissions();
   }
 
@@ -276,6 +284,79 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
     return d + s + p;
   }
 
+  Future<void> _loadApprovedIncidents() async {
+    setState(() => _loadingApprovedIncidents = true);
+    try {
+      final incidents = await _service.fetchApprovedIncidents();
+      if (mounted) {
+        setState(() {
+          _approvedIncidents = incidents;
+          _loadingApprovedIncidents = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingApprovedIncidents = false);
+    }
+  }
+
+  void _selectIncident(ApprovedIncidentModel incident) {
+    setState(() {
+      _selectedIncidentId = incident.id;
+      _selectedIncident = incident;
+
+      // Disaster type
+      final matchingType = _disasterTypes.firstWhere(
+        (t) => t.toLowerCase() == incident.disasterType.toLowerCase(),
+        orElse: () => 'Other',
+      );
+      _disasterType = matchingType;
+      if (_disasterType == 'Other') {
+        _otherDisasterController.text = incident.disasterType;
+      }
+
+      // District
+      final nearest = incident.nearestDistrict;
+      if (_districts.contains(nearest)) {
+        _district = nearest;
+      }
+
+      // Coordinates / Landmark
+      if (incident.latitude != 0.0 || incident.longitude != 0.0) {
+        _landmarkController.text = 'GPS: ${incident.latitude.toStringAsFixed(4)}, ${incident.longitude.toStringAsFixed(4)}';
+      }
+
+      // Notes
+      if (incident.description.isNotEmpty) {
+        _notesController.text = '[Incident Ref: #${incident.id.length >= 8 ? incident.id.substring(0, 8).toUpperCase() : incident.id}] ${incident.description}';
+      }
+    });
+
+    _tabController.animateTo(0);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Auto-filled from Incident #${incident.id.length >= 8 ? incident.id.substring(0, 8).toUpperCase() : incident.id} (${incident.disasterType} - ${incident.nearestDistrict})'),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF2563EB),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _clearSelectedIncident() {
+    setState(() {
+      _selectedIncidentId = null;
+      _selectedIncident = null;
+    });
+  }
+
   Future<void> _loadSubmissions() async {
     setState(() => _loadingSubmissions = true);
     try {
@@ -306,6 +387,8 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
   }
 
   void _resetForm() {
+    _selectedIncidentId = null;
+    _selectedIncident = null;
     _dsDivisionController.clear();
     _gnDivisionController.clear();
     _affectedVillageController.clear();
@@ -451,6 +534,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
       final compiled = _compileStructuredNotes();
 
       final newReport = await _service.submitCitizenDamageReport(
+        incidentId: _selectedIncidentId,
         district: _district,
         location: _affectedVillageController.text.trim().isNotEmpty
             ? '${_affectedVillageController.text.trim()}, $_district'
@@ -472,7 +556,7 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
       if (mounted) {
         _resetForm();
         _loadSubmissions();
-        _tabController.animateTo(1); // switch to submissions ledger tab
+        _tabController.animateTo(2); // switch to submissions ledger tab
 
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final isOfficer = auth.isOfficerOrAdmin;
@@ -563,10 +647,14 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                 tabs: [
                   const Tab(icon: Icon(Icons.edit_note), text: 'Field Assessment'),
                   Tab(
+                    icon: const Icon(Icons.flash_on),
+                    text: 'Incidents Queue (${_approvedIncidents.length})',
+                  ),
+                  Tab(
                     icon: const Icon(Icons.receipt_long),
                     text: isOfficer
-                        ? 'Citizen Submissions (${_submissions.length})'
-                        : 'My Submissions (${displayedSubmissions.length})',
+                        ? 'Submissions (${_submissions.length})'
+                        : 'My Reports (${displayedSubmissions.length})',
                   ),
                 ],
               ),
@@ -583,6 +671,8 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Section 0: Live Approved Incidents Queue Selector
+                  _buildIncidentQueueSelector(),
                   // Section 1: Geographic Scope
                   _buildSectionCard(
                     title: 'Section 1: Incident & Geographic Location',
@@ -939,7 +1029,10 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
             ),
           ),
 
-          // ── TAB 2: MY SUBMISSIONS / CITIZEN SUBMISSIONS ──
+          // ── TAB 2: APPROVED INCIDENTS QUEUE ──
+          _buildApprovedIncidentsQueueTab(),
+
+          // ── TAB 3: MY SUBMISSIONS / CITIZEN SUBMISSIONS ──
           RefreshIndicator(
             onRefresh: _loadSubmissions,
             child: _loadingSubmissions
@@ -1112,6 +1205,434 @@ class _CitizenDamageReportScreenState extends State<CitizenDamageReportScreen>
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildIncidentQueueSelector() {
+    if (_selectedIncident != null) {
+      final inc = _selectedIncident!;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEFF6FF), Color(0xFFDBEAFE)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1F3B82F6),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.link, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'LINKED INCIDENT #${inc.id.length >= 8 ? inc.id.substring(0, 8).toUpperCase() : inc.id}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Color(0xFF1E40AF),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              inc.status,
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${inc.disasterType} • ${inc.nearestDistrict} (Severity: ${inc.severityReported})',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A)),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFDC2626),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: _clearSelectedIncident,
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Clear', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            if (inc.description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xD9FFFFFF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Incident Description: ${inc.description}',
+                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF334155), fontStyle: FontStyle.italic),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.flash_on, color: Color(0xFF2563EB), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Approved Incidents Queue (${_approvedIncidents.length})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: kTextPrimary),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: _loadingApprovedIncidents
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh, size: 18, color: Color(0xFF2563EB)),
+                tooltip: 'Refresh queue',
+                onPressed: _loadingApprovedIncidents ? null : _loadApprovedIncidents,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Select an approved incident from the incident module to auto-fill details:',
+            style: TextStyle(fontSize: 11.5, color: kTextSecondary),
+          ),
+          const SizedBox(height: 10),
+          if (_loadingApprovedIncidents && _approvedIncidents.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            )
+          else if (_approvedIncidents.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Color(0xFF64748B)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No pending approved incidents in queue. You can fill an independent field assessment below.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            SizedBox(
+              height: 105,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _approvedIncidents.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (ctx, idx) {
+                  final inc = _approvedIncidents[idx];
+                  return InkWell(
+                    onTap: () => _selectIncident(inc),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 210,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  inc.disasterType,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: inc.severityReported.toLowerCase() == 'critical'
+                                      ? const Color(0xFFFEE2E2)
+                                      : const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  inc.severityReported,
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: inc.severityReported.toLowerCase() == 'critical'
+                                        ? const Color(0xFFDC2626)
+                                        : const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on, size: 12, color: Color(0xFF2563EB)),
+                              const SizedBox(width: 3),
+                              Text(
+                                inc.nearestDistrict,
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '#${inc.id.length >= 6 ? inc.id.substring(0, 6).toUpperCase() : inc.id}',
+                                style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Text('Select', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    SizedBox(width: 2),
+                                    Icon(Icons.arrow_forward_ios, size: 8, color: Colors.white),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApprovedIncidentsQueueTab() {
+    if (_loadingApprovedIncidents && _approvedIncidents.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_approvedIncidents.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadApprovedIncidents,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(height: 60),
+              Icon(Icons.check_circle_outline, size: 64, color: Colors.green[400]),
+              const SizedBox(height: 16),
+              const Text(
+                'No Approved Incidents in Queue',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kTextPrimary),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'All approved disaster missions have been addressed or no new incidents have been filed. You can file a direct field damage assessment from the Field Assessment tab.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: kTextSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                onPressed: _loadApprovedIncidents,
+                icon: const Icon(Icons.refresh, color: Colors.white, size: 16),
+                label: const Text('Refresh Queue', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadApprovedIncidents,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _approvedIncidents.length,
+        itemBuilder: (ctx, idx) {
+          final inc = _approvedIncidents[idx];
+          final isSelected = _selectedIncidentId == inc.id;
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            elevation: isSelected ? 3 : 1,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.warning_amber_rounded, color: Color(0xFF2563EB), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${inc.disasterType} — ${inc.nearestDistrict}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
+                              ),
+                              Text(
+                                'Incident #${inc.id.length >= 8 ? inc.id.substring(0, 8).toUpperCase() : inc.id}',
+                                style: const TextStyle(fontSize: 11, color: kTextSecondary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          inc.status,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (inc.description.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      inc.description,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _buildStatChip(Icons.speed, 'Severity: ${inc.severityReported}'),
+                      if (inc.latitude != 0 || inc.longitude != 0) ...[
+                        const SizedBox(width: 8),
+                        _buildStatChip(Icons.pin_drop, '${inc.latitude.toStringAsFixed(3)}, ${inc.longitude.toStringAsFixed(3)}'),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isSelected ? const Color(0xFF10B981) : const Color(0xFF2563EB),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _selectIncident(inc),
+                          icon: Icon(isSelected ? Icons.check : Icons.edit_note, size: 18, color: Colors.white),
+                          label: Text(
+                            isSelected ? 'Selected (Go to Form)' : 'Select & Fill Assessment',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

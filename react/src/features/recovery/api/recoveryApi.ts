@@ -13,6 +13,77 @@ import {
   DamageIntakeFormData,
 } from '../types/recoveryTypes';
 
+// ── Approved Incidents (cross-module, from Incident API) ──────────────────────
+export interface ApprovedIncident {
+  id: string;
+  disasterType: string;
+  description: string;
+  severityAssessed: string | null;
+  severityReported: string;
+  latitude: number;
+  longitude: number;
+  status: string;
+  createdAt: string;
+  district?: string; // resolved from lat/lng or injected by backend
+  damageReport?: {
+    housesDamaged: number;
+    displacedFamilies: number;
+    infrastructureDamageNotes: string;
+    infrastructureDamage?: { assetName: string; assetType: string; damageLevel: string; estimatedCost: number }[];
+  } | null;
+}
+
+// Coordinate → District mapping (same table as backend DistrictHelper)
+const DISTRICT_COORDINATES: { name: string; lat: number; lng: number }[] = [
+  { name: 'Colombo', lat: 6.9271, lng: 79.8612 },
+  { name: 'Gampaha', lat: 7.0917, lng: 80.0000 },
+  { name: 'Kalutara', lat: 6.5854, lng: 79.9607 },
+  { name: 'Kandy', lat: 7.2906, lng: 80.6337 },
+  { name: 'Matale', lat: 7.4675, lng: 80.6234 },
+  { name: 'Nuwara Eliya', lat: 6.9497, lng: 80.7891 },
+  { name: 'Galle', lat: 6.0535, lng: 80.2210 },
+  { name: 'Matara', lat: 5.9549, lng: 80.5550 },
+  { name: 'Hambantota', lat: 6.1429, lng: 81.1212 },
+  { name: 'Jaffna', lat: 9.6615, lng: 80.0255 },
+  { name: 'Kilinochchi', lat: 9.3803, lng: 80.3770 },
+  { name: 'Mannar', lat: 8.9833, lng: 79.9167 },
+  { name: 'Vavuniya', lat: 8.7514, lng: 80.4971 },
+  { name: 'Mullaitivu', lat: 9.2667, lng: 80.8167 },
+  { name: 'Batticaloa', lat: 7.7172, lng: 81.7000 },
+  { name: 'Ampara', lat: 7.2978, lng: 81.6747 },
+  { name: 'Trincomalee', lat: 8.5874, lng: 81.2152 },
+  { name: 'Kurunegala', lat: 7.4867, lng: 80.3647 },
+  { name: 'Puttalam', lat: 8.0362, lng: 79.8283 },
+  { name: 'Anuradhapura', lat: 8.3114, lng: 80.4037 },
+  { name: 'Polonnaruwa', lat: 7.9403, lng: 81.0188 },
+  { name: 'Badulla', lat: 6.9934, lng: 81.0550 },
+  { name: 'Monaragala', lat: 6.8728, lng: 81.3507 },
+  { name: 'Ratnapura', lat: 6.7056, lng: 80.3847 },
+  { name: 'Kegalle', lat: 7.2513, lng: 80.3464 },
+];
+
+function resolveDistrict(lat: number, lng: number): string {
+  let closest = DISTRICT_COORDINATES[0];
+  let minDist = Infinity;
+  for (const d of DISTRICT_COORDINATES) {
+    const dist = Math.sqrt((d.lat - lat) ** 2 + (d.lng - lng) ** 2);
+    if (dist < minDist) { minDist = dist; closest = d; }
+  }
+  return closest.name;
+}
+
+export async function fetchApprovedIncidents(): Promise<ApprovedIncident[]> {
+  const params = new URLSearchParams({ status: 'MissionApproved', pageSize: '50' });
+  const res = await fetch(`/api/incidents?${params.toString()}`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch approved incidents');
+  const data = await res.json();
+  const items: ApprovedIncident[] = (data.items ?? data ?? []).map((inc: ApprovedIncident) => ({
+    ...inc,
+    district: inc.district || resolveDistrict(inc.latitude, inc.longitude),
+  }));
+  return items;
+}
+
 const API_BASE = '/api/recovery';
 
 // ── Shelters ─────────────────────────────────────────────────────────────────
