@@ -1,6 +1,7 @@
 import { getAuthHeaders } from '../../../shared/auth/authApi';
 import type {
   AdjustInventoryDto,
+  ApprovedIncidentSummary,
   CreateDispatchRequestDto,
   CreateInventoryDto,
   CreateWarehouseDto,
@@ -249,6 +250,65 @@ export async function fetchDispatchPlans(): Promise<DispatchPlan[]> {
   return plans.map(mapDispatchResponse);
 }
 
+export async function fetchApprovedIncidents(): Promise<ApprovedIncidentSummary[]> {
+  const res = await fetch(
+    `/api/incidents/?status=MissionApproved&pageSize=100`,
+    { headers: getAuthHeaders() },
+  );
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch approved incidents');
+  }
+
+  const data = await res.json();
+  const items: any[] = Array.isArray(data) ? data : (data.items ?? []);
+
+  return items.map((i) => ({
+    id: i.id ?? i.Id ?? '',
+    disasterType: i.disasterType ?? i.DisasterType ?? '',
+    severityAssessed: i.severityAssessed ?? i.SeverityAssessed ?? null,
+    severityReported: i.severityReported ?? i.SeverityReported ?? '',
+    // Approximate district label from coordinates
+    district: deriveDistrictLabel(
+      Number(i.latitude ?? i.Latitude ?? 0),
+      Number(i.longitude ?? i.Longitude ?? 0),
+    ),
+    latitude: Number(i.latitude ?? i.Latitude ?? 0),
+    longitude: Number(i.longitude ?? i.Longitude ?? 0),
+    createdAt: i.createdAt ?? i.CreatedAt ?? new Date().toISOString(),
+  }));
+}
+
+/**
+ * Approximate district label from a lat/lng pair.
+ * Matches the district centroids used in the backend seeder and the
+ * Incident module's DistrictHelper so the frontend label lines up with
+ * the dispatched district.
+ */
+function deriveDistrictLabel(lat: number, lng: number): string {
+  const centroids: Array<[string, number, number]> = [
+    ['Colombo', 6.9271, 79.8612],
+    ['Gampaha', 7.0917, 79.9997],
+    ['Kalutara', 6.5854, 79.9607],
+    ['Kandy', 7.2906, 80.6337],
+    ['Nuwara Eliya', 6.9497, 80.7891],
+    ['Ratnapura', 6.6828, 80.3992],
+    ['Galle', 6.0535, 80.2210],
+    ['Matara', 5.9549, 80.5550],
+    ['Kegalle', 7.2513, 80.3464],
+  ];
+
+  let best = 'Colombo';
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const [name, cLat, cLng] of centroids) {
+    const d = (lat - cLat) ** 2 + (lng - cLng) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = name;
+    }
+  }
+  return best;
+}
 // ---------------------------------------------------------------------------
 // Response → UI shape mapper (backend uses PascalCase-friendly JSON via
 // default ASP.NET Core JSON options, so both camelCase and PascalCase work)
