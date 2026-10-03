@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using static Aegis.Tests.IncidentTestSupport;
+using System.Net.Http.Json;
 
 namespace Aegis.Tests;
 
@@ -81,5 +82,42 @@ public class IncidentAuthorizationTests : IClassFixture<WebApplicationFactory<Pr
     {
         var res = await _client.GetAsync($"/api/incident/{Guid.NewGuid()}/damage-report");
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode); // 404, not 401: Recovery calls this without a token
+    }
+
+        [Fact]
+    public async Task CreateIncident_Anonymous_Returns401()
+    {
+        var res = await SendAsync(_client, HttpMethod.Post, "/api/incidents", null,
+            new { disasterType = "Flood", severityReported = "High", description = "x" });
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateIncident_ReporterIdComesFromToken_NotFromBody()
+    {
+        var realUser = Guid.NewGuid();
+        var spoofed = Guid.NewGuid();
+        var res = await SendAsync(_client, HttpMethod.Post, "/api/incidents", Token("Citizen", realUser),
+            new { disasterType = "Flood", severityReported = "High", description = "x", reportedByUserId = spoofed });
+        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+        var body = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal(realUser, body.GetProperty("reportedByUserId").GetGuid());
+    }
+
+    [Fact]
+    public async Task MyReports_OtherUsersId_Returns403_ForCitizen()
+    {
+        var res = await SendAsync(_client, HttpMethod.Get,
+            $"/api/incidents/my-reports?reportedByUserId={Guid.NewGuid()}", Token("Citizen"));
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task MyReports_OwnId_Returns200()
+    {
+        var me = Guid.NewGuid();
+        var res = await SendAsync(_client, HttpMethod.Get,
+            $"/api/incidents/my-reports?reportedByUserId={me}", Token("Citizen", me));
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
 }
