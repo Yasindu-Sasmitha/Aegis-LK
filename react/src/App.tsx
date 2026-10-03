@@ -55,8 +55,9 @@ import {
   InventoryManagementPage,
   DispatchManagementPage,
 } from './features/resource';
+import { UserManagementPage } from './features/admin';
 
-type NavView = 'home' | 'weather' | 'recovery' | 'resource' | 'incident';
+type NavView = 'home' | 'weather' | 'recovery' | 'resource' | 'incident' | 'user-management';
 
 const ROLE_BADGES: Record<string, { label: string; color: string; bg: string }> = {
   Admin: { label: 'Admin', color: '#c084fc', bg: 'rgba(192,132,252,0.15)' },
@@ -127,6 +128,13 @@ const MainPlatform: React.FC = () => {
     }
   }, [currentView, canAccessResources]);
 
+  // If a non-admin somehow ends up in the user-management view, bounce them home.
+  useEffect(() => {
+    if (currentView === 'user-management' && user?.role !== 'Admin') {
+      setCurrentView('home');
+    }
+  }, [currentView, user?.role]);
+
   // Role-filtered tabs for Weather module
   const WEATHER_TABS = [
     { id: 'dashboard', label: 'Forecast & Live Risk' },
@@ -196,6 +204,15 @@ const MainPlatform: React.FC = () => {
     setCurrentView('incident');
     setIncidentTab(tab);
     setSelectedIncidentId(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateToUserManagement = () => {
+    if (user?.role !== 'Admin') {
+      alert('Access restricted to System Administrators.');
+      return;
+    }
+    setCurrentView('user-management');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -339,6 +356,31 @@ const MainPlatform: React.FC = () => {
             <span>Incidents</span>
           </button>
 
+          {/* User Management — Admin Only */}
+          {user?.role === 'Admin' && (
+            <button
+              onClick={navigateToUserManagement}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 1rem',
+                borderRadius: 8,
+                border: 'none',
+                background: currentView === 'user-management' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                color: currentView === 'user-management' ? '#38bdf8' : '#cbd5e1',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <UsersIcon size={16} />
+              <span>User Management</span>
+            </button>
+          )}
+
           <button
             onClick={() => navigateToWeather(isOfficerOrAdmin ? 'analytics' : 'history')}
             style={{
@@ -402,7 +444,7 @@ const MainPlatform: React.FC = () => {
       </header>
 
       {/* Sub-header Module Nav */}
-      {currentView !== 'home' && (
+      {currentView !== 'home' && currentView !== 'user-management' && (
         <div style={{
           backgroundColor: '#0c2242',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -1133,6 +1175,13 @@ const MainPlatform: React.FC = () => {
                 )}
               </>
             )}
+          </main>
+        )}
+
+        {/* ============ USER MANAGEMENT MODULE (ADMIN ONLY) ============ */}
+        {currentView === 'user-management' && (
+          <main>
+            <UserManagementPage onNavigateHome={() => setCurrentView('home')} />
           </main>
         )}
       </div>
