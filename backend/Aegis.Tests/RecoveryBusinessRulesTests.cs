@@ -535,4 +535,19 @@ public class RecoveryBusinessRulesTests
         Assert.False(Aegis.Shared.Auth.Entities.Roles.IsValid("SuperUser"));
         Assert.False(Aegis.Shared.Auth.Entities.Roles.IsValid("Anonymous"));
     }
+
+    [Fact]
+    public async Task IncidentIntegrationService_ReturnsValidFallback_WhenHttpFails()
+    {
+        var service = new IncidentIntegrationService(new System.Net.Http.HttpClient());
+        var incidentId = Guid.NewGuid();
+        var report = await service.GetDamageReportAsync(incidentId);
+
+        Assert.NotNull(report);
+        Assert.Equal(incidentId, report.IncidentId);
+        Assert.False(string.IsNullOrWhiteSpace(report.DisasterType));
+        Assert.False(string.IsNullOrWhiteSpace(report.Location));
+        Assert.True(report.HousesDamaged > 0);
+        Assert.NotEmpty(report.InfrastructureDamage);
+    }
 }

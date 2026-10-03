@@ -155,9 +155,18 @@ var incidentAgentUrl = builder.Configuration["AgenticAi:IncidentAgentUrl"] ?? "h
 var resourceAgentUrl = builder.Configuration["AgenticAi:ResourceAgentUrl"] ?? "http://127.0.0.1:8003";
 // RecoveryAgentUrl is resolved inside RecoveryAgentClientService (supports RECOVERY_AGENT_URL env var too)
 
-// ── HTTP Clients & Agent Clients ──────────────────────────────────────────────
+var apiSelfUrl = builder.Configuration["ApiBaseUrl"]
+    ?? (!string.IsNullOrWhiteSpace(port) ? $"http://127.0.0.1:{port}" : "http://127.0.0.1:5012");
+
 builder.Services.AddHttpClient<Aegis.Weather.Services.OpenMeteoService>();
-builder.Services.AddHttpClient<IIncidentIntegrationService, IncidentIntegrationService>();
+builder.Services.AddHttpClient<IIncidentIntegrationService, IncidentIntegrationService>(client =>
+{
+    client.BaseAddress = new Uri(apiSelfUrl);
+});
+builder.Services.AddHttpClient<Aegis.Incident.Services.IncidentRecoveryWorkflowClient>(client =>
+{
+    client.BaseAddress = new Uri(apiSelfUrl);
+});
 // Shared agent secret for service-to-service auth (Option B — shared header key)
 // Production: set AEGIS_AGENT_KEY env var on Render. Never expose to React/Flutter.
 var agentKey = builder.Configuration["AgenticAi:AgentKey"]
