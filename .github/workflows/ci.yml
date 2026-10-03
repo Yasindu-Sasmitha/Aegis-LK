@@ -277,3 +277,22 @@ jobs:
         working-directory: "${{ github.workspace }}/react"
         run: npm run build
 
+  # ── 7. Python: Incident agents deterministic tests (no live Gemini key) ─────
+  incident-agent-tests:
+    name: Incident Agent Tests (Python)
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_API_KEY: "ci-placeholder-not-real"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CI dependencies
+        working-directory: "${{ github.workspace }}/agentic-ai/agents"
+        run: pip install -r requirements-ci.txt requests
+      - name: Run Incident agent tests
+        working-directory: "${{ github.workspace }}/agentic-ai"
+        run: python -m pytest tests/test_incident_agents.py --tb=short --no-header -v
