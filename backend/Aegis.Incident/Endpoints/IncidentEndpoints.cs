@@ -1,3 +1,4 @@
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -118,7 +119,7 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents/{id}/assess — calls the Incident Assessment Agent
-        group.MapPost("/{id:guid}/assess", async (Guid id, IncidentDbContext db, IncidentAgentClient agentClient) =>
+        group.MapPost("/{id:guid}/assess", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, IncidentAgentClient agentClient) =>
         {
             var incident = await db.Incidents.FindAsync(id);
             if (incident is null) return Results.NotFound();
@@ -166,7 +167,7 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents/{id}/approve — officer approves, creates RescueMission
-        group.MapPost("/{id:guid}/approve", async (Guid id, ApproveIncidentRequest request, IncidentDbContext db, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory) => //added integration for resource module (IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory)     
+        group.MapPost("/{id:guid}/approve", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, ApproveIncidentRequest request, IncidentDbContext db, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory) => //added integration for resource module (IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory)     
 
         {
 
@@ -274,7 +275,7 @@ public static class IncidentEndpoints
             return Results.Ok(mission);
         });
 
-        group.MapPost("/{id:guid}/reject", async (Guid id, RejectIncidentRequest request, IncidentDbContext db) =>
+        group.MapPost("/{id:guid}/reject", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, RejectIncidentRequest request, IncidentDbContext db) =>
         {
             if (string.IsNullOrWhiteSpace(request.Reason))
                 return Results.BadRequest("A reason is required to reject an incident.");
@@ -298,7 +299,7 @@ public static class IncidentEndpoints
             return Results.Ok(incident);
         });
 
-        group.MapPost("/{id:guid}/hold", async (Guid id, HoldIncidentRequest request, IncidentDbContext db) =>
+        group.MapPost("/{id:guid}/hold", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, HoldIncidentRequest request, IncidentDbContext db) =>
         {
             var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
             if (incident is null) return Results.NotFound();
@@ -321,7 +322,7 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents/{id}/damage-report — closes the incident, records damage, triggers recovery workflow
-        group.MapPost("/{id:guid}/damage-report", async (Guid id, CreateDamageReportRequest request, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
+        group.MapPost("/{id:guid}/damage-report", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, CreateDamageReportRequest request, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
         {
             var incident = await db.Incidents
                 .Include(i => i.DamageReport)
@@ -417,7 +418,7 @@ public static class IncidentEndpoints
 
         // GET /api/incidents/logs — global, searchable activity log across all
         // incidents: every agent run and every officer action, in one feed.
-        group.MapGet("/logs", async (
+        group.MapGet("/logs", [Authorize(Roles = "DisasterOfficer,Admin")] async (
             string? search,
             Guid? incidentId,
             int? page,
@@ -449,7 +450,7 @@ public static class IncidentEndpoints
         // Called on the DUPLICATE (not the primary): clears its link, restoring it as its own
         // primary incident, visible again in the main queue. No reason required — this corrects
         // an agent guess, not a judgment call about the incident itself — but always logged.
-        group.MapPost("/{id:guid}/unlink", async (Guid id, IncidentDbContext db) =>
+        group.MapPost("/{id:guid}/unlink", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db) =>
         {
             var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
             if (incident is null) return Results.NotFound();
