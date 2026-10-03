@@ -240,6 +240,16 @@ export async function approveDispatchPlan(id: string): Promise<DispatchPlan> {
   return mapDispatchResponse(result);
 }
 
+export async function deleteDispatchPlan(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/dispatch/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await readError(res, 'Failed to delete dispatch plan'));
+  }
+}
+
 export async function fetchDispatchPlans(): Promise<DispatchPlan[]> {
   const res = await fetch(`${API_BASE}/dispatch/`, {
     headers: getAuthHeaders(),
