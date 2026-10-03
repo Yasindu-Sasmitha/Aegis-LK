@@ -116,7 +116,6 @@ export const DonationsPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>📦</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Public Community Donations &amp; Supplies Registry
             </h1>
@@ -141,7 +140,7 @@ export const DonationsPage: React.FC = () => {
               textTransform: 'uppercase',
               letterSpacing: '0.04em'
             }}>
-              {isAdmin ? '⚙️ System Admin' : isDisasterOfficer ? '🛡️ Disaster Officer' : isResponder ? '🚨 Field Responder' : '👥 Citizen Donor'}
+              {isAdmin ? 'System Admin' : isDisasterOfficer ? 'Disaster Officer' : isResponder ? 'Field Responder' : 'Citizen Donor'}
             </span>
           </div>
 
@@ -162,7 +161,6 @@ export const DonationsPage: React.FC = () => {
               boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
             }}
           >
-            <span>➕</span>
             <span>Record Community Donation</span>
           </button>
         </div>
@@ -171,7 +169,6 @@ export const DonationsPage: React.FC = () => {
       {/* ── TRACKER & TABLE ── */}
       {loading ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
           <p>Loading donations registry...</p>
         </div>
       ) : (
@@ -188,7 +185,6 @@ export const DonationsPage: React.FC = () => {
           <div style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', width: '520px', maxWidth: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>🎁</span>
                 <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
                   Record Public Relief Contribution
                 </h2>

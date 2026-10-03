@@ -6,4 +6,5 @@
   <Project Path="Aegis.Shared/Aegis.Shared.csproj" />
   <Project Path="Aegis.Tests/Aegis.Tests.csproj" />
   <Project Path="Aegis.Weather/Aegis.Weather.csproj" />
+  <Project Path="Aegis.Resource/Aegis.Resource.csproj" />
 </Solution>

@@ -13,15 +13,23 @@ namespace Aegis.Resource.Endpoints
                 .WithTags("Resource - Warehouses");
 
             group.MapGet("/", async (
-                string? district,
-                string? search,
-                int page,
-                int pageSize,
-                IWarehouseService warehouseService) =>
+                IWarehouseService warehouseService,
+                string? district = null,
+                string? search = null,
+                int page = 1,
+                int pageSize = 20) =>
             {
                 var result = await warehouseService.GetAllAsync(
                     district, search, page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize);
-                return Results.Ok(result);
+                var items = result.ToList();
+
+                return Results.Ok(new
+                {
+                    total = items.Count,
+                    page = page == 0 ? 1 : page,
+                    pageSize = pageSize == 0 ? 20 : pageSize,
+                    items
+                });
             });
 
             group.MapGet("/{id:guid}", async (Guid id, IWarehouseService warehouseService) =>
@@ -34,13 +42,13 @@ namespace Aegis.Resource.Endpoints
             {
                 var created = await warehouseService.CreateAsync(dto);
                 return Results.Created($"/api/resource/warehouses/{created.Id}", created);
-            }).RequireAuthorization(policy => policy.RequireRole("ResourceManager", "Admin"));
+            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
 
             group.MapPut("/{id:guid}", async (Guid id, UpdateWarehouseDto dto, IWarehouseService warehouseService) =>
             {
                 var updated = await warehouseService.UpdateAsync(id, dto);
                 return updated is null ? Results.NotFound() : Results.Ok(updated);
-            }).RequireAuthorization(policy => policy.RequireRole("ResourceManager", "Admin"));
+            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
 
             group.MapDelete("/{id:guid}", async (Guid id, IWarehouseService warehouseService) =>
             {

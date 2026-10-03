@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Aegis.Incident\Aegis.Incident.csproj" />
     <ProjectReference Include="..\Aegis.Recovery\Aegis.Recovery.csproj" />
     <ProjectReference Include="..\Aegis.Data\Aegis.Data.csproj" />
+    <ProjectReference Include="..\Aegis.Resource\Aegis.Resource.csproj" />
   </ItemGroup>
 
 </Project>

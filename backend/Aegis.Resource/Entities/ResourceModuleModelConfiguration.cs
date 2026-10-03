@@ -19,11 +19,14 @@ namespace Aegis.Resource.Entities
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Warehouse -> Vehicle (1-to-many)
+            // Cascade: when a warehouse is removed, its vehicles go with it. This
+            // keeps the delete-warehouse operation atomic from the UI without leaving
+            // orphaned vehicle records behind.
             modelBuilder.Entity<Vehicle>()
                 .HasOne(v => v.Warehouse)
                 .WithMany(w => w.Vehicles)
                 .HasForeignKey(v => v.WarehouseId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Vehicle -> Fuel (1-to-1)
             modelBuilder.Entity<Vehicle>()
@@ -42,7 +45,7 @@ namespace Aegis.Resource.Entities
                 .HasOne(d => d.Warehouse)
                 .WithMany()
                 .HasForeignKey(d => d.WarehouseId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Dispatch>()
                 .HasOne(d => d.Vehicle)
@@ -58,13 +61,20 @@ namespace Aegis.Resource.Entities
 
             // Store ItemsAllocated as a PostgreSQL jsonb column instead of a
             // separate join table.
+            var allocatedItemComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<System.Collections.Generic.List<AllocatedItem>>(
+                (c1, c2) => JsonSerializer.Serialize(c1, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(c2, (JsonSerializerOptions?)null),
+                c => c == null ? 0 : JsonSerializer.Serialize(c, (JsonSerializerOptions?)null).GetHashCode(),
+                c => JsonSerializer.Deserialize<System.Collections.Generic.List<AllocatedItem>>(JsonSerializer.Serialize(c, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null) ?? new()
+            );
+
             modelBuilder.Entity<Dispatch>()
                 .Property(d => d.ItemsAllocated)
                 .HasColumnType("jsonb")
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                     v => JsonSerializer.Deserialize<System.Collections.Generic.List<AllocatedItem>>(
-                        v, (JsonSerializerOptions?)null) ?? new()
+                        v, (JsonSerializerOptions?)null) ?? new(),
+                    allocatedItemComparer
                 );
 
             // Helpful index — you'll query "does any warehouse have stock of

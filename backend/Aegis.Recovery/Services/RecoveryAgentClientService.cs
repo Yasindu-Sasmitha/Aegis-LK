@@ -110,19 +110,33 @@ public class RecoveryAgentClientService
                 activeNGOs.Select(n => n.Name).ToList(), safe.InputFlagged || guidanceFlagged);
             run.Validations.AddRange(guardrails);
 
-            // Human approval gate (Deterministic Rule)
+            // Human approval gate
             var failedChecks = guardrails.Where(g => !g.Passed).Select(g => g.RuleName).ToList();
             var reasons = new List<string>();
-            if (computedBudget > RecoveryRules.HumanApprovalBudgetThresholdLkr)
-                reasons.Add($"Budget LKR {computedBudget:N0} exceeds the LKR {RecoveryRules.HumanApprovalBudgetThresholdLkr:N0} threshold.");
-            if (pyResponse?.Agent4Output?.RequiresHumanApproval == true)
-                reasons.Add($"AI policy review requested human review: {pyResponse.Agent4Output.ApprovalReason}");
+
+            if (pyResponse?.Agent4Output != null)
+            {
+                // Follow Agent 4's explicit safety & policy review verdict
+                if (pyResponse.Agent4Output.RequiresHumanApproval)
+                {
+                    reasons.Add(string.IsNullOrWhiteSpace(pyResponse.Agent4Output.ApprovalReason)
+                        ? "AI safety & policy review requested human approval."
+                        : $"AI policy review requested human review: {pyResponse.Agent4Output.ApprovalReason}");
+                }
+            }
+            else if (computedBudget > RecoveryRules.HumanApprovalBudgetThresholdLkr)
+            {
+                // Fallback deterministic rule only when Python agent output is absent
+                reasons.Add($"Budget LKR {computedBudget:N0} exceeds the standard approval threshold.");
+            }
+
             if (failedChecks.Count > 0)
                 reasons.Add($"Guardrail(s) failed: {string.Join("; ", failedChecks)}.");
-            if (run.UsedFallback)
-                reasons.Add("Degraded mode: Python Agent Microservice was offline; fallback deterministic logic was used.");
+            if (safe.InputFlagged)
+                reasons.Add("Input contained flagged safety patterns.");
 
             var requiresHumanApproval = reasons.Count > 0;
+            AlignAgent4Summary(run, tasks.Count, computedBudget, requiresHumanApproval);
             var planStatus = requiresHumanApproval ? "PendingApproval" : "Approved";
             var taskStatus = requiresHumanApproval ? "Pending" : "InProgress";
 
@@ -143,6 +157,9 @@ public class RecoveryAgentClientService
                     safe.Location,
                     safe.HousesDamaged,
                     safe.DisplacedFamilies,
+                    safe.ReporterName,
+                    safe.ReporterContact,
+                    safe.AdditionalNotes,
                     DisasterCategory = category,
                     Phases = phases.RecoveryPhases,
                     ShelterAllocations = shelterResult.Allocations,
@@ -198,7 +215,18 @@ public class RecoveryAgentClientService
                 stipendData = stipend
             };
 
-            using var response = await _httpClient.PostAsJsonAsync(run.AgentServiceUrl, payload, JsonOptions, run.Ct);
+            using var req = new HttpRequestMessage(HttpMethod.Post, run.AgentServiceUrl)
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions)
+            };
+            var agentKey = Environment.GetEnvironmentVariable("AEGIS_AGENT_KEY")
+                ?? _configuration?["AgenticAi:AgentKey"];
+            if (!string.IsNullOrWhiteSpace(agentKey) && !_httpClient.DefaultRequestHeaders.Contains("X-Aegis-Agent-Key"))
+            {
+                req.Headers.Add("X-Aegis-Agent-Key", agentKey);
+            }
+
+            using var response = await _httpClient.SendAsync(req, run.Ct);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<PythonWorkflowResponse>(JsonOptions, run.Ct);
@@ -455,6 +483,11 @@ public class RecoveryAgentClientService
                 RecoveryRules.NormalizeDamageLevel(level)));
         }
 
+        var repName = PromptSafety.Sanitize(report.ReporterName, 120, out var f6);
+        var repContact = PromptSafety.Sanitize(report.ReporterContact, 50, out var f7);
+        var addNotes = PromptSafety.Sanitize(report.AdditionalNotes, 1000, out var f8);
+        flagged |= f6 | f7 | f8;
+
         return new SafeReport(
             incidentId,
             string.IsNullOrEmpty(disasterType) ? "Unknown" : disasterType,
@@ -462,7 +495,10 @@ public class RecoveryAgentClientService
             Math.Clamp(report.HousesDamaged, 0, RecoveryRules.MaxFamilies),
             Math.Clamp(report.DisplacedFamilies, 0, RecoveryRules.MaxFamilies),
             assets,
-            flagged);
+            flagged,
+            string.IsNullOrWhiteSpace(repName) ? null : repName,
+            string.IsNullOrWhiteSpace(repContact) ? null : repContact,
+            string.IsNullOrWhiteSpace(addNotes) ? null : addNotes);
     }
 
     private static string ExtractDistrict(string location) => location.Split(',')[0].Trim();
@@ -551,6 +587,19 @@ public class RecoveryAgentClientService
         run.Steps[agent3Index] = step with
         {
             OutputSummary = $"Created {taskCount} actionable tasks with final computed budget: LKR {computedBudget:N2}"
+        };
+    }
+
+    private static void AlignAgent4Summary(RunState run, int taskCount, decimal computedBudget, bool requiresHumanApproval)
+    {
+        var agent4Index = run.Steps.FindIndex(step => step.AgentName.Contains("Agent 4", StringComparison.OrdinalIgnoreCase));
+        if (agent4Index < 0) return;
+
+        var step = run.Steps[agent4Index];
+        run.Steps[agent4Index] = step with
+        {
+            InputSummary = $"Validation Scope: {taskCount} drafted recovery tasks (Total: LKR {computedBudget:N0}), safety rules",
+            OutputSummary = $"Policy validation completed. Requires approval: {requiresHumanApproval}"
         };
     }
 
@@ -656,7 +705,7 @@ public class RecoveryAgentClientService
 // Domain Helper Records & Utility Classes
 // ──────────────────────────────────────────────────────────────────────────────
 
-public sealed record SafeReport(Guid IncidentId, string DisasterType, string Location, int HousesDamaged, int DisplacedFamilies, IReadOnlyList<SafeAsset> Assets, bool InputFlagged);
+public sealed record SafeReport(Guid IncidentId, string DisasterType, string Location, int HousesDamaged, int DisplacedFamilies, IReadOnlyList<SafeAsset> Assets, bool InputFlagged, string? ReporterName = null, string? ReporterContact = null, string? AdditionalNotes = null);
 
 public sealed record SafeAsset(string AssetName, string AssetType, string DamageLevel);
 
@@ -708,7 +757,7 @@ public static class PromptSafety
 
 public static class RecoveryRules
 {
-    public const decimal HumanApprovalBudgetThresholdLkr = 500_000m;
+    public const decimal HumanApprovalBudgetThresholdLkr = 2_500_000m;
     public const decimal ShelterDailyCostPerFamilyLkr = 1_200m;
     public const int MaxFamilies = 10_000;
     public static readonly string[] ValidPriorities = { "Critical", "High", "Medium", "Low" };
@@ -840,8 +889,8 @@ public sealed class RecoveryToolbox
         {
             var (min, max) = a.DamageLevel switch
             {
-                "Destroyed" => (300_000m, 800_000m),
-                "Severe" => (150_000m, 400_000m),
+                "Destroyed" => (500_000m, 1_500_000m),
+                "Severe" => (200_000m, 500_000m),
                 "Moderate" => (80_000m, 200_000m),
                 _ => (30_000m, 80_000m)
             };

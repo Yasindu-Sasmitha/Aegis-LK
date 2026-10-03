@@ -60,7 +60,8 @@ public record AidRequestDto(
     Guid? ShelterId,
     string? ShelterName,
     string Notes,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    Guid? SubmittedByUserId = null
 );
 
 // Donation DTOs
@@ -103,7 +104,7 @@ public record ApproveCompensationRequest(
     decimal ApprovedAmount,
     string Status,
     string VerificationNotes,
-    string ApprovedBy
+    string? ApprovedBy = null
 );
 
 public record CompensationDto(
@@ -116,7 +117,8 @@ public record CompensationDto(
     string VerificationNotes,
     string? ApprovedBy,
     DateTime CreatedAt,
-    DateTime? ApprovedAt
+    DateTime? ApprovedAt,
+    Guid? SubmittedByUserId = null
 );
 
 // NGO DTOs
@@ -146,7 +148,7 @@ public record GeneratePlanRequest(Guid IncidentId);
 public record ApprovePlanRequest(
     string Action, // "Approve" | "Reject" | "Revise"
     string ReviewerNotes,
-    string ReviewedBy
+    string? ReviewedBy = null
 );
 
 public record TaskDto(
@@ -187,6 +189,7 @@ public class DamageIntakeInfrastructureItem
 // Damage Report DTOs
 public class CreateDamageReportRequest
 {
+    public Guid? IncidentId { get; set; }
     public string District { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
     public string DisasterType { get; set; } = string.Empty;
@@ -213,7 +216,8 @@ public record DamageReportDto(
     string Status,
     Guid? RecoveryPlanId,
     DateTime CreatedAt,
-    DateTime? ProcessedAt
+    DateTime? ProcessedAt,
+    Guid? SubmittedByUserId = null
 );
 
 public record OriginatingIntakeDto(
@@ -242,4 +246,5 @@ public record RecoveryReportDto(
     string ReportSummary,
     DateTime GeneratedAt
 );
+
 

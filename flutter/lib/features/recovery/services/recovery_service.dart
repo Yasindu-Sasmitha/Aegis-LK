@@ -1,11 +1,21 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../../shared/auth/auth_service.dart';
+import '../../../shared/api/api_config.dart';
 import '../models/recovery_models.dart';
 
 class RecoveryService {
   final String baseUrl;
+  final AuthService _authService;
 
-  RecoveryService({this.baseUrl = 'http://localhost:5012/api/recovery'});
+  RecoveryService({
+    this.baseUrl = ApiConfig.recoveryBase,
+    AuthService? authService,
+  }) : _authService = authService ?? AuthService();
+
+  Future<Map<String, String>> _getAuthHeaders() async {
+    return await _authService.getAuthHeaders();
+  }
 
   // ── 1. Shelters ─────────────────────────────────────────────────────────────
 
@@ -14,13 +24,50 @@ class RecoveryService {
         ? '?district=$district'
         : '';
     final uri = Uri.parse('$baseUrl/shelters$query');
-    final response = await http.get(uri);
+    final headers = await _getAuthHeaders();
+    final response = await http.get(uri, headers: headers);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List data = decoded is List ? decoded : (decoded['items'] ?? []);
       return data.map((e) => ShelterModel.fromJson(e as Map<String, dynamic>)).toList();
     }
     throw Exception('Failed to load shelters');
+  }
+
+  Future<ShelterModel> createShelter({
+    required String name,
+    required String district,
+    required String location,
+    required int capacity,
+    required String contactPerson,
+    required String contactPhone,
+    required List<String> facilities,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final headers = await _getAuthHeaders();
+    final response = await http.post(
+      Uri.parse('$baseUrl/shelters'),
+      headers: headers,
+      body: jsonEncode({
+        'name': name,
+        'district': district,
+        'location': location,
+        'capacity': capacity,
+        'currentOccupancy': 0,
+        'status': 'Open',
+        'contactPerson': contactPerson,
+        'contactPhone': contactPhone,
+        'facilities': facilities,
+        'latitude': latitude,
+        'longitude': longitude,
+      }),
+    );
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return ShelterModel.fromJson(jsonDecode(response.body));
+    }
+    final err = jsonDecode(response.body);
+    throw Exception(err['error'] ?? 'Failed to create shelter');
   }
 
   // ── 2. Aid Requests ─────────────────────────────────────────────────────────
@@ -35,9 +82,10 @@ class RecoveryService {
     String? shelterId,
     required String notes,
   }) async {
+    final headers = await _getAuthHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/aid-requests'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'victimName': victimName,
         'contactPhone': contactPhone,
@@ -57,7 +105,8 @@ class RecoveryService {
   }
 
   Future<List<AidRequestModel>> fetchMyAidRequests() async {
-    final response = await http.get(Uri.parse('$baseUrl/aid-requests'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/aid-requests'), headers: headers);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List data = decoded is List ? decoded : (decoded['items'] ?? []);
@@ -76,9 +125,10 @@ class RecoveryService {
     required String itemDescription,
     String? targetShelterId,
   }) async {
+    final headers = await _getAuthHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/donations'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'donorName': donorName,
         'donorContact': donorContact,
@@ -92,7 +142,8 @@ class RecoveryService {
   }
 
   Future<List<DonationModel>> fetchDonations() async {
-    final response = await http.get(Uri.parse('$baseUrl/donations'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/donations'), headers: headers);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List data = decoded is List ? decoded : (decoded['items'] ?? []);
@@ -113,9 +164,10 @@ class RecoveryService {
     required String bankDetails,
     String? description,
   }) async {
+    final headers = await _getAuthHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/compensations'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'applicantName': applicantName,
         'applicantNIC': applicantNIC,
@@ -135,7 +187,8 @@ class RecoveryService {
   }
 
   Future<List<CompensationModel>> fetchCompensations() async {
-    final response = await http.get(Uri.parse('$baseUrl/compensations'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/compensations'), headers: headers);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List data = decoded is List ? decoded : (decoded['items'] ?? []);
@@ -146,13 +199,29 @@ class RecoveryService {
 
   // ── 5. Autonomous Multi-Agent Workflows & Damage Intake ─────────────────────
 
-  Future<RecoveryPlanModel> submitDamageIntake(DamageIntakeModel intake) async {
+  Future<RecoveryPlanModel> submitDamageIntake(
+    DamageIntakeModel intake, {
+    String? incidentId,
+    String? damageReportId,
+    String? revisionGuidance,
+  }) async {
+    final headers = await _getAuthHeaders();
+    final Map<String, dynamic> payload = {
+      'directDamageIntake': intake.toJson(),
+    };
+    if (incidentId != null && incidentId.isNotEmpty) {
+      payload['incidentId'] = incidentId;
+    }
+    if (damageReportId != null && damageReportId.isNotEmpty) {
+      payload['damageReportId'] = damageReportId;
+    }
+    if (revisionGuidance != null && revisionGuidance.isNotEmpty) {
+      payload['revisionGuidance'] = revisionGuidance;
+    }
     final response = await http.post(
       Uri.parse('$baseUrl/workflows/start'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'directDamageIntake': intake.toJson(),
-      }),
+      headers: headers,
+      body: jsonEncode(payload),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
       return RecoveryPlanModel.fromJson(jsonDecode(response.body));
@@ -165,7 +234,8 @@ class RecoveryService {
     final query = (status != null && status.isNotEmpty && status != 'all')
         ? '?status=$status'
         : '';
-    final response = await http.get(Uri.parse('$baseUrl/workflows$query'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/workflows$query'), headers: headers);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List data = decoded is List ? decoded : (decoded['items'] ?? []);
@@ -175,7 +245,8 @@ class RecoveryService {
   }
 
   Future<RecoveryPlanModel> fetchRecoveryPlanDetail(String planId) async {
-    final response = await http.get(Uri.parse('$baseUrl/workflows/$planId'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/workflows/$planId'), headers: headers);
     if (response.statusCode == 200) {
       return RecoveryPlanModel.fromJson(jsonDecode(response.body));
     }
@@ -183,7 +254,8 @@ class RecoveryService {
   }
 
   Future<WorkflowTraceModel> fetchWorkflowTrace(String planId) async {
-    final response = await http.get(Uri.parse('$baseUrl/workflows/$planId/trace'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/workflows/$planId/trace'), headers: headers);
     if (response.statusCode == 200) {
       return WorkflowTraceModel.fromJson(jsonDecode(response.body));
     }
@@ -196,9 +268,10 @@ class RecoveryService {
     String? reviewerNotes,
     String? reviewedBy,
   }) async {
+    final headers = await _getAuthHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/workflows/$planId/approve'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'action': action,
         'reviewerNotes': reviewerNotes,
@@ -215,7 +288,8 @@ class RecoveryService {
   // ── 6. Reports ──────────────────────────────────────────────────────────────
 
   Future<List<RecoveryReportModel>> fetchReports() async {
-    final response = await http.get(Uri.parse('$baseUrl/reports'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/reports'), headers: headers);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List data = decoded is List ? decoded : (decoded['items'] ?? []);
@@ -231,7 +305,8 @@ class RecoveryService {
     if (status != null && status.isNotEmpty && status != 'all') params.add('status=$status');
     if (district != null && district.isNotEmpty && district != 'all') params.add('district=$district');
     final query = params.isNotEmpty ? '?${params.join('&')}' : '';
-    final response = await http.get(Uri.parse('$baseUrl/damage-reports$query'));
+    final headers = await _getAuthHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/damage-reports$query'), headers: headers);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
       final List data = decoded is List ? decoded : (decoded['items'] ?? []);
@@ -241,6 +316,7 @@ class RecoveryService {
   }
 
   Future<DamageReportModel> submitCitizenDamageReport({
+    String? incidentId,
     required String district,
     required String location,
     required String disasterType,
@@ -251,20 +327,26 @@ class RecoveryService {
     required String additionalNotes,
     List<DamageIntakeInfrastructureItemModel>? infrastructureDamage,
   }) async {
+    final headers = await _getAuthHeaders();
+    final Map<String, dynamic> payload = {
+      'district': district,
+      'location': location,
+      'disasterType': disasterType,
+      'housesDamaged': housesDamaged,
+      'displacedFamilies': displacedFamilies,
+      'reporterName': reporterName,
+      'reporterContact': reporterContact,
+      'additionalNotes': additionalNotes,
+      'infrastructureDamage': infrastructureDamage?.map((e) => e.toJson()).toList() ?? [],
+    };
+    if (incidentId != null && incidentId.isNotEmpty) {
+      payload['incidentId'] = incidentId;
+    }
+
     final response = await http.post(
       Uri.parse('$baseUrl/damage-reports'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'district': district,
-        'location': location,
-        'disasterType': disasterType,
-        'housesDamaged': housesDamaged,
-        'displacedFamilies': displacedFamilies,
-        'reporterName': reporterName,
-        'reporterContact': reporterContact,
-        'additionalNotes': additionalNotes,
-        'infrastructureDamage': infrastructureDamage?.map((e) => e.toJson()).toList() ?? [],
-      }),
+      headers: headers,
+      body: jsonEncode(payload),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
       return DamageReportModel.fromJson(jsonDecode(response.body));
@@ -272,5 +354,26 @@ class RecoveryService {
     final err = jsonDecode(response.body);
     throw Exception(err['error'] ?? 'Failed to submit citizen damage report');
   }
+
+  // ── 8. Incident Module Integration Queue ────────────────────────────────────
+
+  Future<List<ApprovedIncidentModel>> fetchApprovedIncidents() async {
+    try {
+      final uri = Uri.parse('${ApiConfig.incidentBase}?pageSize=50');
+      final headers = await _getAuthHeaders();
+      final response = await http.get(uri, headers: headers);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final List data = decoded is List ? decoded : (decoded['items'] ?? []);
+        final list = data.map((e) => ApprovedIncidentModel.fromJson(e as Map<String, dynamic>)).toList();
+        return list.where((i) {
+          final s = i.status.toLowerCase();
+          return s == 'missionapproved' || s == 'closed' || s == 'assessed' || s == 'approved' || s == 'reported';
+        }).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
 }
+
 

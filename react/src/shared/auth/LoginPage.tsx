@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
 import { AegisLogo } from '../components/AegisLogo';
+import {
+  AlertTriangleIcon,
+  ShieldIcon,
+  UsersIcon,
+  UserIcon,
+  LockIcon,
+  EyeIcon,
+  EyeOffIcon,
+  ArrowRightIcon,
+} from '../components/Icons';
 
 interface LoginPageProps {
   onSwitchToRegister: () => void;
 }
 
-const DEMO_ACCOUNTS = [
-  { role: 'Disaster Officer', email: 'officer@aegis.lk', icon: '🛡️', color: '#2563eb', desc: 'Officer approval & review' },
-  { role: 'Citizen', email: 'citizen@aegis.lk', icon: '👥', color: '#10b981', desc: 'Forecasts & relief aid' },
-  { role: 'Field Responder', email: 'responder@aegis.lk', icon: '🚨', color: '#f59e0b', desc: 'Rescue ops & shelter relief' },
-  { role: 'System Admin', email: 'admin@aegis.lk', icon: '⚙️', color: '#8b5cf6', desc: 'Full administration control' },
-];
-
 export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
-  const { login, quickLogin, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,15 +31,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
       await login({ email, password });
     } catch (err: any) {
       setError(err.message || 'Login failed. Please verify credentials.');
-    }
-  };
-
-  const handleQuickLogin = async (demoEmail: string) => {
-    setError(null);
-    try {
-      await quickLogin(demoEmail);
-    } catch (err: any) {
-      setError(err.message || 'Quick demo login failed.');
     }
   };
 
@@ -69,7 +63,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
             {/* Value Proposition Feature Bullets */}
             <div className="ae-feature-bullets">
               <div className="ae-feature-bullet">
-                <div className="ae-bullet-icon red">🚨</div>
+                <div className="ae-bullet-icon red">
+                  <AlertTriangleIcon size={20} color="#dc2626" />
+                </div>
                 <div>
                   <div className="ae-bullet-title">Early Warnings</div>
                   <div className="ae-bullet-desc">
@@ -79,7 +75,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               </div>
 
               <div className="ae-feature-bullet">
-                <div className="ae-bullet-icon blue">👥</div>
+                <div className="ae-bullet-icon blue">
+                  <UsersIcon size={20} color="#0284c7" />
+                </div>
                 <div>
                   <div className="ae-bullet-title">Coordinated Response</div>
                   <div className="ae-bullet-desc">
@@ -89,7 +87,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               </div>
 
               <div className="ae-feature-bullet">
-                <div className="ae-bullet-icon green">🛡️</div>
+                <div className="ae-bullet-icon green">
+                  <ShieldIcon size={20} color="#16a34a" />
+                </div>
                 <div>
                   <div className="ae-bullet-title">Safer Communities</div>
                   <div className="ae-bullet-desc">
@@ -145,7 +145,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 alignItems: 'center',
                 gap: '0.5rem'
               }}>
-                <span>⚠️</span>
+                <AlertTriangleIcon size={16} color="#b91c1c" />
                 <span>{error}</span>
               </div>
             )}
@@ -155,7 +155,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               <div className="ae-form-group">
                 <label className="ae-form-label">Username or Email</label>
                 <div className="ae-input-wrapper">
-                  <span className="ae-input-icon">👤</span>
+                  <span className="ae-input-icon">
+                    <UserIcon size={18} color="#64748b" />
+                  </span>
                   <input
                     type="email"
                     required
@@ -170,7 +172,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               <div className="ae-form-group">
                 <label className="ae-form-label">Password</label>
                 <div className="ae-input-wrapper">
-                  <span className="ae-input-icon">🔒</span>
+                  <span className="ae-input-icon">
+                    <LockIcon size={18} color="#64748b" />
+                  </span>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
@@ -191,11 +195,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                       cursor: 'pointer',
                       fontSize: '1rem',
                       color: '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       padding: 0
                     }}
                     title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                    {showPassword ? (
+                      <EyeOffIcon size={18} color="#64748b" />
+                    ) : (
+                      <EyeIcon size={18} color="#64748b" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -219,7 +231,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
 
                 <button
                   type="button"
-                  onClick={() => alert('For password reset assistance, please contact the DMC Admin at admin@aegis.lk or use the Demo Accounts below.')}
+                  onClick={() => alert('For password reset assistance, please contact the DMC Administrator at admin@aegis.lk.')}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -238,43 +250,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 type="submit"
                 disabled={isLoading}
                 className="ae-auth-btn-primary"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
               >
                 <span>{isLoading ? 'Signing In...' : 'Sign In'}</span>
-                <span>→</span>
+                <ArrowRightIcon size={16} />
               </button>
             </form>
 
-            {/* Quick Demo One-Click Login Box */}
-            <div className="ae-quick-demo-box">
-              <div className="ae-quick-demo-title">
-                <span>⚡ Instant Role Demo Login</span>
-                <span style={{ color: '#0284c7', fontSize: '0.675rem' }}>Password: Aegis@123</span>
-              </div>
-              <div className="ae-demo-grid">
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <button
-                    key={acc.email}
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => handleQuickLogin(acc.email)}
-                    className="ae-demo-btn"
-                  >
-                    <span style={{ fontSize: '1.1rem' }}>{acc.icon}</span>
-                    <div style={{ overflow: 'hidden' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.725rem', color: acc.color }}>
-                        {acc.role}
-                      </div>
-                      <div style={{ color: '#64748b', fontSize: '0.625rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {acc.email}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Link to Register */}
-            <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: '#64748b' }}>
+            <div style={{ textAlign: 'center', marginTop: '1.75rem', fontSize: '0.875rem', color: '#64748b' }}>
               Don't have an account?{' '}
               <button
                 type="button"
@@ -301,7 +285,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           <strong>Aegis-LK</strong> &nbsp;|&nbsp; Sri Lanka Disaster Management System
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <span>🛡️</span>
+          <ShieldIcon size={14} color="#60a5fa" />
           <span>Preparedness &nbsp;•&nbsp; Response &nbsp;•&nbsp; Recovery &nbsp;•&nbsp; Resilience</span>
         </div>
       </footer>

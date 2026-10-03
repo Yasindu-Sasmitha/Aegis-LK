@@ -17,6 +17,7 @@ public class DamageReport
     public string InfrastructureJson { get; set; } = "[]";
     public string Status { get; set; } = "Submitted"; // Submitted, PlanGenerated, UnderReview, Approved, Rejected
     public Guid? RecoveryPlanId { get; set; }
+    public Guid? SubmittedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ProcessedAt { get; set; }
 }

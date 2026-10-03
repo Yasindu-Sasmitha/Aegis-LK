@@ -40,7 +40,8 @@ public record InfrastructureItemRequest(
 public record StartWorkflowRequest(
     Guid? IncidentId,                           // Optional — uses IncidentIntegrationService if provided
     DamageIntakeRequest? DirectDamageIntake,    // Required if IncidentId is null
-    string? RevisionGuidance                    // Populated when re-running after a revision request
+    string? RevisionGuidance,                   // Populated when re-running after a revision request
+    Guid? DamageReportId = null                 // Optional — links to an existing citizen damage report
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

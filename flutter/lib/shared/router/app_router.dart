@@ -12,7 +12,14 @@ class AppRouter {
   static const String weatherHome = '/weather';
   static const String weatherAlerts = '/weather/alerts';
   static const String alertReviewQueue = '/weather/review-queue';
+  static const String weatherPredictions = '/weather/predictions';
   static const String recoveryHome = '/recovery';
+
+  // Resource & Logistics routes (primary index 3)
+  static const String resourceHome = '/resource';
+  static const String resourceWarehouses = '/resource/warehouses';
+  static const String resourceDispatch = '/resource/dispatch';
+  static const String resourceDeliveryQr = '/resource/delivery-qr';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -38,10 +45,33 @@ class AppRouter {
         return MaterialPageRoute(
           builder: (_) => const MainShell(initialPrimaryIndex: 1, initialSubIndex: 2),
         );
+      case weatherPredictions:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 1, initialSubIndex: 3),
+        );
       case recoveryHome:
         return MaterialPageRoute(
           builder: (_) => const MainShell(initialPrimaryIndex: 2, initialSubIndex: 0),
         );
+
+      // Resource routes
+      case resourceHome:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 3, initialSubIndex: 0),
+        );
+      case resourceWarehouses:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 3, initialSubIndex: 0),
+        );
+      case resourceDispatch:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 3, initialSubIndex: 1),
+        );
+      case resourceDeliveryQr:
+        return MaterialPageRoute(
+          builder: (_) => const MainShell(initialPrimaryIndex: 3, initialSubIndex: 2),
+        );
+
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(

@@ -37,28 +37,39 @@ export const ShelterManagementPage: React.FC = () => {
     facilities: 'Clean Water, Sanitation, Hot Meals, Emergency Medical Post, Generator',
   });
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const data = await fetchShelters(selectedDistrict === 'all' ? undefined : selectedDistrict);
       setShelters(Array.isArray(data) ? data : (data as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
   }, [selectedDistrict]);
 
   const handleOccupancyChange = async (id: string, newOccupancy: number) => {
+    // Optimistic UI state update
+    setShelters(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const isFull = newOccupancy >= s.capacity;
+      return {
+        ...s,
+        currentOccupancy: newOccupancy,
+        status: isFull ? 'Full' : (s.status === 'Full' ? 'Active' : s.status)
+      };
+    }));
+
     try {
       await updateShelterOccupancy(id, newOccupancy);
-      loadData();
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Failed to update shelter occupancy');
+      loadData(false);
     }
   };
 
@@ -132,7 +143,6 @@ export const ShelterManagementPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>⛺</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Emergency Shelter &amp; Evacuation Network
             </h1>
@@ -157,7 +167,7 @@ export const ShelterManagementPage: React.FC = () => {
               textTransform: 'uppercase',
               letterSpacing: '0.04em'
             }}>
-              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Camp Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen Evacuee'}
+              {user?.role === 'Admin' ? 'System Admin' : user?.role === 'DisasterOfficer' ? 'Camp Officer' : user?.role === 'Responder' ? 'Field Responder' : 'Citizen Evacuee'}
             </span>
           </div>
 
@@ -180,44 +190,17 @@ export const ShelterManagementPage: React.FC = () => {
                 transition: 'all 0.15s ease',
               }}
             >
-              <span>➕</span>
               <span>Register Emergency Shelter</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* ── CITIZEN INFORMATIONAL BANNER ── */}
-      {isCitizen && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#eff6ff',
-          border: '1px solid #dbeafe',
-          borderLeft: '4px solid #2563eb',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#1e40af',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>ℹ️</span>
-          <div>
-            <strong>Safe Evacuation Shelter Guide</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
-              Find operational disaster shelters with open beds in your district. Each center provides clean drinking water, sanitation facilities, warm meals, and an emergency medical station.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      {/* ── METRICS SUMMARY CARDS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Active Relief Centers</span>
-            <span style={{ fontSize: '1.25rem' }}>⛺</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
             {shelters.length} Shelters
@@ -230,7 +213,6 @@ export const ShelterManagementPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Available Bed Capacity</span>
-            <span style={{ fontSize: '1.25rem' }}>🛏️</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
             {totalAvailableBeds} Beds Open
@@ -243,7 +225,6 @@ export const ShelterManagementPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#1e40af', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Current Sheltered Population</span>
-            <span style={{ fontSize: '1.25rem' }}>👥</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8' }}>
             {totalOcc} / {totalCap}
@@ -270,7 +251,7 @@ export const ShelterManagementPage: React.FC = () => {
 
         <input
           type="text"
-          placeholder="🔍 Search shelter name, location, contact..."
+          placeholder="Search shelter name, location, contact..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{ padding: '0.45rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', minWidth: '260px' }}
@@ -280,7 +261,6 @@ export const ShelterManagementPage: React.FC = () => {
       {/* ── SHELTER CARDS LIST ── */}
       {loading ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
           <p>Loading emergency shelters...</p>
         </div>
       ) : (
@@ -293,7 +273,6 @@ export const ShelterManagementPage: React.FC = () => {
           <div style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', width: '540px', maxWidth: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>⛺</span>
                 <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
                   Register Emergency Relief Shelter
                 </h2>
@@ -425,7 +404,7 @@ export const ShelterManagementPage: React.FC = () => {
                     boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
-                  {submitting ? 'Registering...' : '✓ Register Shelter'}
+                  {submitting ? 'Registering...' : 'Register Shelter'}
                 </button>
               </div>
             </form>

@@ -404,4 +404,150 @@ public class RecoveryBusinessRulesTests
         var deletedPlan = await db.RecoveryPlans.FindAsync(plan.Id);
         Assert.Null(deletedPlan);
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // RBAC & Ownership Scoping Tests
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Citizen_AidRequests_ScopedToSubmittedByUserId()
+    {
+        using var db = GetInMemoryDbContext();
+        var citizen1 = Guid.NewGuid();
+        var citizen2 = Guid.NewGuid();
+
+        db.AidRequests.AddRange(
+            new AidRequest { VictimName = "Citizen 1 Victim", ContactPhone = "0771111111", District = "Colombo", SubmittedByUserId = citizen1 },
+            new AidRequest { VictimName = "Citizen 2 Victim", ContactPhone = "0772222222", District = "Galle", SubmittedByUserId = citizen2 }
+        );
+        await db.SaveChangesAsync();
+
+        // Citizen 1 query
+        var citizen1Requests = await db.AidRequests.Where(a => a.SubmittedByUserId == citizen1).ToListAsync();
+        Assert.Single(citizen1Requests);
+        Assert.Equal("Citizen 1 Victim", citizen1Requests[0].VictimName);
+
+        // Disaster Officer / Admin query (all)
+        var allRequests = await db.AidRequests.ToListAsync();
+        Assert.Equal(2, allRequests.Count);
+    }
+
+    [Fact]
+    public async Task Citizen_DamageReports_ScopedToSubmittedByUserId()
+    {
+        using var db = GetInMemoryDbContext();
+        var citizen1 = Guid.NewGuid();
+        var citizen2 = Guid.NewGuid();
+
+        db.DamageReports.AddRange(
+            new DamageReport { District = "Ratnapura", Location = "Ratnapura Town", DisasterType = "Flood", SubmittedByUserId = citizen1 },
+            new DamageReport { District = "Kalutara", Location = "Kalutara South", DisasterType = "Landslide", SubmittedByUserId = citizen2 }
+        );
+        await db.SaveChangesAsync();
+
+        var citizen1Reports = await db.DamageReports.Where(d => d.SubmittedByUserId == citizen1).ToListAsync();
+        Assert.Single(citizen1Reports);
+        Assert.Equal("Ratnapura", citizen1Reports[0].District);
+    }
+
+    [Fact]
+    public async Task Citizen_Compensations_ScopedToSubmittedByUserId()
+    {
+        using var db = GetInMemoryDbContext();
+        var citizenId = Guid.NewGuid();
+        var otherId = Guid.NewGuid();
+
+        db.Compensations.AddRange(
+            new Compensation { ApplicantName = "Own Claim", NIC = "200012345678", ClaimAmount = 50000m, SubmittedByUserId = citizenId },
+            new Compensation { ApplicantName = "Other Claim", NIC = "199987654321", ClaimAmount = 100000m, SubmittedByUserId = otherId }
+        );
+        await db.SaveChangesAsync();
+
+        var ownClaims = await db.Compensations.Where(c => c.SubmittedByUserId == citizenId).ToListAsync();
+        Assert.Single(ownClaims);
+        Assert.Equal("Own Claim", ownClaims[0].ApplicantName);
+    }
+
+    [Fact]
+    public async Task CompensationApproval_SetsAuthenticatedActorName()
+    {
+        using var db = GetInMemoryDbContext();
+        var claim = new Compensation
+        {
+            ApplicantName = "Kamal Perera",
+            NIC = "199512345678",
+            ClaimAmount = 75000m,
+            Status = "Submitted"
+        };
+        db.Compensations.Add(claim);
+        await db.SaveChangesAsync();
+
+        // Simulate approval with actor from JWT claims
+        var actorName = "Disaster Officer Silva";
+        claim.ApprovedAmount = 70000m;
+        claim.Status = "Approved";
+        claim.ApprovedBy = actorName;
+        claim.ApprovedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        var updated = await db.Compensations.FindAsync(claim.Id);
+        Assert.NotNull(updated);
+        Assert.Equal("Approved", updated.Status);
+        Assert.Equal("Disaster Officer Silva", updated.ApprovedBy);
+        Assert.Equal(70000m, updated.ApprovedAmount);
+    }
+
+    [Fact]
+    public async Task RecoveryPlanApproval_SetsAuthenticatedActorName()
+    {
+        using var db = GetInMemoryDbContext();
+        var plan = new RecoveryPlan
+        {
+            IncidentId = Guid.NewGuid(),
+            PlanName = "Post-Flood Master Recovery Plan",
+            Status = "PendingApproval",
+            EstimatedTotalBudget = 2_500_000m,
+            PlanSummaryJson = "{}"
+        };
+        db.RecoveryPlans.Add(plan);
+        await db.SaveChangesAsync();
+
+        var actorName = "Admin Bandara";
+        plan.Status = "Approved";
+        plan.ReviewedBy = actorName;
+        plan.ReviewedAt = DateTime.UtcNow;
+        plan.ReviewNotes = "All tasks validated with field reports.";
+        await db.SaveChangesAsync();
+
+        var saved = await db.RecoveryPlans.FindAsync(plan.Id);
+        Assert.NotNull(saved);
+        Assert.Equal("Approved", saved.Status);
+        Assert.Equal("Admin Bandara", saved.ReviewedBy);
+    }
+
+    [Fact]
+    public void Roles_ContainsAllStandardRoles()
+    {
+        Assert.True(Aegis.Shared.Auth.Entities.Roles.IsValid("Admin"));
+        Assert.True(Aegis.Shared.Auth.Entities.Roles.IsValid("DisasterOfficer"));
+        Assert.True(Aegis.Shared.Auth.Entities.Roles.IsValid("Responder"));
+        Assert.True(Aegis.Shared.Auth.Entities.Roles.IsValid("Citizen"));
+        Assert.False(Aegis.Shared.Auth.Entities.Roles.IsValid("SuperUser"));
+        Assert.False(Aegis.Shared.Auth.Entities.Roles.IsValid("Anonymous"));
+    }
+
+    [Fact]
+    public async Task IncidentIntegrationService_ReturnsValidFallback_WhenHttpFails()
+    {
+        var service = new IncidentIntegrationService(new System.Net.Http.HttpClient());
+        var incidentId = Guid.NewGuid();
+        var report = await service.GetDamageReportAsync(incidentId);
+
+        Assert.NotNull(report);
+        Assert.Equal(incidentId, report.IncidentId);
+        Assert.False(string.IsNullOrWhiteSpace(report.DisasterType));
+        Assert.False(string.IsNullOrWhiteSpace(report.Location));
+        Assert.True(report.HousesDamaged > 0);
+        Assert.NotEmpty(report.InfrastructureDamage);
+    }
 }

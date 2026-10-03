@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAidRequests, createAidRequest, updateAidRequestStatus } from '../api/recoveryApi';
+import { fetchAidRequests, createAidRequest, updateAidRequestStatus, fetchShelters } from '../api/recoveryApi';
 import { AidRequestTable } from '../components/AidRequestTable';
-import { AidRequest } from '../types/recoveryTypes';
+import { AidRequest, Shelter } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
 
 const SRI_LANKA_DISTRICTS = [
@@ -28,6 +28,7 @@ export const AidRequestsPage: React.FC = () => {
   const isCitizen = user?.role === 'Citizen';
 
   const [requests, setRequests] = useState<AidRequest[]>([]);
+  const [shelters, setShelters] = useState<Shelter[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,21 +36,35 @@ export const AidRequestsPage: React.FC = () => {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [newRequest, setNewRequest] = useState({
+  const [newRequest, setNewRequest] = useState<{
+    victimName: string;
+    contactPhone: string;
+    district: string;
+    aidType: string;
+    familySize: number;
+    urgency: string;
+    shelterId?: string;
+    notes: string;
+  }>({
     victimName: user?.fullName || '',
     contactPhone: user?.phoneNumber || '',
     district: user?.district || 'Kalutara',
     aidType: 'Food Rations',
     familySize: 4,
     urgency: 'High',
+    shelterId: '',
     notes: '',
   });
 
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const data = await fetchAidRequests(filterStatus === 'all' ? undefined : filterStatus);
+      const [data, shelterData] = await Promise.all([
+        fetchAidRequests(filterStatus === 'all' ? undefined : filterStatus),
+        fetchShelters()
+      ]);
       setRequests(Array.isArray(data) ? data : (data as any).items || []);
+      setShelters(Array.isArray(shelterData) ? shelterData : (shelterData as any).items || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -114,7 +129,17 @@ export const AidRequestsPage: React.FC = () => {
     }
   };
 
+  const userFullName = (user?.fullName || '').trim().toLowerCase();
+  const userPhone = (user?.phoneNumber || '').trim().replace(/[^0-9]/g, '');
+
   const filteredRequests = requests.filter((r) => {
+    if (isCitizen && !isOfficer) {
+      const rName = (r.victimName || '').trim().toLowerCase();
+      const rPhone = (r.contactPhone || '').trim().replace(/[^0-9]/g, '');
+      const isOwner = (userFullName && (rName === userFullName || rName.includes(userFullName))) ||
+                      (userPhone && rPhone && (userPhone.endsWith(rPhone.slice(-9)) || rPhone.endsWith(userPhone.slice(-9))));
+      if (!isOwner) return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -125,8 +150,8 @@ export const AidRequestsPage: React.FC = () => {
     );
   });
 
-  const pendingCount = requests.filter((r) => r.status === 'Pending').length;
-  const fulfilledCount = requests.filter((r) => r.status === 'Fulfilled').length;
+  const pendingCount = filteredRequests.filter((r) => r.status === 'Pending').length;
+  const fulfilledCount = filteredRequests.filter((r) => r.status === 'Fulfilled').length;
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#0f172a' }}>
@@ -135,7 +160,6 @@ export const AidRequestsPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-            <span style={{ fontSize: '1.85rem' }}>🤝</span>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
               Citizen Emergency Aid &amp; Relief Portal
             </h1>
@@ -160,7 +184,7 @@ export const AidRequestsPage: React.FC = () => {
               textTransform: 'uppercase',
               letterSpacing: '0.04em'
             }}>
-              {user?.role === 'Admin' ? '⚙️ System Admin' : user?.role === 'DisasterOfficer' ? '🛡️ Disaster Officer' : user?.role === 'Responder' ? '🚨 Field Responder' : '👥 Citizen'}
+              {user?.role === 'Admin' ? 'System Admin' : user?.role === 'DisasterOfficer' ? 'Disaster Officer' : user?.role === 'Responder' ? 'Field Responder' : 'Citizen'}
             </span>
           </div>
 
@@ -182,65 +206,16 @@ export const AidRequestsPage: React.FC = () => {
               transition: 'all 0.15s ease',
             }}
           >
-            <span>➕</span>
             <span>Apply for Emergency Relief</span>
           </button>
         </div>
       </div>
 
-      {/* ── CITIZEN INFO BANNER ── */}
-      {isCitizen ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderLeft: '4px solid #16a34a',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#166534',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>ℹ️</span>
-          <div>
-            <strong>Citizen Relief Request Service</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#15803d', fontWeight: 400 }}>
-              Need emergency rations, potable drinking water, medical kits, or temporary bedding? Click <strong>"+ Apply for Emergency Relief"</strong>. Your request will be prioritized and assigned to field response teams.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-          background: '#eff6ff',
-          border: '1px solid #dbeafe',
-          borderLeft: '4px solid #2563eb',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          color: '#1e40af',
-        }}>
-          <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🛡️</span>
-          <div>
-            <strong>Officer Relief Dispatch &amp; Fulfillment Portal</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#1d4ed8', fontWeight: 400 }}>
-              Manage intake volume, filter by critical urgency, assign victims to emergency shelters, and advance request fulfillment status.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── METRICS SUMMARY CARDS (Pattern matching Reference Image 1) ── */}
+      {/* ── METRICS SUMMARY CARDS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Applications</span>
-            <span style={{ fontSize: '1.25rem' }}>📋</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
             {requests.length} Requests
@@ -253,7 +228,6 @@ export const AidRequestsPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #fde68a', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#b45309', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Pending Review</span>
-            <span style={{ fontSize: '1.25rem' }}>⏳</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309' }}>
             {pendingCount} Pending
@@ -266,7 +240,6 @@ export const AidRequestsPage: React.FC = () => {
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Fulfilled / Dispatched</span>
-            <span style={{ fontSize: '1.25rem' }}>✅</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
             {fulfilledCount} Completed
@@ -441,6 +414,24 @@ export const AidRequestsPage: React.FC = () => {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                  Designated Emergency Shelter (Optional)
+                </label>
+                <select
+                  value={newRequest.shelterId || ''}
+                  onChange={(e) => setNewRequest({ ...newRequest, shelterId: e.target.value || undefined })}
+                  style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.875rem', boxSizing: 'border-box', background: '#f8fafc' }}
+                >
+                  <option value="">Unassigned (Direct Field Relief / Community Delivery)</option>
+                  {shelters.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.district} — {s.currentOccupancy}/{s.capacity} beds)
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>

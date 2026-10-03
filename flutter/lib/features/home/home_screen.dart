@@ -476,6 +476,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   buttonLabel: 'Find Shelters',
                   onTap: () => widget.onNavigate?.call('recovery', subIndex: 1),
                 ),
+
+                _buildCapabilityCard(
+                  icon: Icons.inventory_2_outlined,
+                  iconColor: const Color(0xFFD97706),
+                  title: 'Resource & Logistics',
+                  description:
+                      'Warehouse inventory visibility, multi-agent dispatch planning, and QR-verified delivery handover across 25 districts.',
+                  buttonLabel: 'Open Resource',
+                  onTap: () => widget.onNavigate?.call('resource'),
+                ),
               ];
 
               if (isWide) {

@@ -17,8 +17,12 @@ namespace Aegis.Resource.DTOs
         [Required]
         public decimal Longitude { get; set; }
 
-        [MaxLength(30)]
+        [MaxLength(10)]
         public string? ContactPhone { get; set; }
+
+        public int? InventoryItemCount { get; set; }
+
+        public int? VehicleCount { get; set; }
     }
 
     public class UpdateWarehouseDto
@@ -37,6 +41,10 @@ namespace Aegis.Resource.DTOs
 
         [MaxLength(30)]
         public string? ContactPhone { get; set; }
+
+        public int? InventoryItemCount { get; set; }
+
+        public int? VehicleCount { get; set; }
     }
 
     public class WarehouseResponseDto

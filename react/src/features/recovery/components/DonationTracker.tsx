@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Donation, Shelter } from '../types/recoveryTypes';
+import { Pagination } from './Pagination';
 
 interface Props {
   donations: Donation[];
@@ -12,6 +13,8 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
   const [targetStatus, setTargetStatus] = useState<string>('Allocated');
   const [targetShelterId, setTargetShelterId] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
 
   const totalMonetary = donations
     .filter((d) => d.donationType === 'Monetary')
@@ -47,7 +50,6 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
   if (donations.length === 0) {
     return (
       <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', color: '#64748b' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📦</div>
         <h3 style={{ margin: '0 0 0.5rem 0', color: '#0f172a', fontWeight: 700 }}>No Donations Logged Yet</h3>
         <p style={{ margin: 0, fontSize: '0.9rem' }}>
           Click "+ Record Community Donation" to log public contributions and relief supply packages.
@@ -56,6 +58,10 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
     );
   }
 
+  const totalPages = Math.ceil(donations.length / pageSize);
+  const safePage = Math.min(currentPage, Math.max(1, totalPages));
+  const paginatedDonations = donations.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   return (
     <div>
       {/* ── METRIC CARDS ── */}
@@ -63,7 +69,6 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#166534', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Monetary Raised</span>
-            <span style={{ fontSize: '1.25rem' }}>💵</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#15803d' }}>
             Rs. {totalMonetary.toLocaleString()}
@@ -76,7 +81,6 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#1e40af', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Total Relief Packages</span>
-            <span style={{ fontSize: '1.25rem' }}>📦</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8' }}>
             {totalSupplies} items
@@ -89,7 +93,6 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
         <div style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Registered Donors</span>
-            <span style={{ fontSize: '1.25rem' }}>🤝</span>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a' }}>
             {donations.length} Contributions
@@ -100,7 +103,7 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
         </div>
       </div>
 
-      {/* ── HIGH-CONTRAST DONATION TABLE ── */}
+      {/* ── DONATION TABLE ── */}
       <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem', color: '#0f172a' }}>
@@ -118,7 +121,7 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
               </tr>
             </thead>
             <tbody>
-              {donations.map((d, idx) => (
+              {paginatedDonations.map((d, idx) => (
                 <tr
                   key={d.id}
                   style={{
@@ -143,7 +146,7 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
                       background: d.donationType === 'Monetary' ? '#dcfce7' : '#eff6ff',
                       color: d.donationType === 'Monetary' ? '#15803d' : '#1d4ed8',
                     }}>
-                      {d.donationType === 'Monetary' ? '💵 Monetary' : '📦 Supplies'}
+                      {d.donationType === 'Monetary' ? 'Monetary' : 'Supplies'}
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: '#0f172a' }}>
@@ -155,7 +158,7 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
                     <div>{d.itemDescription || 'General Disaster Relief'}</div>
                     {d.targetShelterId && (
                       <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>
-                        ⛺ {shelters.find((s) => s.id === d.targetShelterId)?.name || 'Designated Shelter'}
+                        {shelters.find((s) => s.id === d.targetShelterId)?.name || 'Designated Shelter'}
                       </div>
                     )}
                   </td>
@@ -208,7 +211,7 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
                           cursor: 'pointer',
                         }}
                       >
-                        ⚙️ Allocate
+                        Allocate
                       </button>
                     </td>
                   )}
@@ -217,6 +220,13 @@ export const DonationTracker: React.FC<Props> = ({ donations, shelters = [], onU
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          currentPage={safePage}
+          totalItems={donations.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* ── ALLOCATION UPDATE MODAL ── */}
