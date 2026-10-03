@@ -252,6 +252,49 @@ namespace Aegis.Resource.Services
             return dispatches.Select(d => ToDto(d, d.ResourceRequest, null, null)).ToList();
         }
 
+                public async Task<bool> DeleteAsync(Guid id)
+        {
+            var dispatch = await _db.Dispatches
+                .FirstOrDefaultAsync(d => d.Id == id);
+
+            if (dispatch is null) return false;
+
+            // Only PendingApproval and Rejected plans can be deleted.
+            // Approved plans are part of the audit trail and must be preserved.
+            if (dispatch.ApprovalStatus == DispatchApprovalStatus.Approved)
+            {
+                throw new InvalidOperationException(
+                    "Approved dispatch plans cannot be deleted — they are part of the audit trail.");
+            }
+
+            // Restore the vehicle to Available if it was marked Dispatched
+            var vehicle = await _db.Vehicles.FindAsync(dispatch.VehicleId);
+            if (vehicle is not null && vehicle.Status == VehicleStatus.Dispatched)
+            {
+                vehicle.Status = VehicleStatus.Available;
+                vehicle.UpdatedAt = DateTime.UtcNow;
+            }
+
+            // Delete dependent Delivery rows first (FK safety)
+            var deliveries = await _db.Deliveries
+                .Where(d => d.DispatchId == id)
+                .ToListAsync();
+            _db.Deliveries.RemoveRange(deliveries);
+
+            // Delete the Dispatch row
+            _db.Dispatches.Remove(dispatch);
+
+            // Delete the associated ResourceRequest
+            var resourceRequest = await _db.ResourceRequests
+                .FindAsync(dispatch.ResourceRequestId);
+            if (resourceRequest is not null)
+            {
+                _db.ResourceRequests.Remove(resourceRequest);
+            }
+
+            await _db.SaveChangesAsync();
+            return true;
+        }
         private static DispatchResponseDto ToDto(
             Dispatch d,
             ResourceRequest? req,
