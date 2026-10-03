@@ -249,8 +249,8 @@ public static class IncidentEndpoints
             return Results.Ok(incident);
         });
 
-        // POST /api/incidents/{id}/damage-report — closes the incident, records damage
-        group.MapPost("/{id:guid}/damage-report", async (Guid id, CreateDamageReportRequest request, IncidentDbContext db) =>
+        // POST /api/incidents/{id}/damage-report — closes the incident, records damage, triggers recovery workflow
+        group.MapPost("/{id:guid}/damage-report", async (Guid id, CreateDamageReportRequest request, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
         {
             var incident = await db.Incidents
                 .Include(i => i.DamageReport)
@@ -273,6 +273,9 @@ public static class IncidentEndpoints
             incident.UpdatedAt = DateTime.UtcNow;
 
             await db.SaveChangesAsync();
+
+            // Fire-and-forget: Trigger the Recovery module's AI planning pipeline
+            _ = RunRecoveryWorkflowTriggerAsync(incident.Id, scopeFactory);
 
             return Results.Created($"/api/incident/{id}/damage-report", damageReport);
         });
@@ -414,11 +417,12 @@ public static class IncidentEndpoints
             if (incident is null || incident.DamageReport is null)
                 return Results.NotFound();
 
+            var district = DistrictHelper.NearestDistrict(incident.Latitude, incident.Longitude);
             var response = new IncidentDamageReportResponse
             {
                 IncidentId = incident.Id,
                 DisasterType = incident.DisasterType,
-                Location = $"{incident.Latitude}, {incident.Longitude}",
+                Location = district,
                 HousesDamaged = incident.DamageReport.HousesDamaged,
                 DisplacedFamilies = incident.DamageReport.DisplacedFamilies,
                 InfrastructureDamage = new List<InfrastructureDamageItemRequest>()
@@ -518,6 +522,32 @@ public static class IncidentEndpoints
         }
 
         await db.SaveChangesAsync();
+    }
+
+    private static async Task RunRecoveryWorkflowTriggerAsync(Guid incidentId, IServiceScopeFactory scopeFactory)
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<IncidentDbContext>();
+            var client = scope.ServiceProvider.GetService<IncidentRecoveryWorkflowClient>();
+            if (client == null) return;
+
+            var triggered = await client.TriggerRecoveryWorkflowAsync(incidentId);
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = incidentId,
+                Note = triggered
+                    ? "Recovery multi-agent workflow auto-triggered with damage assessment data."
+                    : "Recovery workflow trigger queued."
+            });
+            await db.SaveChangesAsync();
+        }
+        catch
+        {
+            // Fire-and-forget: failure in background trigger must not affect incident operations
+        }
     }
 
     private static double HaversineDistanceKm(double lat1, double lng1, double lat2, double lng2)

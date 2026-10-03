@@ -529,6 +529,7 @@ public static class RecoveryEndpoints
 
                 var report = new DamageReport
                 {
+                    IncidentId = request.IncidentId,
                     District = request.District.Trim(),
                     Location = string.IsNullOrWhiteSpace(request.Location) ? request.District.Trim() : request.Location.Trim(),
                     DisasterType = string.IsNullOrWhiteSpace(request.DisasterType) ? "Flood" : request.DisasterType.Trim(),
@@ -602,7 +603,9 @@ public static class RecoveryEndpoints
                 if (intake.DisplacedFamilies < 0)
                     return Results.BadRequest(new { error = "Displaced families count cannot be negative." });
 
-                incidentId = Guid.NewGuid(); // Generate a local reference ID
+                incidentId = request.IncidentId.HasValue && request.IncidentId.Value != Guid.Empty
+                    ? request.IncidentId.Value
+                    : Guid.NewGuid(); // Use provided incident ID or generate a local reference ID
                 damageReport = new IncidentDamageReportDto
                 {
                     IncidentId = incidentId,
@@ -666,6 +669,19 @@ public static class RecoveryEndpoints
             var workflowResult = await RunWorkflowInternal(incidentId, damageReport, request.RevisionGuidance, db, agentClient, null, dbDamageReport);
             return workflowResult;
         }).RequireAuthorization(p => p.RequireRole(Roles.Admin, Roles.DisasterOfficer));
+
+        /// POST /api/recovery/workflows/auto-start/{incidentId:guid}
+        /// Internal / cross-module trigger to auto-generate a recovery plan for an approved/closed incident.
+        group.MapPost("/workflows/auto-start/{incidentId:guid}", async (Guid incidentId, RecoveryDbContext db,
+            IIncidentIntegrationService incidentService, RecoveryAgentClientService agentClient) =>
+        {
+            var damageReport = await incidentService.GetDamageReportAsync(incidentId);
+            if (damageReport is null)
+                return Results.NotFound(new { error = $"No damage report found for incident {incidentId}." });
+
+            var workflowResult = await RunWorkflowInternal(incidentId, damageReport, null, db, agentClient);
+            return workflowResult;
+        });
 
         /// GET /api/recovery/workflows/{planId:guid}
         /// Returns full RecoveryPlan detail (with Tasks, NGO names, and WorkflowLog Trace) by Plan ID.
