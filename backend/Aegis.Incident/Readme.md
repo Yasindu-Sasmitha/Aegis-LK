@@ -205,12 +205,9 @@ Each agent was verified at three levels before merging:
    (citizen request → C# → Python agent → Gemini/tools → back through C# → Postgres) works
    together, including the fire-and-forget background triggering for Plausibility and Dedup
 
-## 11. Explicitly deferred (correctly, not a gap)
+## 11. Integration Status & Role-Based Authorization
 
-- **Rescue mission ETA** — belongs to the Resource module's agent output, not this module's.
-- **Outbound POST to Resource on mission approval** — stubbed as a TODO comment in
-  `POST /{id}/approve`, wrapped so approval still succeeds standalone since Resource doesn't
-  exist yet in the repo.
-- **Role-based authorization on these endpoints** — JWT auth now exists project-wide; applying
-  `[Authorize(Roles = "...")]` to these specific routes is planned once the module's core
-  functionality and UI are complete.
+- **Outbound POST to Resource on mission approval (Completed):** `POST /{id}/approve` now dispatches a request directly to the Resource module (`POST /api/resource/dispatch-requests`), automatically queuing resource allocation for the approved rescue mission.
+- **Role-based authorization (Completed):** Endpoints are secured with JWT authentication (`[Authorize(Roles = "DisasterOfficer,Admin")]` for mission approvals, incident rejection, hold, and damage logging; citizen endpoints require appropriate citizen/authenticated claims).
+- **Rescue mission ETA:** Sourced from the Resource module's dispatch plan rather than computed in this module, maintaining clean module boundaries.
+
