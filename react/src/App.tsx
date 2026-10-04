@@ -56,6 +56,7 @@ import {
   DispatchManagementPage,
 } from './features/resource';
 import { UserManagementPage } from './features/admin';
+import { Navbar } from './shared/layout/Navbar';
 
 type NavView = 'home' | 'weather' | 'recovery' | 'resource' | 'incident' | 'user-management';
 
@@ -232,216 +233,32 @@ const MainPlatform: React.FC = () => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* Top Main Navigation Bar */}
-      <header style={{
-        backgroundColor: '#07162c',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        padding: '0.75rem 2.5rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.25)'
-      }}>
-        {/* Brand */}
-        <div style={{ cursor: 'pointer' }} onClick={() => setCurrentView('home')}>
-          <AegisLogo size={38} lightText={true} />
-        </div>
+      <Navbar
+        currentView={currentView}
+        weatherTab={weatherTab}
+        incidentTab={incidentTab}
+        resourceTab={resourceTab}
+        recoveryTab={recoveryTab}
+        canAccessResources={canAccessResources}
+        isOfficerOrAdmin={isOfficerOrAdmin}
+        user={user}
+        roleBadge={roleBadge}
+        weatherTabs={WEATHER_TABS}
+        incidentTabs={INCIDENT_TABS}
+        resourceTabs={RESOURCE_TABS}
+        recoveryTabs={RECOVERY_TABS}
+        onNavigateHome={() => {
+          setCurrentView('home');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateWeather={navigateToWeather}
+        onNavigateIncident={navigateToIncident}
+        onNavigateResource={navigateToResource}
+        onNavigateRecovery={navigateToRecovery}
+        onNavigateUserManagement={navigateToUserManagement}
+        onLogout={logout}
+      />
 
-        {/* Center Nav Links */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            onClick={() => setCurrentView('home')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.5rem 1rem',
-              borderRadius: 8,
-              border: 'none',
-              background: currentView === 'home' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-              color: currentView === 'home' ? '#38bdf8' : '#cbd5e1',
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <HomeIcon size={16} />
-            <span>Home</span>
-          </button>
-
-          <button
-            onClick={() => navigateToWeather('dashboard')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.5rem 1rem',
-              borderRadius: 8,
-              border: 'none',
-              background: currentView === 'weather' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-              color: currentView === 'weather' ? '#38bdf8' : '#cbd5e1',
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <CloudRainIcon size={16} />
-            <span>Weather Intelligence</span>
-          </button>
-
-          <button
-            onClick={() => navigateToRecovery('dashboard')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.5rem 1rem',
-              borderRadius: 8,
-              border: 'none',
-              background: currentView === 'recovery' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-              color: currentView === 'recovery' ? '#38bdf8' : '#cbd5e1',
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <ShieldIcon size={16} />
-            <span>Recovery & Relief</span>
-          </button>
-
-          {/* Resources — hidden for Citizens */}
-          {canAccessResources && (
-            <button
-              onClick={() => navigateToResource('dashboard')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.5rem 1rem',
-                borderRadius: 8,
-                border: 'none',
-                background: currentView === 'resource' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                color: currentView === 'resource' ? '#38bdf8' : '#cbd5e1',
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontWeight: 600,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <PackageIcon size={16} />
-              <span>Resources</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => navigateToIncident('dashboard')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.5rem 1rem',
-              borderRadius: 8,
-              border: 'none',
-              background: currentView === 'incident' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-              color: currentView === 'incident' ? '#38bdf8' : '#cbd5e1',
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <AlertTriangleIcon size={16} />
-            <span>Incidents</span>
-          </button>
-
-          {/* User Management — Admin Only */}
-          {user?.role === 'Admin' && (
-            <button
-              onClick={navigateToUserManagement}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.5rem 1rem',
-                borderRadius: 8,
-                border: 'none',
-                background: currentView === 'user-management' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                color: currentView === 'user-management' ? '#38bdf8' : '#cbd5e1',
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontWeight: 600,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <UsersIcon size={16} />
-              <span>User Management</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => navigateToWeather(isOfficerOrAdmin ? 'analytics' : 'history')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.5rem 1rem',
-              borderRadius: 8,
-              border: 'none',
-              background: 'transparent',
-              color: '#94a3b8',
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 500, fontSize: '0.9rem', cursor: 'pointer',
-            }}
-          >
-            <BarChartIcon size={16} />
-            <span>Reports</span>
-          </button>
-        </nav>
-
-        {/* Right User Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ color: '#ffffff', fontSize: '0.875rem', fontWeight: 600 }}>
-              {user?.fullName}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', justifyContent: 'flex-end', marginTop: 2 }}>
-              <span style={{
-                fontSize: '0.675rem', fontWeight: 700,
-                color: roleBadge.color, backgroundColor: roleBadge.bg,
-                padding: '2px 8px', borderRadius: 10,
-                border: `1px solid ${roleBadge.color}40`,
-                textTransform: 'uppercase', letterSpacing: '0.03em'
-              }}>
-                {roleBadge.label}
-              </span>
-              {user?.district && (
-                <span style={{ color: '#94a3b8', fontSize: '0.725rem', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                  <MapPinIcon size={12} color="#94a3b8" />
-                  {user.district}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <button
-            onClick={logout}
-            style={{
-              padding: '0.45rem 0.95rem',
-              backgroundColor: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              borderRadius: 8, color: '#fca5a5',
-              fontSize: '0.825rem', fontWeight: 600,
-              cursor: 'pointer', transition: 'all 0.2s ease',
-            }}
-            title="Sign out of Aegis-LK"
-          >
-            Sign Out
-          </button>
-        </div>
-      </header>
 
       {/* Sub-header Module Nav */}
       {currentView !== 'home' && currentView !== 'user-management' && (

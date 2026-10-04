@@ -1,0 +1,507 @@
+/* Aegis-LK Enterprise Navigation System Styles */
+
+/* ── Sticky Top Header with Smooth Glass Transition ───────────────────── */
+.ae-navbar-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: #07162c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.75rem 2.25rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              backdrop-filter 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              -webkit-backdrop-filter 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              padding 0.3s ease;
+}
+
+/* Scrolled state: Translucent dark navy glass */
+.ae-navbar-header.ae-navbar-scrolled {
+  background-color: rgba(7, 22, 44, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+.ae-navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ── Brand / Logo ──────────────────────────────────────────────────────── */
+.ae-nav-brand {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+.ae-nav-brand:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+/* ── Desktop Primary Navigation List ───────────────────────────────────── */
+.ae-nav-desktop {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Nav Item Wrapper (Trigger + Dropdown Container) */
+.ae-nav-item-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Nav Button */
+.ae-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #cbd5e1;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.ae-nav-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.ae-nav-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.ae-nav-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+/* Chevron indicator */
+.ae-nav-chevron {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  opacity: 0.7;
+}
+
+.ae-nav-btn:hover .ae-nav-chevron {
+  opacity: 1;
+}
+
+.ae-nav-chevron.open {
+  transform: rotate(180deg);
+  opacity: 1;
+  color: #38bdf8;
+}
+
+/* ── Hover Dropdown Subnavigation ──────────────────────────────────────── */
+.ae-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  background: rgba(10, 26, 49, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0.45rem;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: aeDropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Invisible bridge so mouse hover doesn't drop when moving between button & menu */
+.ae-dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+
+@keyframes aeDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dropdown Menu Item */
+.ae-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 0.825rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ae-dropdown-item:hover {
+  background: rgba(56, 189, 248, 0.12);
+  color: #ffffff;
+  padding-left: 1rem;
+}
+
+.ae-dropdown-item.active {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.ae-dropdown-item:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: -1px;
+}
+
+.ae-dropdown-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+  flex-shrink: 0;
+  margin-left: 0.75rem;
+}
+
+/* ── Desktop User Profile & Sign Out ──────────────────────────────────── */
+.ae-nav-user-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-shrink: 0;
+}
+
+.ae-nav-user-info {
+  text-align: right;
+}
+
+.ae-nav-user-name {
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ae-nav-user-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.ae-nav-role-badge {
+  font-size: 0.675rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ae-nav-district-badge {
+  color: #94a3b8;
+  font-size: 0.725rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ae-nav-signout-btn {
+  padding: 0.45rem 0.95rem;
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  color: #fca5a5;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.ae-nav-signout-btn:hover {
+  background-color: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.ae-nav-signout-btn:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
+/* ── Mobile Hamburger Toggle Button ───────────────────────────────────── */
+.ae-nav-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ae-nav-mobile-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+/* ── Mobile Navigation Drawer ─────────────────────────────────────────── */
+.ae-mobile-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 200;
+  animation: aeFadeOverlay 0.2s ease;
+}
+
+@keyframes aeFadeOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ae-mobile-drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 330px;
+  max-width: 86vw;
+  background: #07162c;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  z-index: 210;
+  animation: aeSlideDrawer 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes aeSlideDrawer {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.ae-mobile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.15rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ae-mobile-drawer-close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ae-mobile-drawer-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.ae-mobile-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* User Card in Mobile Drawer */
+.ae-mobile-user-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.ae-mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ae-mobile-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 0.95rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ae-mobile-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.ae-mobile-nav-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.ae-mobile-sublist {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0.5rem 0.5rem 2.25rem;
+  gap: 2px;
+}
+
+.ae-mobile-sub-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 0.825rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ae-mobile-sub-btn:hover {
+  color: #ffffff;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.ae-mobile-sub-btn.active {
+  color: #38bdf8;
+  font-weight: 700;
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.ae-mobile-drawer-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Responsive Media Queries ─────────────────────────────────────────── */
+@media (max-width: 1280px) {
+  .ae-navbar-header {
+    padding: 0.75rem 1.5rem;
+  }
+  .ae-nav-desktop {
+    gap: 0.2rem;
+  }
+  .ae-nav-btn {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.825rem;
+    gap: 0.35rem;
+  }
+}
+
+@media (max-width: 1040px) {
+  .ae-nav-btn span {
+    font-size: 0.8rem;
+  }
+  .ae-nav-btn {
+    padding: 0.4rem 0.6rem;
+  }
+  .ae-nav-user-bar {
+    gap: 0.75rem;
+  }
+}
+
+/* Collapse into Mobile Navigation under 960px */
+@media (max-width: 960px) {
+  .ae-navbar-header {
+    padding: 0.75rem 1.25rem;
+  }
+  .ae-nav-desktop {
+    display: none;
+  }
+  .ae-nav-user-bar {
+    display: none;
+  }
+  .ae-nav-mobile-toggle {
+    display: inline-flex;
+  }
+}
