@@ -1476,7 +1476,6 @@ export const RecoveryPlanningPage: React.FC = () => {
                 {/* Header row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                    <span style={{ fontSize: '1rem' }}>🚨</span>
                     <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Approved Incidents Queue</span>
                     <span style={{
                       fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '6px',

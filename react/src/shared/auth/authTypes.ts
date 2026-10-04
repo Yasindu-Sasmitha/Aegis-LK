@@ -7,7 +7,9 @@ export interface User {
   role: UserRole;
   district?: string | null;
   phoneNumber?: string | null;
+  isActive?: boolean;
   createdAt?: string;
+  updatedAt?: string | null;
 }
 
 export interface AuthResponse {
@@ -34,3 +36,44 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
 }
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  district?: string | null;
+  phoneNumber?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface CreateAdminUserRequest {
+  email: string;
+  password: string;
+  fullName: string;
+  role: UserRole;
+  district?: string;
+  phoneNumber?: string;
+}
+
+export interface UpdateAdminUserRequest {
+  email: string;
+  fullName: string;
+  role: UserRole;
+  district?: string;
+  phoneNumber?: string;
+  newPassword?: string;
+}
+
+export interface SetUserStatusRequest {
+  isActive: boolean;
+}
+
+export interface AdminUserFilters {
+  search?: string;
+  role?: string;
+  isActive?: boolean;
+}
+
