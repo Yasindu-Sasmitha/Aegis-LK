@@ -246,23 +246,23 @@ All endpoints are prefixed with `/api/resource` and require JWT authentication. 
 ### Warehouses
 - `GET /api/resource/warehouses` — Paginated list with `district` filter, `search`, sorting, pagination.
 - `GET /api/resource/warehouses/{id}` — Retrieve a single warehouse.
-- `POST /api/resource/warehouses` — Register a warehouse (*ResourceManager / Admin*).
-- `PUT /api/resource/warehouses/{id}` — Update a warehouse (*ResourceManager / Admin*).
+- `POST /api/resource/warehouses` — Register a warehouse (*DisasterOfficer / Admin*).
+- `PUT /api/resource/warehouses/{id}` — Update a warehouse (*DisasterOfficer / Admin*).
 - `DELETE /api/resource/warehouses/{id}` — Delete with cascading vehicle + inventory cleanup (*Admin only*).
 
 ### Inventory
 - `GET /api/resource/inventory` — Paginated list with `warehouseId`, `itemType`, `lowStockOnly`, sorting.
 - `GET /api/resource/inventory/{id}` — Retrieve a single inventory row.
-- `POST /api/resource/inventory` — Create an inventory row (*ResourceManager / Admin*).
-- `PUT /api/resource/inventory/{id}` — Update an inventory row (*ResourceManager / Admin*).
+- `POST /api/resource/inventory` — Create an inventory row (*DisasterOfficer / Admin*).
+- `PUT /api/resource/inventory/{id}` — Update an inventory row (*DisasterOfficer / Admin*).
 - `PATCH /api/resource/inventory/{id}/adjust` — **Business-specific operation**: signed `QuantityChange` with audit `Reason`. Rejects negative-stock attempts with `400 Bad Request`.
 - `DELETE /api/resource/inventory/{id}` — Delete an inventory row (*Admin only*).
 
 ### Dispatch
-- `POST /api/resource/dispatch/requests` — **Core business operation**: trigger the Agentic AI dispatch planning workflow. Returns the full 4-agent trace and a `PendingApproval` plan (*ResourceManager / Admin / DisasterOfficer*).
+- `POST /api/resource/dispatch/requests` — **Core business operation**: trigger the Agentic AI dispatch planning workflow. Returns the full 4-agent trace and a `PendingApproval` plan (*DisasterOfficer / Admin*).
 - `GET /api/resource/dispatch` — List recent dispatch plans (last 50, ordered by CreatedAt DESC).
 - `GET /api/resource/dispatch/{id}` — Fetch a single dispatch plan with its items and route summary.
-- `POST /api/resource/dispatch/{id}/approve` — **Human-in-the-loop**: approve a plan and atomically reserve inventory (*ResourceManager / Admin*).
+- `POST /api/resource/dispatch/{id}/approve` — **Human-in-the-loop**: approve a plan and atomically reserve inventory (*DisasterOfficer / Admin*).
 
 ### Business Operations Beyond CRUD
 1. **Inventory Adjustment** — signed-quantity changes with validation against negative stock.
@@ -277,53 +277,63 @@ All endpoints are prefixed with `/api/resource` and require JWT authentication. 
 ```powershell
 cd backend
 dotnet run --project Aegis.Api
+```
 
 ### 2. Python Resource Agent (port 8003) 
 
+```powershell
 cd agentic-ai/agents
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 uvicorn resource_agent_service:app --host 127.0.0.1 --port 8003 --reload
+```
 
 Health check:
+```powershell
 curl.exe http://127.0.0.1:8003/health
 # → {"status":"ok","service":"resource-agent","port":8003}
+```
 
-### 3.React Frontend
+### 3. React Frontend
 
+```powershell
 cd react
 npm install
 npm run dev
+```
 
-cd flutter
-flutter pub get
-flutter run -d chrome
+### 4. Flutter Mobile App
 
-### 4.Flutter mobile app
-
+```powershell
 cd flutter
 flutter pub get
 flutter run -d chrome
 
 # Or Android emulator:
 # flutter run -d emulator-5554
+```
 
 ### 5. Running Automated Tests
 
-Backend (xUnit) — 120 tests total, 7 for Resource module:
+Backend (xUnit) — 140 tests total across the platform, including Resource dispatch tests:
 
+```powershell
 cd backend
 dotnet test Aegis.Tests/Aegis.Tests.csproj
+```
 
-Expected: Passed! - Failed: 0, Passed: 120, Skipped: 0
+Expected: `Passed! - Failed: 0, Passed: 140, Skipped: 0`
 
-### Agent (Python unittest) — 5 golden-case tests:
+### 6. Agent (Python pytest) — 5 golden-case tests:
 
+```powershell
 cd agentic-ai/agents
 python -m pytest tests/test_agent.py -v
+```
 
-Expected: 5 passed
+Expected: `5 passed`
+
 
 
