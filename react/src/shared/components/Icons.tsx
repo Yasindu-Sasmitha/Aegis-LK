@@ -567,3 +567,121 @@ export const SettingsIcon: React.FC<IconProps> = ({
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
+
+export const SearchIcon: React.FC<IconProps> = ({
+  size = 18,
+  color = 'currentColor',
+  className = '',
+  strokeWidth = 2,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
+  </svg>
+);
+
+export const PlusIcon: React.FC<IconProps> = ({
+  size = 18,
+  color = 'currentColor',
+  className = '',
+  strokeWidth = 2,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M5 12h14" />
+    <path d="M12 5v14" />
+  </svg>
+);
+
+export const EditIcon: React.FC<IconProps> = ({
+  size = 16,
+  color = 'currentColor',
+  className = '',
+  strokeWidth = 2,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    <path d="m15 5 4 4" />
+  </svg>
+);
+
+export const RefreshCwIcon: React.FC<IconProps> = ({
+  size = 16,
+  color = 'currentColor',
+  className = '',
+  strokeWidth = 2,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </svg>
+);
+
+export const XIcon: React.FC<IconProps> = ({
+  size = 18,
+  color = 'currentColor',
+  className = '',
+  strokeWidth = 2,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
+

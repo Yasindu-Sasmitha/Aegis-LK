@@ -60,5 +60,31 @@ public class UserProfileResponse
     public required string Role { get; set; }
     public string? District { get; set; }
     public string? PhoneNumber { get; set; }
+    public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+public class UpdateAdminUserRequest
+{
+    [Required, MinLength(2)]
+    public required string FullName { get; set; }
+
+    [Required, EmailAddress]
+    public required string Email { get; set; }
+
+    [Required]
+    public required string Role { get; set; }
+
+    public string? District { get; set; }
+
+    public string? PhoneNumber { get; set; }
+
+    [MinLength(6)]
+    public string? NewPassword { get; set; }
+}
+
+public class SetUserStatusRequest
+{
+    public bool IsActive { get; set; }
 }
