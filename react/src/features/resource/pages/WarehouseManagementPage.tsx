@@ -284,7 +284,7 @@ export const WarehouseManagementPage: React.FC<WarehouseManagementPageProps> = (
                 </label>
 
                 <div style={{ gridColumn: '1 / -1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '0.75rem 0.9rem', color: '#0369a1', fontSize: '0.82rem', fontWeight: 600 }}>
-                  ℹ️ Inventory items and vehicles are managed on their own pages. The counts shown in the table update automatically.
+                  Inventory items and vehicles are managed on their own pages. The counts shown in the table update automatically.
                 </div>
               </div>
 
