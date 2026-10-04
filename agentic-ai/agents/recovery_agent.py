@@ -373,6 +373,12 @@ def run_agent_4_validation(payload: AgentRequestPayload, agent3: Agent3Output) -
         guardrailChecks=checks
     )
 
+# ── Health Check (required by Render) ───────────────────────────────────────
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "recovery-agent"}
+
 # ── FastAPI Main Route ───────────────────────────────────────────────────────
 
 @app.post("/api/recovery/agent/run", response_model=WorkflowResponse)

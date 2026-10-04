@@ -10,5 +10,6 @@ namespace Aegis.Resource.Services
         Task<DispatchResponseDto?> GetAsync(Guid id);
         Task<DispatchResponseDto?> ApproveAsync(Guid id, Guid userId);
         Task<List<DispatchResponseDto>> GetAllAsync();
+        Task<bool> DeleteAsync(Guid id);        // ← NEW
     }
 }

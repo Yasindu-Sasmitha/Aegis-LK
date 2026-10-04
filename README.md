@@ -1,4 +1,3 @@
-# Aegis-LK
 
 Intelligent Disaster Prediction, Response and Recovery Platform for Sri Lanka.
 
@@ -137,12 +136,11 @@ resources to a rescue mission.
 **Database entities:** Warehouse, Inventory, Vehicle, Dispatch, ResourceRequest, Fuel, Delivery.
 
 **Agent — Resource Allocation Agent:** given a resource need, finds warehouses with stock,
-checks vehicles and road closures, calculates delivery routes, generates a dispatch plan —
-manager approves, resources are dispatched.
+checks vehicles, calculates delivery routes, generates a dispatch plan — officer approves,
+resources are dispatched. Runs on `http://127.0.0.1:8003`.
 
-**Runs independently?** Mostly — it can be built and demoed with mock resource requests before
-Incident is finished. In the full end-to-end demo it consumes Incident's output, but that's a
-later integration step, not a blocker for early development.
+**Runs independently?** Mostly — it can be demoed with mock resource requests before
+Incident is finished. In the full end-to-end demo it consumes Incident's output.
 
 ---
 
@@ -155,18 +153,16 @@ later integration step, not a blocker for early development.
 planning.
 
 **Database entities:** Shelter, AidRequest, Donation, Compensation, RecoveryTask,
-InfrastructureDamage, NGO, RecoveryReport.
+InfrastructureDamage, NGO, RecoveryReport, RecoveryPlan, RecoveryWorkflowLog.
 
-**Agent — Recovery Planning Agent:** given damage reports, prioritizes infrastructure repairs,
-allocates families to shelters, estimates budget, assigns NGOs — recovery officer approves.
-**Status note:** entities, endpoints and migration are live; the actual agent reasoning is
-currently a placeholder in `RecoveryAgentClientService.cs` (simulated, not yet calling
-`recovery_agent.py`) — needs to be wired up the same way Weather's `WeatherAgentClient` calls its
-Python service, for a real Agentic AI contribution.
+**Agent — Recovery Planning Agent (4-Agent Pipeline):** given damage reports, a 4-agent
+collaborative pipeline (Orchestrator → Infrastructure & Shelter → Resource & NGO Tools →
+Safety & Policy Validation) prioritizes repairs, allocates shelters, estimates budget, assigns
+NGOs — recovery officer approves, rejects, or triggers AI revision with feedback. Deterministic
+guardrails enforce budget thresholds and capacity limits. Runs on `http://127.0.0.1:8004`.
 
 **Runs independently?** Yes for early development (shelters, donations, aid requests all work
-standalone). It naturally consumes Incident's damage data in the full workflow, same caveat as
-Resource above.
+standalone). It naturally consumes Incident's damage data in the full workflow.
 
 ---
 
@@ -187,6 +183,7 @@ anything bigger in the group chat before merging:
 A centralized, JWT-based authentication system runs in the `auth` PostgreSQL schema (`AuthDbContext`):
 - **Roles:** `Admin`, `DisasterOfficer`, `Responder`, `Citizen`.
 - **Public Registration:** `POST /api/auth/register` strictly creates `Citizen` accounts. Staff roles are provisioned by Admins via `POST /api/auth/admin/users`.
+- **Admin User Management:** Admins can view, search, create, edit, and activate/deactivate any user account via `GET/POST/PUT/PATCH /api/auth/admin/users`. Accessible in the React app via the **User Management** page (Admin-only nav link). Safety guards prevent an admin from deactivating their own account or removing the last active Admin.
 - **Pre-Seeded Demo Accounts** (Password: `Aegis@123`):
   - `admin@aegis.lk` (`Admin`)
   - `officer@aegis.lk` (`DisasterOfficer`)
@@ -194,6 +191,7 @@ A centralized, JWT-based authentication system runs in the `auth` PostgreSQL sch
   - `citizen@aegis.lk` (`Citizen`)
 - **Quick Demo Login:** Both React (`http://localhost:3000`) and Flutter feature one-click demo login buttons for each role for instant testing and viva demonstrations.
 - **Secret Storage:** `Jwt:SigningKey` is stored in `dotnet user-secrets` for `Aegis.Api`, never committed to git (satisfying Section 18.2).
+- **Full documentation:** `backend/Aegis.Shared/Readme.md`.
 
 ---
 
@@ -221,10 +219,10 @@ than once, it's the right size. `ITxxxxxxxx-incident-entities` — good.
 
 | IT ID | Module |
 |---|---|
-| ITxxxxxxxx | Weather |
-| ITxxxxxxxx | Incident |
-| ITxxxxxxxx | Resource |
-| ITxxxxxxxx | Recovery |
+| IT24101345 | Weather |
+| IT24100876 | Incident |
+| IT24102301 | Resource |
+| IT24103206 | Recovery |
 
 **The loop, every time:**
 
@@ -343,9 +341,9 @@ git push origin --delete feature/<your-IT-ID>-<task>
 ### Member 3 — Resource module
 
 **Owns, full stop:**
-- Entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`
-- Endpoints: `POST /api/resource/dispatch/requests`, `GET /api/resource/dispatch/{id}`, `POST /api/resource/dispatch/{id}/approve`, `GET /api/resource/inventory`
-- Agent: Resource Allocation Agent — input `{ missionId, teamsRequired, location }`, output `{ dispatchPlan, estimatedArrival }`
+- Entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`(✅ completed)
+- Endpoints: `POST /api/resource/dispatch/requests`, `GET /api/resource/dispatch/{id}`, `POST /api/resource/dispatch/{id}/approve`, `GET /api/resource/inventory`(✅ completed)
+- Agent: Resource Allocation Agent — input `{ missionId, teamsRequired, location }`, output `{ dispatchPlan, estimatedArrival }`(✅ completed)
 - Third-party call: Maps/routing API for road closures and route calculation — lives here, nowhere else
 - React: warehouse/inventory/dispatch dashboards
 - Flutter: delivery tracking, QR delivery confirmation
@@ -357,7 +355,7 @@ git push origin --delete feature/<your-IT-ID>-<task>
 
 **Borders:**
 - Inbound from Incident (hard border, you're the receiver): you implement `POST /api/resource/dispatch-requests` exactly as Incident's contract above. Your agent starts here — this is your trigger, you don't poll or watch for incidents yourself.
-- Nothing flows onward to Recovery. This is a common mistake to avoid: it feels natural to think "Resource dispatches supplies, so Resource should also handle post-disaster resource needs for recovery" — it shouldn't. Recovery gets its information from Incident's damage report, not from you. If Recovery genuinely needs to request more supplies during rebuilding, that's a new `ResourceRequest` coming through your same public endpoint, initiated by Recovery's officer through normal UI action — not a special direct pipe between your two modules.
+- Nothing flows onward to Recovery. This is a common mistake to avoid: it feels natural to think "Resource dispatches supplies, so Resource should also handle post-disaster resource needs for recovery" — it shouldn't. Recovery gets its information from Incident's damage report, not from you. If Recovery genuinely needs to request more supplies during rebuilding, that's a new `ResourceRequest` coming through your same public endpoint, initiated by Recovery's officer through normal UI action — not a special direct pipe between your two modules.(✅ completed)
 
 **The exact line:** your module starts at "here's a mission that needs resources" and ends at "resources have been dispatched, here's an ETA." You never touch a `RescueMission` row and you never look ahead to what happens after delivery.
 
@@ -425,6 +423,12 @@ uvicorn <your>_agent_service:app --host 127.0.0.1 --port 800X
 ```
    Free-tier Gemini (`gemini-2.5-flash-lite` via `langchain-google-genai`) is the recommended model
    for any agent.
+
+   **Agent port assignments:**
+   - **Weather Agent:** `http://127.0.0.1:8001` (Member 1 — ✅ active)
+   - **Incident Agent:** `http://127.0.0.1:8002` (Member 2 — ✅ active)
+   - **Resource Agent:** `http://127.0.0.1:8003` (Member 3 — ✅ active)
+   - **Recovery Agent:** `http://127.0.0.1:8004` (Member 4 — ✅ active)
 
 7. **React Web Frontend:**
 ```powershell
@@ -511,27 +515,27 @@ This section outlines what has been completed and provides a step-by-step roadma
 
 **Goal:** Receive dispatch requests from Incident missions, allocate warehouse inventory and response vehicles, calculate delivery routes, and track fulfillment.
 
-#### 1. Backend (`backend/Aegis.Resource/`)
+#### 1. Backend (`backend/Aegis.Resource/`)(✅ completed)
 - [ ] Implement EF Core entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`.
 - [ ] Implement endpoints:
-  - `POST /api/resource/dispatch-requests`: Inbound receiver contract from Member 2's Incident module.
+  - `POST /api/resource/dispatch/requests`: Inbound receiver contract from Member 2's Incident module.
   - `GET /api/resource/dispatch/{id}`: Fetch dispatch plan details.
   - `POST /api/resource/dispatch/{id}/approve`: Logistics manager approves dispatch plan and reserves inventory/vehicle.
   - `GET /api/resource/inventory`: Current stock levels across Sri Lanka warehouses.
   - `POST /api/resource/delivery/{id}/confirm`: Confirm arrival of resources at mission site.
 
-#### 2. Agentic AI (`agentic-ai/agents/resource_agent.py`)
+#### 2. Agentic AI (`agentic-ai/agents/resource_agent.py`)(✅ completed)
 - [ ] Create `resource_agent.py` and `resource_agent_service.py` running on **port 8003**.
 - [ ] Input schema: `{ missionId, teamsRequired, location: { lat, lng } }`.
 - [ ] Output schema: `{ warehouseId, allocatedItems: [{ itemName, quantity }], vehicleId, routeSummary, estimatedArrivalMinutes }`.
 - [ ] Check stock availability before recommending allocation.
 
-#### 3. React Frontend (`react/src/features/resource/`)
+#### 3. React Frontend (`react/src/features/resource/`)(✅ completed)
 - [ ] Warehouse & Inventory Dashboard: visual bars showing stock of food rations, medical kits, water, and boats.
 - [ ] Dispatch Plan Review: map showing origin warehouse, destination mission, and allocated resources.
 - [ ] Vehicle Fleet tracking table with status tags (`Available`, `EnRoute`, `Maintenance`).
 
-#### 4. Flutter Mobile App (`flutter/lib/features/resource/`)
+#### 4. Flutter Mobile App (`flutter/lib/features/resource/`)(✅ completed)
 - [ ] Implement `screens/warehouse_inventory_screen.dart`: Stock browser for field officers.
 - [ ] Implement `screens/dispatch_plan_screen.dart`: Review and confirm outbound dispatches.
 - [ ] Implement `screens/delivery_qr_screen.dart`: QR code scanner or confirmation code entry for field responders verifying delivery.
@@ -542,31 +546,24 @@ This section outlines what has been completed and provides a step-by-step roadma
 
 **Goal:** Citizens find emergency shelters and submit aid requests; Recovery Officers coordinate post-disaster infrastructure repair, donations, and long-term aid using damage reports from closed incidents.
 
-#### 1. Backend (`backend/Aegis.Recovery/`)
-- [ ] Implement EF Core entities: `Shelter`, `AidRequest`, `Donation`, `Compensation`, `RecoveryTask`, `InfrastructureDamage`, `NGO`, `RecoveryReport`.
-- [ ] Implement endpoints:
-  - `POST /api/recovery/shelters` & `GET /api/recovery/shelters`: Shelter locations, capacity, and current occupancy.
-  - `POST /api/recovery/aid-requests` & `GET /api/recovery/aid-requests`: Citizens request emergency aid (food, medicine, shelter).
-  - `POST /api/recovery/donations`: Public donations recording.
-  - `GET /api/recovery/plan/{incidentId}`: Ingests damage report from Incident module (`GET /api/incident/{id}/damage-report`) and generates recovery plan.
-- [ ] Connect `RecoveryAgentClientService.cs` to real Python service instead of simulated placeholders.
+#### 1. Backend (`backend/Aegis.Recovery/`) — ✅ Complete
+- [x] EF Core entities: `Shelter`, `AidRequest`, `Donation`, `Compensation`, `RecoveryTask`, `InfrastructureDamage`, `NGO`, `RecoveryReport`, `RecoveryPlan`, `RecoveryWorkflowLog`.
+- [x] Full REST API: shelters, aid requests, donations, compensations, workflows, and audit reports.
+- [x] 4-Agent Gemini pipeline wired via `RecoveryAgentClientService.cs` → `recovery_agent.py` on port 8004.
+- [x] Human-in-the-loop: Approve / Reject / Revise with revision-feedback loop.
+- [x] Deterministic guardrails: budget ceiling, cost bounds per asset type, shelter capacity integrity.
 
-#### 2. Agentic AI (`agentic-ai/agents/recovery_agent.py`)
-- [ ] Create `recovery_agent.py` and `recovery_agent_service.py` running on **port 8004**.
-- [ ] Input schema: `{ incidentId, damageReport: { housesDamaged, displacedFamilies, infrastructureDamage } }`.
-- [ ] Output schema: `{ recoveryPlanSummary, shelterAllocations, estimatedBudgetLkr, prioritizedTasks: string[] }`.
+#### 2. Agentic AI (`agentic-ai/agents/recovery_agent.py`) — ✅ Complete
+- [x] `recovery_agent.py` + `recovery_agent_service.py` running on **port 8004**.
+- [x] 4-agent collaborative pipeline: Orchestrator → Infrastructure & Shelter → Resource & NGO Tools → Safety & Policy Validation.
+- [x] Allow-listed tools: `tool_filter_ngos_by_sector`, `tool_match_shelter_capacity`, `tool_calculate_infrastructure_costs`.
 
-#### 3. React Frontend (`react/src/features/recovery/`)
-- [ ] Shelter Capacity Dashboard: real-time occupancy meters.
-- [ ] Aid Request review queue with status toggles (`Pending`, `Approved`, `Dispatched`).
-- [ ] Recovery plan visualization showing damage metrics and allocated budgets.
+#### 3. React Frontend (`react/src/features/recovery/`) — ✅ Complete
+- [x] Recovery Dashboard, Shelter Management, Aid Requests, Donations, Compensation, Recovery Planning Studio, and Audit Reports pages.
+- [x] Full agent trace viewer and human-in-the-loop approval/revision UI.
 
-#### 4. Flutter Mobile App (`flutter/lib/features/recovery/`)
-- [ ] Wire existing scaffolded screens in `flutter/lib/features/recovery/screens/`:
-  - `shelter_finder_screen.dart`: Display real shelters from `GET /api/recovery/shelters`.
-  - `aid_request_screen.dart`: Connect form to `POST /api/recovery/aid-requests`.
-  - `donate_screen.dart`: Public donation intake.
-  - `citizen_damage_report_screen.dart`: Citizen post-disaster damage filing.
+#### 4. Flutter Mobile App (`flutter/lib/features/recovery/`) — ✅ Complete
+- [x] `recovery_home_screen.dart`, `shelter_finder_screen.dart`, `aid_request_screen.dart`, `my_aid_requests_screen.dart`, `donate_screen.dart`, `recovery_plan_status_screen.dart`, `citizen_damage_report_screen.dart`.
 
 ---
 

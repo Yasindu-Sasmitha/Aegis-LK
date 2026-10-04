@@ -88,6 +88,64 @@ def get_weather(district: str) -> str:
         return json.dumps({"error": f"Weather lookup failed for {district}: {str(e)}"})
 
 
+# Base URL of the ASP.NET Core API (same variable the Dedup agent uses). The Weather
+# module's data is only ever read through its PUBLIC HTTP endpoints, never its database.
+INCIDENT_API_BASE = os.getenv("INCIDENT_API_BASE", "http://localhost:5012")
+
+
+def _normalize_name(name: str) -> str:
+    """'Nuwara Eliya' and 'NuwaraEliya' must match: lowercase, keep letters/digits only."""
+    return "".join(ch for ch in str(name).lower() if ch.isalnum())
+
+
+@tool
+def get_weather_thresholds(district: str) -> str:
+    """Extra corroboration. Get the Weather module's stored baseline for a Sri
+    Lankan district for the CURRENT month: average rainfall plus the flood and landslide
+    rainfall thresholds (mm). Use it together with get_weather (not instead of it) to judge
+    whether the recent rainfall you measured is unusually high for this district and month.
+    If it returns an error, ignore it and continue with the other evidence.
+    Valid district names: Colombo, Gampaha, Kalutara, Kandy, NuwaraEliya, Ratnapura,
+    Galle, Matara, Kegalle."""
+    if district not in DISTRICT_COORDS:
+        return json.dumps({"error": f"Unknown district '{district}'. Valid options: {list(DISTRICT_COORDS.keys())}"})
+
+    try:
+        from uuid import UUID
+
+        listing = requests.get(f"{INCIDENT_API_BASE}/api/weather/districts", timeout=10)
+        listing.raise_for_status()
+        target = _normalize_name(district)
+        match = next(
+            (d for d in listing.json() if _normalize_name(d.get("name", "")) == target),
+            None,
+        )
+        if match is None:
+            return json.dumps({"error": f"Weather module has no district matching '{district}'."})
+
+        district_id = str(UUID(str(match.get("id"))))  # reject anything that is not a GUID
+
+        hist = requests.get(
+            f"{INCIDENT_API_BASE}/api/weather/districts/{district_id}/historical", timeout=10
+        )
+        hist.raise_for_status()
+        month = datetime.now(timezone.utc).month
+        row = next((r for r in hist.json() if r.get("month") == month), None)
+        if row is None:
+            return json.dumps({"error": f"No stored baseline for {district} in month {month}."})
+
+        return json.dumps({
+            "district": district,
+            "month": month,
+            "avg_rainfall_mm": row.get("avgRainfallMm"),
+            "flood_threshold_mm": row.get("floodThresholdMm"),
+            "landslide_threshold_mm": row.get("landslideThresholdMm"),
+            "source": "Weather module stored baseline",
+        })
+    except Exception as e:
+        return json.dumps({"error": f"Weather baseline lookup failed for {district}: {str(e)}"})
+
+
 @tool
 def get_upstream_districts(district: str) -> str:
     """Get the list of known upstream districts for a given district, relevant for
@@ -128,7 +186,7 @@ def build_plausibility_agent(has_photo: bool):
     """Builds the agent fresh per-request so the toolset only includes analyze_image
     when a photo actually exists — cleaner than hoping the LLM chooses not to use a
     tool that would fail anyway."""
-    tools = [get_weather, get_upstream_districts]
+    tools = [get_weather, get_upstream_districts, get_weather_thresholds]
     if has_photo:
         tools.append(analyze_image)
 
@@ -159,6 +217,9 @@ Nearest district: {district}{photo_line}
 
 Steps to follow:
 1. Call get_weather for the nearest district first.
+1b. Also call get_weather_thresholds for the same district, and compare the 48h rainfall to
+   the stored flood/landslide thresholds as extra corroboration. If it returns an error, say the
+   extra check was unavailable and continue - never lower the score just because it failed.
 2. If disaster type is Flood AND local rainfall is low (under ~10mm in 48h), call
    get_upstream_districts, then call get_weather again for any upstream district(s) returned —
    Sri Lankan floods are frequently river-driven from upstream rain with no local rainfall.

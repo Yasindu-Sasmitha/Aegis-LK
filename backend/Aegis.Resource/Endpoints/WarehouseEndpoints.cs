@@ -2,17 +2,20 @@ using Aegis.Resource.DTOs;
 using Aegis.Resource.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+
 namespace Aegis.Resource.Endpoints
 {
     public static class WarehouseEndpoints
     {
         public static void MapWarehouseEndpoints(this WebApplication app)
         {
-            var group = app.MapGroup("/api/resource/warehouses")
-                .RequireAuthorization()
+            // READ endpoints — Admin, DisasterOfficer, Responder
+            var readGroup = app.MapGroup("/api/resource/warehouses")
+                .RequireAuthorization(p => p.RequireRole(
+                    "Admin", "DisasterOfficer", "Responder"))
                 .WithTags("Resource - Warehouses");
 
-            group.MapGet("/", async (
+            readGroup.MapGet("/", async (
                 IWarehouseService warehouseService,
                 string? district = null,
                 string? search = null,
@@ -32,29 +35,36 @@ namespace Aegis.Resource.Endpoints
                 });
             });
 
-            group.MapGet("/{id:guid}", async (Guid id, IWarehouseService warehouseService) =>
+            readGroup.MapGet("/{id:guid}", async (Guid id, IWarehouseService warehouseService) =>
             {
                 var result = await warehouseService.GetByIdAsync(id);
                 return result is null ? Results.NotFound() : Results.Ok(result);
             });
 
-            group.MapPost("/", async (CreateWarehouseDto dto, IWarehouseService warehouseService) =>
+            // WRITE endpoints — Admin, DisasterOfficer only
+            var writeGroup = app.MapGroup("/api/resource/warehouses")
+                .RequireAuthorization(p => p.RequireRole(
+                    "Admin", "DisasterOfficer"))
+                .WithTags("Resource - Warehouses (write)");
+
+            writeGroup.MapPost("/", async (CreateWarehouseDto dto, IWarehouseService warehouseService) =>
             {
                 var created = await warehouseService.CreateAsync(dto);
                 return Results.Created($"/api/resource/warehouses/{created.Id}", created);
-            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
+            });
 
-            group.MapPut("/{id:guid}", async (Guid id, UpdateWarehouseDto dto, IWarehouseService warehouseService) =>
+            writeGroup.MapPut("/{id:guid}", async (Guid id, UpdateWarehouseDto dto, IWarehouseService warehouseService) =>
             {
                 var updated = await warehouseService.UpdateAsync(id, dto);
                 return updated is null ? Results.NotFound() : Results.Ok(updated);
-            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
+            });
 
-            group.MapDelete("/{id:guid}", async (Guid id, IWarehouseService warehouseService) =>
+            // DELETE — Admin + DisasterOfficer (was Admin only)
+            writeGroup.MapDelete("/{id:guid}", async (Guid id, IWarehouseService warehouseService) =>
             {
                 var deleted = await warehouseService.DeleteAsync(id);
                 return deleted ? Results.NoContent() : Results.NotFound();
-            }).RequireAuthorization(policy => policy.RequireRole("Admin"));
+            });
         }
     }
 }
