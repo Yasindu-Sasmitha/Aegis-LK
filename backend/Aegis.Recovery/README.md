@@ -130,7 +130,7 @@ Aegis-LK/
 
 ## 4. Multi-Agent AI Workflow
 
-The Recovery Planning Agent is a **4-Agent Collaborative Pipeline** built with Google Gemini (`gemini-3.1-flash-lite` / `gemini-2.5-flash-lite`) and reinforced by deterministic C# guardrails:
+The Recovery Planning Agent is a **4-Agent Collaborative Pipeline** built with Google Gemini (`gemini-2.5-flash-lite`, free tier) and reinforced by deterministic C# guardrails:
 
 ```
                   ┌─────────────────────────────────────┐
@@ -246,7 +246,7 @@ dotnet run --project Aegis.Api
 cd "react"
 npm run dev
 ```
-- URL: `http://localhost:5173`
+- URL: `http://localhost:3000`
 
 ### 3. Flutter Mobile App
 ```powershell
