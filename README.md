@@ -1,4 +1,3 @@
-# Aegis-LK
 
 Intelligent Disaster Prediction, Response and Recovery Platform for Sri Lanka.
 
@@ -342,9 +341,9 @@ git push origin --delete feature/<your-IT-ID>-<task>
 ### Member 3 — Resource module
 
 **Owns, full stop:**
-- Entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`
-- Endpoints: `POST /api/resource/dispatch/requests`, `GET /api/resource/dispatch/{id}`, `POST /api/resource/dispatch/{id}/approve`, `GET /api/resource/inventory`
-- Agent: Resource Allocation Agent — input `{ missionId, teamsRequired, location }`, output `{ dispatchPlan, estimatedArrival }`
+- Entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`(✅ completed)
+- Endpoints: `POST /api/resource/dispatch/requests`, `GET /api/resource/dispatch/{id}`, `POST /api/resource/dispatch/{id}/approve`, `GET /api/resource/inventory`(✅ completed)
+- Agent: Resource Allocation Agent — input `{ missionId, teamsRequired, location }`, output `{ dispatchPlan, estimatedArrival }`(✅ completed)
 - Third-party call: Maps/routing API for road closures and route calculation — lives here, nowhere else
 - React: warehouse/inventory/dispatch dashboards
 - Flutter: delivery tracking, QR delivery confirmation
@@ -356,7 +355,7 @@ git push origin --delete feature/<your-IT-ID>-<task>
 
 **Borders:**
 - Inbound from Incident (hard border, you're the receiver): you implement `POST /api/resource/dispatch-requests` exactly as Incident's contract above. Your agent starts here — this is your trigger, you don't poll or watch for incidents yourself.
-- Nothing flows onward to Recovery. This is a common mistake to avoid: it feels natural to think "Resource dispatches supplies, so Resource should also handle post-disaster resource needs for recovery" — it shouldn't. Recovery gets its information from Incident's damage report, not from you. If Recovery genuinely needs to request more supplies during rebuilding, that's a new `ResourceRequest` coming through your same public endpoint, initiated by Recovery's officer through normal UI action — not a special direct pipe between your two modules.
+- Nothing flows onward to Recovery. This is a common mistake to avoid: it feels natural to think "Resource dispatches supplies, so Resource should also handle post-disaster resource needs for recovery" — it shouldn't. Recovery gets its information from Incident's damage report, not from you. If Recovery genuinely needs to request more supplies during rebuilding, that's a new `ResourceRequest` coming through your same public endpoint, initiated by Recovery's officer through normal UI action — not a special direct pipe between your two modules.(✅ completed)
 
 **The exact line:** your module starts at "here's a mission that needs resources" and ends at "resources have been dispatched, here's an ETA." You never touch a `RescueMission` row and you never look ahead to what happens after delivery.
 
@@ -516,27 +515,27 @@ This section outlines what has been completed and provides a step-by-step roadma
 
 **Goal:** Receive dispatch requests from Incident missions, allocate warehouse inventory and response vehicles, calculate delivery routes, and track fulfillment.
 
-#### 1. Backend (`backend/Aegis.Resource/`)
+#### 1. Backend (`backend/Aegis.Resource/`)(✅ completed)
 - [ ] Implement EF Core entities: `Warehouse`, `Inventory`, `Vehicle`, `Dispatch`, `ResourceRequest`, `Fuel`, `Delivery`.
 - [ ] Implement endpoints:
-  - `POST /api/resource/dispatch-requests`: Inbound receiver contract from Member 2's Incident module.
+  - `POST /api/resource/dispatch/requests`: Inbound receiver contract from Member 2's Incident module.
   - `GET /api/resource/dispatch/{id}`: Fetch dispatch plan details.
   - `POST /api/resource/dispatch/{id}/approve`: Logistics manager approves dispatch plan and reserves inventory/vehicle.
   - `GET /api/resource/inventory`: Current stock levels across Sri Lanka warehouses.
   - `POST /api/resource/delivery/{id}/confirm`: Confirm arrival of resources at mission site.
 
-#### 2. Agentic AI (`agentic-ai/agents/resource_agent.py`)
+#### 2. Agentic AI (`agentic-ai/agents/resource_agent.py`)(✅ completed)
 - [ ] Create `resource_agent.py` and `resource_agent_service.py` running on **port 8003**.
 - [ ] Input schema: `{ missionId, teamsRequired, location: { lat, lng } }`.
 - [ ] Output schema: `{ warehouseId, allocatedItems: [{ itemName, quantity }], vehicleId, routeSummary, estimatedArrivalMinutes }`.
 - [ ] Check stock availability before recommending allocation.
 
-#### 3. React Frontend (`react/src/features/resource/`)
+#### 3. React Frontend (`react/src/features/resource/`)(✅ completed)
 - [ ] Warehouse & Inventory Dashboard: visual bars showing stock of food rations, medical kits, water, and boats.
 - [ ] Dispatch Plan Review: map showing origin warehouse, destination mission, and allocated resources.
 - [ ] Vehicle Fleet tracking table with status tags (`Available`, `EnRoute`, `Maintenance`).
 
-#### 4. Flutter Mobile App (`flutter/lib/features/resource/`)
+#### 4. Flutter Mobile App (`flutter/lib/features/resource/`)(✅ completed)
 - [ ] Implement `screens/warehouse_inventory_screen.dart`: Stock browser for field officers.
 - [ ] Implement `screens/dispatch_plan_screen.dart`: Review and confirm outbound dispatches.
 - [ ] Implement `screens/delivery_qr_screen.dart`: QR code scanner or confirmation code entry for field responders verifying delivery.
