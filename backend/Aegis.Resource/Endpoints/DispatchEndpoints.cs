@@ -68,6 +68,19 @@ namespace Aegis.Resource.Endpoints
                 }
             }).RequireAuthorization(p => p.RequireRole(
                 "Admin", "DisasterOfficer"));
+                            group.MapDelete("/{id:guid}", async (Guid id, IDispatchService svc) =>
+            {
+                try
+                {
+                    var deleted = await svc.DeleteAsync(id);
+                    return deleted ? Results.NoContent() : Results.NotFound();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+            }).RequireAuthorization(p => p.RequireRole(
+                "Admin", "DisasterOfficer"));
         }
     }
 }
