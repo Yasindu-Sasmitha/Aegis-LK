@@ -217,7 +217,7 @@ Status: 'PendingApproval'
 │
 ▼
 ┌─────────────────────────────────────┐
-│ RESOURCE MANAGER REVIEW & APPROVE │
+│ DISASTER OFFICER REVIEW & APPROVE │
 │ POST /dispatch/{id}/approve │
 │ → Inventory decremented atomically │
 └─────────────────────────────────────┘
