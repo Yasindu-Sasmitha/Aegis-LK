@@ -1,4 +1,3 @@
-<img width="1021" height="142" alt="image" src="https://github.com/user-attachments/assets/cc33a6aa-aa91-4796-9fee-419d2cfb0ede" /># Aegis-LK
 
 Intelligent Disaster Prediction, Response and Recovery Platform for Sri Lanka.
 
