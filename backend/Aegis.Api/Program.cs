@@ -45,6 +45,9 @@ else if (!builder.Environment.IsDevelopment())
 
 builder.Services.AddOpenApi();
 
+// ── In-memory cache (used by OpenMeteoService for 10-min forecast cache) ─────
+builder.Services.AddMemoryCache();
+
 // ── Forwarded Headers (Render / reverse proxy support) ───────────────────────
 // ASPNETCORE_FORWARDEDHEADERS_ENABLED=true is the standard way to enable this
 // on Render. We also configure it explicitly so it works regardless of env var.
