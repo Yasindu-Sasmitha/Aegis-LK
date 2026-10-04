@@ -10,11 +10,13 @@ namespace Aegis.Resource.Endpoints
     {
         public static void MapInventoryEndpoints(this WebApplication app)
         {
-            var group = app.MapGroup("/api/resource/inventory")
-                .RequireAuthorization()
+            // READ endpoints — Admin, DisasterOfficer, Responder
+            var readGroup = app.MapGroup("/api/resource/inventory")
+                .RequireAuthorization(p => p.RequireRole(
+                    "Admin", "DisasterOfficer", "Responder"))
                 .WithTags("Resource - Inventory");
 
-            group.MapGet("/", async (
+            readGroup.MapGet("/", async (
                 IInventoryService inventoryService,
                 Guid? warehouseId = null,
                 ItemType? itemType = null,
@@ -38,13 +40,19 @@ namespace Aegis.Resource.Endpoints
                 });
             });
 
-            group.MapGet("/{id:guid}", async (Guid id, IInventoryService inventoryService) =>
+            readGroup.MapGet("/{id:guid}", async (Guid id, IInventoryService inventoryService) =>
             {
                 var result = await inventoryService.GetByIdAsync(id);
                 return result is null ? Results.NotFound() : Results.Ok(result);
             });
 
-            group.MapPost("/", async (CreateInventoryDto dto, IInventoryService inventoryService) =>
+            // WRITE endpoints — Admin, DisasterOfficer only
+            var writeGroup = app.MapGroup("/api/resource/inventory")
+                .RequireAuthorization(p => p.RequireRole(
+                    "Admin", "DisasterOfficer"))
+                .WithTags("Resource - Inventory (write)");
+
+            writeGroup.MapPost("/", async (CreateInventoryDto dto, IInventoryService inventoryService) =>
             {
                 try
                 {
@@ -55,22 +63,16 @@ namespace Aegis.Resource.Endpoints
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }
-            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
+            });
 
-            group.MapPut("/{id:guid}", async (Guid id, UpdateInventoryDto dto, IInventoryService inventoryService) =>
+            writeGroup.MapPut("/{id:guid}", async (Guid id, UpdateInventoryDto dto, IInventoryService inventoryService) =>
             {
                 var updated = await inventoryService.UpdateAsync(id, dto);
                 return updated is null ? Results.NotFound() : Results.Ok(updated);
-            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
+            });
 
-            group.MapDelete("/{id:guid}", async (Guid id, IInventoryService inventoryService) =>
-            {
-                var deleted = await inventoryService.DeleteAsync(id);
-                return deleted ? Results.NoContent() : Results.NotFound();
-            }).RequireAuthorization(policy => policy.RequireRole("Admin"));
-
-            // Business-specific operation beyond basic CRUD
-            group.MapPatch("/{id:guid}/adjust", async (
+            // PATCH /adjust — Admin, DisasterOfficer only
+            writeGroup.MapPatch("/{id:guid}/adjust", async (
                 Guid id, AdjustInventoryQuantityDto dto, IInventoryService inventoryService) =>
             {
                 try
@@ -82,7 +84,17 @@ namespace Aegis.Resource.Endpoints
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }
-            }).RequireAuthorization(policy => policy.RequireRole("Admin", "DisasterOfficer"));
+            });
+
+            // DELETE — Admin only
+            app.MapDelete("/api/resource/inventory/{id:guid}",
+                async (Guid id, IInventoryService inventoryService) =>
+                {
+                    var deleted = await inventoryService.DeleteAsync(id);
+                    return deleted ? Results.NoContent() : Results.NotFound();
+                })
+                .RequireAuthorization(p => p.RequireRole("Admin"))
+                .WithTags("Resource - Inventory (admin)");
         }
     }
 }

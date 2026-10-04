@@ -12,46 +12,68 @@ namespace Aegis.Resource.Endpoints
     {
         public static void MapDispatchEndpoints(this WebApplication app)
         {
-            var group = app.MapGroup("/api/resource/dispatch")
-                .RequireAuthorization()
+            // READ endpoints — Admin, DisasterOfficer, Responder
+            var readGroup = app.MapGroup("/api/resource/dispatch")
+                .RequireAuthorization(p => p.RequireRole(
+                    "Admin", "DisasterOfficer", "Responder"))
                 .WithTags("Resource - Dispatch");
 
-            group.MapGet("/", async (IDispatchService svc) =>
+            readGroup.MapGet("/", async (IDispatchService svc) =>
             {
                 var plans = await svc.GetAllAsync();
                 return Results.Ok(plans);
             });
-            group.MapPost("/requests", async (
-            CreateDispatchRequestDto dto,
-            IDispatchService svc,
-            HttpContext ctx,
-            IConfiguration config) =>
-        {
-            // Internal service-to-service call: check for X-Aegis-Agent-Key header.
-            // If present and valid, bypass JWT role check (but still require an authenticated identity).
-            var agentKey = config["AgenticAi:AgentKey"]
-                ?? Environment.GetEnvironmentVariable("AEGIS_AGENT_KEY")
-                ?? "";
-            var providedKey = ctx.Request.Headers["X-Aegis-Agent-Key"].ToString();
-            var isInternalCall = !string.IsNullOrWhiteSpace(agentKey)
-                && string.Equals(agentKey, providedKey, StringComparison.Ordinal);
 
-            // If not an internal call, enforce the role policy.
-            if (!isInternalCall && !ctx.User.IsInRole("Responder")
-                && !ctx.User.IsInRole("Admin") && !ctx.User.IsInRole("DisasterOfficer"))
+            readGroup.MapGet("/{id:guid}", async (Guid id, IDispatchService svc) =>
             {
-                return Results.Unauthorized();
-            }
+                var plan = await svc.GetAsync(id);
+                return plan is null ? Results.NotFound() : Results.Ok(plan);
+            });
 
-            var result = await svc.CreateDispatchRequestAsync(dto);
-            if (result is null)
-                return Results.Problem("Agent service unavailable.", statusCode: 503);
-            if (result.ApprovalStatus == "SafeFailure")
-                return Results.UnprocessableEntity(result);
-            return Results.Ok(result);
-        }).AllowAnonymous();
+            // WRITE endpoints — Admin, DisasterOfficer + internal service
+            // POST /api/resource/dispatch/requests
+            // This endpoint accepts two authentication paths:
+            //   1. Internal service-to-service call (X-Aegis-Agent-Key header)
+            //      — from the Incident module's cross-module dispatch trigger.
+            //   2. External authenticated user with a staff role (Admin / DisasterOfficer).
+            // Citizens and Responders cannot create dispatch plans.
+            app.MapPost("/api/resource/dispatch/requests", async (
+                CreateDispatchRequestDto dto,
+                IDispatchService svc,
+                HttpContext ctx,
+                IConfiguration config) =>
+            {
+                var agentKey = config["AgenticAi:AgentKey"]
+                    ?? Environment.GetEnvironmentVariable("AEGIS_AGENT_KEY")
+                    ?? "";
+                var providedKey = ctx.Request.Headers["X-Aegis-Agent-Key"].ToString();
+                var isInternalCall = !string.IsNullOrWhiteSpace(agentKey)
+                    && string.Equals(agentKey, providedKey, StringComparison.Ordinal);
 
-            group.MapPost("/{id:guid}/approve", async (
+                if (!isInternalCall
+                    && !ctx.User.IsInRole("Admin")
+                    && !ctx.User.IsInRole("DisasterOfficer"))
+                {
+                    return Results.Forbid();
+                }
+
+                var result = await svc.CreateDispatchRequestAsync(dto);
+                if (result is null)
+                    return Results.Problem("Agent service unavailable.", statusCode: 503);
+                if (result.ApprovalStatus == "SafeFailure")
+                    return Results.UnprocessableEntity(result);
+                return Results.Ok(result);
+            })
+            .AllowAnonymous()  // Authorization is enforced inside the handler
+            .WithTags("Resource - Dispatch (write)");
+
+            // POST /approve — Admin, DisasterOfficer only
+            var approveGroup = app.MapGroup("/api/resource/dispatch")
+                .RequireAuthorization(p => p.RequireRole(
+                    "Admin", "DisasterOfficer"))
+                .WithTags("Resource - Dispatch (write)");
+
+            approveGroup.MapPost("/{id:guid}/approve", async (
                 Guid id, IDispatchService svc, HttpContext ctx) =>
             {
                 var userId = Guid.TryParse(
@@ -66,9 +88,10 @@ namespace Aegis.Resource.Endpoints
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }
-            }).RequireAuthorization(p => p.RequireRole(
-                "Admin", "DisasterOfficer"));
-                            group.MapDelete("/{id:guid}", async (Guid id, IDispatchService svc) =>
+            });
+
+            // DELETE — Admin, DisasterOfficer only
+            approveGroup.MapDelete("/{id:guid}", async (Guid id, IDispatchService svc) =>
             {
                 try
                 {
@@ -79,8 +102,7 @@ namespace Aegis.Resource.Endpoints
                 {
                     return Results.BadRequest(new { message = ex.Message });
                 }
-            }).RequireAuthorization(p => p.RequireRole(
-                "Admin", "DisasterOfficer"));
+            });
         }
     }
 }
