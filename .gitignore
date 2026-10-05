@@ -35,6 +35,9 @@ Thumbs.db
 # === Secrets (defense in depth) ===
 appsettings.*.local.json
 *.pfx
+*.jks
+*.keystore
+key.properties
 
 appsettings.Development.json
 
