@@ -10,6 +10,7 @@ import {
   deleteDamageReport,
   fetchApprovedIncidents,
   type ApprovedIncident,
+  isValidSriLankanPhone,
 } from '../api/recoveryApi';
 import {
   RecoveryPlan,
@@ -373,38 +374,39 @@ export const RecoveryPlanningPage: React.FC = () => {
   const validateForm = (): boolean => {
     setErrorMessage(null);
 
-    if (!district.trim()) {
-      setErrorMessage('Please select the affected Sri Lankan District.');
+    const fail = (msg: string): boolean => {
+      setErrorMessage(msg);
+      alert(msg);
       return false;
+    };
+
+    if (!district.trim()) {
+      return fail('Please select the affected Sri Lankan District.');
     }
     if (!disasterType.trim() || (disasterType === 'Other' && !otherDisasterType.trim())) {
-      setErrorMessage('Please select the Disaster Type or specify Other.');
-      return false;
+      return fail('Please select the Disaster Type or specify Other.');
     }
     if (totalHousesDamaged < 0) {
-      setErrorMessage('Housing damage counts cannot be negative.');
-      return false;
+      return fail('Housing damage counts cannot be negative.');
     }
     if (displacedFamilies === '' || Number(displacedFamilies) < 0) {
-      setErrorMessage('Please enter the Displaced Families Count (cannot be empty or negative).');
-      return false;
+      return fail('Please enter the Displaced Families Count (cannot be empty or negative).');
     }
     if (totalHousesDamaged === 0 && Number(displacedFamilies) === 0 && infraItems.length === 0) {
-      setErrorMessage('Please provide non-zero damage impact: enter affected houses, displaced families, or add damaged infrastructure.');
-      return false;
+      return fail('Please provide non-zero damage impact: enter affected houses, displaced families, or add damaged infrastructure.');
     }
     if (!notes.trim() || notes.trim().length < 5) {
-      setErrorMessage('Please provide Disaster Situation & Field Notes describing the field conditions.');
-      return false;
+      return fail('Please provide Disaster Situation & Field Notes describing the field conditions.');
     }
     if (!reportedBy.trim()) {
-      setErrorMessage('Please enter the Reporter / Submitter Name.');
-      return false;
+      return fail('Please enter the Reporter / Submitter Name.');
     }
     const cleanContact = reporterContact.trim();
-    if (!cleanContact || cleanContact.replace(/[^0-9+]/g, '').length < 9) {
-      setErrorMessage('Please provide a valid Emergency Contact Phone Number (at least 9–10 digits, e.g. 0771234567 or +94112345670).');
-      return false;
+    if (!cleanContact || !isValidSriLankanPhone(cleanContact)) {
+      return fail('Please provide a valid Sri Lankan phone number for the Reporter (10 digits starting with 0, e.g. 0771234567, or with country code +94, e.g. +94771234567). Numbers exceeding 10 digits without country code are invalid.');
+    }
+    if (emergencyContactPhone.trim() && !isValidSriLankanPhone(emergencyContactPhone.trim())) {
+      return fail('Please provide a valid Sri Lankan phone number for the Secondary Emergency Contact (10 digits starting with 0, e.g. 0112136136, or with country code +94, e.g. +94112136136).');
     }
     return true;
   };
@@ -2044,7 +2046,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                 <input
                   type="tel"
                   required
-                  placeholder="e.g. 0771234567"
+                  placeholder="e.g. 0771234567 or +94771234567"
                   value={reporterContact}
                   onChange={(e) => setReporterContact(e.target.value)}
                 />
@@ -2092,7 +2094,7 @@ export const RecoveryPlanningPage: React.FC = () => {
                   <label>Emergency Phone Number</label>
                   <input
                     type="tel"
-                    placeholder="e.g. 0112136136"
+                    placeholder="e.g. 0112136136 or +94112136136"
                     value={emergencyContactPhone}
                     onChange={(e) => setEmergencyContactPhone(e.target.value)}
                   />

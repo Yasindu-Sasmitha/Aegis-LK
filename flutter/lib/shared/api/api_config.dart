@@ -7,10 +7,10 @@
 ///   Pass the deployed API URL at build time using --dart-define:
 ///
 ///     flutter build apk \
-///       --dart-define=API_BASE_URL=https://aegis-api.onrender.com
+///       --dart-define=API_BASE_URL=https://aegis-lk.onrender.com
 ///
 ///     flutter run \
-///       --dart-define=API_BASE_URL=https://aegis-api.onrender.com
+///       --dart-define=API_BASE_URL=https://aegis-lk.onrender.com
 ///
 /// All feature services (auth, weather, incident, resource, recovery)
 /// must use [ApiConfig.baseUrl] as their root — never hard-code localhost.

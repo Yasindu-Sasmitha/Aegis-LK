@@ -75,6 +75,20 @@ class IncidentService {
     }
   }
 
+  /// POST /api/incidents/{id}/close — the reporter closes their own incident
+  /// once the approved rescue mission has concluded.
+  Future<void> closeIncident(String incidentId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/$incidentId/close'),
+      headers: await _getAuthHeaders(),
+    );
+    if (response.statusCode == 200) return;
+    if (response.statusCode == 409) {
+      throw Exception('This incident can no longer be closed.');
+    }
+    throw _httpError('close the incident', response.statusCode);
+  }
+
   /// GET /api/incidents/my-reports — citizen's own reports with honest displayStatus.
   Future<List<MyIncidentReportModel>> fetchMyReports(String userId) async {
     final uri = Uri.parse('$baseUrl/my-reports?reportedByUserId=$userId');

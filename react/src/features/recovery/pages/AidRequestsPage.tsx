@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAidRequests, createAidRequest, updateAidRequestStatus, fetchShelters } from '../api/recoveryApi';
+import { fetchAidRequests, createAidRequest, updateAidRequestStatus, fetchShelters, isValidSriLankanPhone } from '../api/recoveryApi';
 import { AidRequestTable } from '../components/AidRequestTable';
 import { AidRequest, Shelter } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
@@ -93,8 +93,8 @@ export const AidRequestsPage: React.FC = () => {
     }
 
     const cleanPhone = newRequest.contactPhone.trim();
-    if (!cleanPhone || cleanPhone.replace(/[^0-9+]/g, '').length < 9) {
-      alert('Please provide a valid contact phone number with at least 9-10 digits (e.g. 0771234567 or +94112345670).');
+    if (!cleanPhone || !isValidSriLankanPhone(cleanPhone)) {
+      alert('Please provide a valid Sri Lankan contact phone number (10 digits starting with 0, e.g. 0771234567, or with country code +94, e.g. +94771234567). Numbers exceeding 10 digits without country code are invalid.');
       return;
     }
 
@@ -330,7 +330,7 @@ export const AidRequestsPage: React.FC = () => {
                   <input
                     type="tel"
                     required
-                    placeholder="e.g. 0771234567"
+                    placeholder="e.g. 0771234567 or +94771234567"
                     value={newRequest.contactPhone}
                     onChange={(e) => setNewRequest({ ...newRequest, contactPhone: e.target.value })}
                     style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box' }}

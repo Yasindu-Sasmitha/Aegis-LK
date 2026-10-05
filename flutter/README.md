@@ -9,6 +9,7 @@ Cross-platform client application for **Aegis-LK** (Intelligent Disaster Predict
 - [Overview & Architecture](#overview--architecture)
 - [Directory Structure](#directory-structure)
 - [Getting Started & Running Locally](#getting-started--running-locally)
+- [Production Deployment & Android Release APK](#production-deployment--android-release-apk)
 - [Design System & Theming (`AegisTheme`)](#design-system--theming-aegistheme)
 - [Authentication & Role-Based Access Control](#authentication--role-based-access-control)
 - [Navigation & Routing (`MainShell` & `AppRouter`)](#navigation--routing-mainshell--approuter)
@@ -16,7 +17,7 @@ Cross-platform client application for **Aegis-LK** (Intelligent Disaster Predict
   - [Member 2 — Incident & Rescue Operations](#member-2--incident--rescue-operations)
   - [Member 3 — Resource & Logistics](#member-3--resource--logistics)
   - [Member 4 — Recovery & Community Support](#member-4--recovery--community-support)
-- [API Client & Network Gotchas (Web vs. Android Emulator)](#api-client--network-gotchas-web-vs-android-emulator)
+- [API Client & Network Configuration](#api-client--network-configuration)
 - [Git Hygiene & Ignored Build Files](#git-hygiene--ignored-build-files)
 
 ---
@@ -28,7 +29,7 @@ The Flutter client mirrors the web application's modern dark theme, features, an
 - **State Management:** `provider` (`ChangeNotifierProvider` for global auth and scoped state).
 - **Typography:** `google_fonts` (Inter font family matching the React UI).
 - **Networking:** `http` with JWT Bearer token injection.
-- **Persistence:** `shared_preferences` for preserving JWT tokens and user session across app restarts.
+- **Persistence:** `flutter_secure_storage` for secure token storage (AES-256 via Android Keystore / iOS Keychain) and user session preservation across app restarts.
 - **Theme:** Dark slate palette (`#0F172A` background, `#1E293B` cards, `#06B6D4` cyan & `#6366F1` indigo accents).
 
 ---
@@ -126,7 +127,10 @@ Container(
 
 ## 🔐 Authentication & Role-Based Access Control
 
-The app uses `AuthProvider` (`lib/shared/auth/auth_provider.dart`) to store user information and JWT tokens.
+The app uses `AuthProvider` (`lib/shared/auth/auth_provider.dart`) and `AuthService` (`lib/shared/auth/auth_service.dart`) to manage user authentication and session persistence.
+
+- **Secure Token Storage:** JWT tokens are persisted securely using `flutter_secure_storage` (`DefaultSecureTokenStorage`), backed by the hardware-backed Android Keystore (AES-256) on Android and Keychain Services on iOS.
+- **Session Restoration:** On app startup, `AuthProvider` automatically reads the persisted token from secure storage and restores the user profile via `/api/auth/me`.
 
 ### How to use `AuthProvider` in any widget:
 ```dart
@@ -192,7 +196,7 @@ The client uses `MainShell` (`lib/shared/shell/main_shell.dart`) which includes:
 **Folder:** `lib/features/resource/`
 - `screens/warehouse_inventory_screen.dart`: Real-time inventory browser across Sri Lanka's 25 district warehouses.
 - `screens/dispatch_plan_screen.dart`: Review, inspect, and approve AI-generated convoy dispatch allocations.
-- `screens/delivery_qr_screen.dart`: Camera/QR code verification scanner for emergency supply deliveries at rescue sites.
+- `screens/delivery_qr_screen.dart`: Device-based QR verification feature for emergency supply deliveries at rescue sites (scans and verifies delivery codes locally on the device).
 - **Service & Models:** `services/resource_service.dart`, `models/resource_models.dart`.
 
 ### Member 4 — Recovery & Community Support
@@ -209,35 +213,62 @@ The client uses `MainShell` (`lib/shared/shell/main_shell.dart`) which includes:
 
 ---
 
-## 🌐 API Client & Network Gotchas (Web vs. Android Emulator)
+## 🌐 API Client & Network Configuration
 
-When making HTTP requests from Flutter, the base URL depends on the target platform:
+All feature services in Aegis-LK use `ApiConfig.baseUrl` (defined in `lib/shared/api/api_config.dart`), which defaults to `http://localhost:5012` for local development.
 
-| Platform | Host URL | Explanation |
+For production deployment or emulator testing, the API base URL is supplied at compile or run time using `--dart-define=API_BASE_URL=...`.
+
+### Base URLs by Target
+
+| Target | Base URL | How to Run / Build |
 |---|---|---|
-| **Chrome (Web)** | `http://localhost:5012` | Runs in browser on the same host machine. |
-| **Android Emulator** | `http://10.0.2.2:5012` | Android emulator loopback alias pointing to your PC host. |
-| **Physical Android/iOS Device** | `http://192.168.x.x:5012` | Use your development machine's local Wi-Fi IP address. |
+| **Production API (Render)** | `https://aegis-lk.onrender.com` | `--dart-define=API_BASE_URL=https://aegis-lk.onrender.com` |
+| **Chrome (Local Web)** | `http://localhost:5012` | `flutter run -d chrome` (default) |
+| **Android Emulator (Local)** | `http://10.0.2.2:5012` | `flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:5012` |
+| **Physical Device (Local LAN)** | `http://192.168.x.x:5012` | Use your host machine's Wi-Fi IP address |
 
-**Recommended helper pattern in services:**
-```dart
-import 'package:flutter/foundation.dart';
+---
 
-String getBaseUrl(String module) {
-  if (kIsWeb) {
-    return 'http://localhost:5012/api/$module';
-  } else {
-    // For Android Emulator (use 10.0.2.2)
-    return 'http://10.0.2.2:5012/api/$module';
-  }
-}
+## 📦 Production Deployment & Android Release APK
+
+The deployed production backend URL for Aegis-LK is:
+**`https://aegis-lk.onrender.com`**
+
+### 1. Building the Production Release APK
+Compile the release APK targeting the production backend:
+
+```powershell
+cd flutter
+flutter build apk --release --dart-define=API_BASE_URL=https://aegis-lk.onrender.com
 ```
+
+The compiled APK will be located at:
+```
+flutter/build/app/outputs/flutter-apk/app-release.apk
+```
+
+### 2. Running Release Build on Device / Emulator
+To run the release configuration with the production backend directly:
+
+```powershell
+flutter run --release --dart-define=API_BASE_URL=https://aegis-lk.onrender.com
+```
+
+### 3. Release Signing Configuration
+Release builds configure signing through `android/key.properties` (loaded in `android/app/build.gradle.kts`):
+- `keyAlias`: Keystore key alias
+- `keyPassword`: Password for the key
+- `storeFile`: Path to keystore file (e.g. `../upload-keystore.jks`)
+- `storePassword`: Password for the keystore
+
+> ⚠️ **Security Requirement:** Keystores (`*.jks`, `*.keystore`) and `android/key.properties` contain secrets and are strictly ignored in `.gitignore`. They must never be checked into Git.
 
 ---
 
 ## 🛡 Git Hygiene & Ignored Build Files
 
-To prevent git pollution from Flutter build artifacts, ensure your `.gitignore` contains:
+To prevent git pollution from Flutter build artifacts and sensitive credentials, ensure your `.gitignore` contains:
 ```gitignore
 # Flutter & Dart build artifacts
 .dart_tool/
@@ -249,5 +280,10 @@ ephemeral/
 .widget_preview/
 ios/Flutter/Generated.xcconfig
 android/.gradle/
+
+# Android signing secrets & keys
+android/key.properties
+*.jks
+*.keystore
 ```
-Never commit the `build/` directory or ephemeral IDE files. Always run `git status` before committing to ensure you are only committing source files in `lib/`.
+Never commit the `build/` directory, signing keys, or `key.properties`. Always run `git status` before committing to ensure you are only committing source files in `lib/`.

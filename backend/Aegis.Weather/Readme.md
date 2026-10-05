@@ -180,8 +180,15 @@ Clean Material 3 mobile application screens:
 ## 8. Third-party integration — Open-Meteo
 
 `OpenMeteoService.cs` — free, no API key. Pulls `precipitation_sum` + `wind_speed_10m_max`,
-3-day forecast, per district's seeded lat/lon. 5s timeout, 3 retry attempts with backoff, returns
-`null` on total failure (caller returns a 503, doesn't crash).
+3-day forecast, per district's seeded lat/lon.
+
+| Behaviour | Detail |
+|---|---|
+| **HTTP timeout** | 15 seconds per request |
+| **HTTP 429 (rate-limited)** | Detected explicitly **before** `EnsureSuccessStatusCode()`. Logs a warning with the status code, attempt number, URL, and `Retry-After` header value (if present). Returns `null` **immediately** — does not retry. Caller returns HTTP 503. |
+| **Transient failures** | `HttpRequestException`, `TaskCanceledException`, `TimeoutException` trigger the retry loop: up to **3 attempts** total. Backoff: attempt 1 failure → wait 1 second; attempt 2 failure → wait 2 seconds. Returns `null` after all 3 attempts fail. |
+| **In-memory forecast cache** | Uses `IMemoryCache` (registered via `builder.Services.AddMemoryCache()` in `Program.cs`). Cache key = `forecast:{lat:F4}:{lon:F4}`. Successful responses are cached for **10 minutes**. A cache hit is logged at `Information` level and returned directly, making zero HTTP calls. Failed and 429 responses are **never cached**. |
+| **Final failure** | Returns `null` → caller (`WeatherEndpoints`) returns HTTP 503. No crash. |
 
 ---
 
