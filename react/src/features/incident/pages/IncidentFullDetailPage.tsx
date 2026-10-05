@@ -411,7 +411,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
 
                 {canApproveOrTriage && user && (
                   <button
-                    onClick={() => runAction(() => approveIncident(incidentId, { approvedByOfficerId: user.id }), 'approve')}
+                    onClick={() => runAction(() => approveIncident(incidentId, { approvedByOfficerId: user.id }).then(() => fetchIncidentById(incidentId)), 'approve')}
                     disabled={actionBusy !== null}
                     style={actionButtonStyle('#059669', '#ffffff', actionBusy === 'approve')}
                   >
