@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import jsPDF from 'jspdf';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 import { fetchIncidents } from '../api/incidentApi';
 import { IncidentReport } from '../types/incidentTypes';
 
@@ -24,17 +39,6 @@ const STATUS_LINE_COLORS: Record<string, string> = {
   Rejected: '#ef4444',
   MissionApproved: '#10b981',
   Closed: '#64748b',
-};
-
-// Lighter, gradient-friendly fills for the status bar chart (paired with a
-// slightly darker top color via an SVG gradient, defined per-bar at render time).
-const STATUS_BAR_COLORS: Record<string, { light: string; dark: string }> = {
-  Reported: { light: '#fde68a', dark: '#f59e0b' },
-  Assessed: { light: '#e2e8f0', dark: '#94a3b8' },
-  OnHold: { light: '#fef08a', dark: '#eab308' },
-  Rejected: { light: '#fecaca', dark: '#ef4444' },
-  MissionApproved: { light: '#a7f3d0', dark: '#10b981' },
-  Closed: { light: '#e2e8f0', dark: '#64748b' },
 };
 
 function formatDateInput(d: Date): string {
@@ -77,25 +81,6 @@ function buildDailyTrendByStatus(
   }
 
   return days;
-}
-
-// Converts a series of points into a smooth Catmull-Rom-to-Bezier path,
-// giving rounded curves instead of sharp straight-line joins.
-function smoothPath(points: { x: number; y: number }[]): string {
-  if (points.length < 2) return points.length === 1 ? `M ${points[0].x} ${points[0].y}` : '';
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i === 0 ? i : i - 1];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
-  }
-  return d;
 }
 
 export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
@@ -158,7 +143,6 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
     if (scored.length === 0) return null;
     return Math.round(scored.reduce((sum, i) => sum + (i.plausibilityScore ?? 0), 0) / scored.length);
   })();
-  const maxCount = Math.max(1, ...STATUS_ORDER.map(countByStatus));
 
   const statusCounts: StatusCount[] = [
     { status: 'Reported', count: countByStatus('Reported'), color: '#92400e', bg: '#fef3c7', icon: '📥' },
@@ -258,24 +242,14 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
   const start = new Date(trendStart);
   const end = new Date(trendEnd);
   const trend = buildDailyTrendByStatus(incidents, start, end);
-  // Note: axis scale intentionally stays based on ALL statuses, not just visible
-  // ones, so toggling lines on/off doesn't rescale the chart and shift remaining
-  // lines around — makes comparisons stable as you toggle.
-  const maxCountAcrossAll = Math.max(1, ...trend.flatMap((t) => STATUS_ORDER.map((s) => t.counts[s])));
-  const chartWidth = 700;
-  const chartHeight = 220;
-  const paddingLeft = 40;
-  const paddingBottom = 30;
-  const paddingTop = 10;
-  const paddingRight = 10;
-  const plotWidth = chartWidth - paddingLeft - paddingRight;
-  const plotHeight = chartHeight - paddingTop - paddingBottom;
-  const stepX = plotWidth / (trend.length - 1 || 1);
-  const yTickCount = 4;
-  const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) =>
-    Math.round((maxCountAcrossAll / yTickCount) * i)
-  );
-  const labelEvery = Math.max(1, Math.ceil(trend.length / 8));
+  // Recharts data: one row per day, one key per status.
+  const trendData = trend.map((t) => ({ label: t.label, ...t.counts }));
+  const statusChartData = STATUS_ORDER.map((status) => ({
+    status,
+    count: countByStatus(status),
+    color: STATUS_LINE_COLORS[status],
+  }));
+  const donutData = statusChartData.filter((d) => d.count > 0);
 
   return (
     <div>
@@ -414,173 +388,158 @@ export const IncidentDashboardPage: React.FC<Props> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Both charts side by side on wide screens via .ae-charts-grid */}
-      <div className="ae-charts-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.5rem' }}>
-        {/* Status breakdown bar chart */}
-        <div className="ae-card">
-          <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
-            Incidents by Status
-          </h3>
-          <svg width="100%" height={220} viewBox="0 0 600 220" style={{ overflow: 'visible' }}>
-            <defs>
-              {STATUS_ORDER.map((status) => (
-                <linearGradient key={status} id={`bar-gradient-${status}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={STATUS_BAR_COLORS[status].dark} stopOpacity={0.85} />
-                  <stop offset="100%" stopColor={STATUS_BAR_COLORS[status].light} stopOpacity={0.85} />
-                </linearGradient>
-              ))}
-            </defs>
-            {STATUS_ORDER.map((status, idx) => {
-              const count = countByStatus(status);
-              const barWidth = 70;
-              const gap = 20;
-              const x = idx * (barWidth + gap) + 20;
-              const barHeight = (count / maxCount) * 150;
-              const y = 170 - barHeight;
-              return (
-                <g key={status}>
-                  <rect x={x} y={y} width={barWidth} height={barHeight} fill={`url(#bar-gradient-${status})`} rx={6} />
-                  <text x={x + barWidth / 2} y={y - 6} textAnchor="middle" fontSize="12" fontWeight="700" fill="#334155">
-                    {count}
-                  </text>
-                  <text x={x + barWidth / 2} y={190} textAnchor="middle" fontSize="10" fill="#64748b">
-                    {status}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
+      {/* Charts row — same card style as the Resource dashboard */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <div style={chartCardStyle}>
+          <div style={chartHeaderStyle}>
+            <h3 style={chartTitleStyle}>Incidents by Status</h3>
+            <span style={chartSubtitleStyle}>Count</span>
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={statusChartData} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="status" fontSize={10} angle={-25} textAnchor="end" height={55} interval={0} />
+              <YAxis fontSize={10} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" name="Incidents" radius={[3, 3, 0, 0]}>
+                {statusChartData.map((d) => (
+                  <Cell key={d.status} fill={d.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Incident volume over time — one curve per status, with date-range controls */}
-        <div className="ae-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
-              Incident Volume by Status
-            </h3>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => setQuickRange(14)} style={quickRangeButtonStyle}>Last 14 days</button>
-              <button onClick={() => setQuickRange(30)} style={quickRangeButtonStyle}>Last month</button>
-              <input
-                type="date"
-                value={trendStart}
-                max={trendEnd}
-                onChange={(e) => setTrendStart(e.target.value)}
-                style={dateInputStyle}
-              />
-              <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>to</span>
-              <input
-                type="date"
-                value={trendEnd}
-                min={trendStart}
-                max={formatDateInput(new Date())}
-                onChange={(e) => setTrendEnd(e.target.value)}
-                style={dateInputStyle}
-              />
+        <div style={chartCardStyle}>
+          <div style={chartHeaderStyle}>
+            <h3 style={chartTitleStyle}>Status Breakdown</h3>
+            <span style={chartSubtitleStyle}>{incidents.length} total</span>
+          </div>
+          {donutData.length === 0 ? (
+            <div style={{ color: '#64748b', padding: '1rem 0', textAlign: 'center', fontSize: '0.85rem' }}>
+              No incidents yet.
             </div>
-          </div>
-
-          {/* Legend — click a status to toggle its line on/off */}
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-            {STATUS_ORDER.map((s) => {
-              const active = visibleStatuses.has(s);
-              return (
-                <button
-                  key={s}
-                  onClick={() => toggleStatus(s)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    fontSize: '0.75rem',
-                    color: active ? '#334155' : '#cbd5e1',
-                    background: active ? '#f8fafc' : 'transparent',
-                    border: '1px solid ' + (active ? '#e2e8f0' : '#f1f5f9'),
-                    borderRadius: 20,
-                    padding: '0.25rem 0.65rem',
-                    cursor: 'pointer',
-                    fontWeight: active ? 600 : 500,
-                  }}
-                >
-                  <span style={{
-                    width: 10, height: 10, borderRadius: '50%',
-                    backgroundColor: active ? STATUS_LINE_COLORS[s] : '#e2e8f0',
-                    display: 'inline-block',
-                  }} />
-                  {s}
-                </button>
-              );
-            })}
-          </div>
-
-          <svg width="100%" height={chartHeight + 20} viewBox={`0 0 ${chartWidth} ${chartHeight + 20}`} style={{ overflow: 'visible' }}>
-            {/* Y-axis gridlines + labels */}
-            {yTicks.map((tick, i) => {
-              const y = paddingTop + plotHeight - (tick / maxCountAcrossAll) * plotHeight;
-              return (
-                <g key={i}>
-                  <line x1={paddingLeft} y1={y} x2={chartWidth - paddingRight} y2={y} stroke="#f1f5f9" strokeWidth={1} />
-                  <text x={paddingLeft - 8} y={y + 3} textAnchor="end" fontSize="9" fill="#94a3b8">{tick}</text>
-                </g>
-              );
-            })}
-
-            {/* Y-axis title */}
-            <text
-              x={12}
-              y={paddingTop + plotHeight / 2}
-              textAnchor="middle"
-              fontSize="9"
-              fill="#64748b"
-              transform={`rotate(-90, 12, ${paddingTop + plotHeight / 2})`}
-            >
-              Incidents Reported
-            </text>
-
-            {/* One smooth line per status — only for toggled-on statuses */}
-            {STATUS_ORDER.filter((s) => visibleStatuses.has(s)).map((status) => {
-              const points = trend.map((t, i) => ({
-                x: paddingLeft + i * stepX,
-                y: paddingTop + plotHeight - (t.counts[status] / maxCountAcrossAll) * plotHeight,
-              }));
-              return (
-                <path
-                  key={status}
-                  d={smoothPath(points)}
-                  fill="none"
-                  stroke={STATUS_LINE_COLORS[status]}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                />
-              );
-            })}
-
-            {/* X-axis labels */}
-            {trend.map((t, i) => (
-              i % labelEvery === 0 || i === trend.length - 1 ? (
-                <text
-                  key={i}
-                  x={paddingLeft + i * stepX}
-                  y={chartHeight}
-                  textAnchor="middle"
-                  fontSize="9"
-                  fill="#94a3b8"
-                >
-                  {t.label}
-                </text>
-              ) : null
-            ))}
-
-            {/* X-axis title */}
-            <text x={paddingLeft + plotWidth / 2} y={chartHeight + 16} textAnchor="middle" fontSize="9" fill="#64748b">
-              Date
-            </text>
-          </svg>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie data={donutData} dataKey="count" nameKey="status" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                  {donutData.map((d) => (
+                    <Cell key={d.status} fill={d.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: '0.78rem' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
+      </div>
+
+      {/* Incident volume over time — one line per status, with date-range controls */}
+      <div style={chartCardStyle}>
+        <div style={{ ...chartHeaderStyle, flexWrap: 'wrap', gap: '0.75rem' }}>
+          <h3 style={chartTitleStyle}>Incident Volume by Status</h3>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => setQuickRange(14)} style={quickRangeButtonStyle}>Last 14 days</button>
+            <button onClick={() => setQuickRange(30)} style={quickRangeButtonStyle}>Last month</button>
+            <input
+              type="date"
+              value={trendStart}
+              max={trendEnd}
+              onChange={(e) => setTrendStart(e.target.value)}
+              style={dateInputStyle}
+            />
+            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>to</span>
+            <input
+              type="date"
+              value={trendEnd}
+              min={trendStart}
+              max={formatDateInput(new Date())}
+              onChange={(e) => setTrendEnd(e.target.value)}
+              style={dateInputStyle}
+            />
+          </div>
+        </div>
+
+        {/* Legend — click a status to toggle its line on/off */}
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          {STATUS_ORDER.map((st) => {
+            const active = visibleStatuses.has(st);
+            return (
+              <button
+                key={st}
+                onClick={() => toggleStatus(st)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.75rem',
+                  color: active ? '#334155' : '#cbd5e1',
+                  background: active ? '#f8fafc' : 'transparent',
+                  border: '1px solid ' + (active ? '#e2e8f0' : '#f1f5f9'),
+                  borderRadius: 20,
+                  padding: '0.25rem 0.65rem',
+                  cursor: 'pointer',
+                  fontWeight: active ? 600 : 500,
+                }}
+              >
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    backgroundColor: active ? STATUS_LINE_COLORS[st] : '#e2e8f0',
+                    display: 'inline-block',
+                  }}
+                />
+                {st}
+              </button>
+            );
+          })}
+        </div>
+
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={trendData} margin={{ top: 5, right: 10, left: -15, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="label" fontSize={10} interval="preserveStartEnd" />
+            <YAxis fontSize={10} allowDecimals={false} />
+            <Tooltip />
+            {STATUS_ORDER.filter((st) => visibleStatuses.has(st)).map((st) => (
+              <Line
+                key={st}
+                type="monotone"
+                dataKey={st}
+                name={st}
+                stroke={STATUS_LINE_COLORS[st]}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
 };
+
+const chartCardStyle: React.CSSProperties = {
+  background: '#fff',
+  borderRadius: 12,
+  boxShadow: '0 2px 8px rgba(15,23,42,0.05)',
+  padding: '0.9rem',
+};
+
+const chartHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '0.6rem',
+};
+
+const chartTitleStyle: React.CSSProperties = { margin: 0, fontSize: '0.95rem', fontWeight: 800 };
+
+const chartSubtitleStyle: React.CSSProperties = { color: '#64748b', fontSize: '0.7rem', fontWeight: 600 };
 
 const quickRangeButtonStyle: React.CSSProperties = {
   padding: '0.4rem 0.75rem',
