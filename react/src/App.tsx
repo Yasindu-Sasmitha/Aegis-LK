@@ -48,6 +48,7 @@ import {
   IncidentQueuePage,
   IncidentDashboardPage,
   IncidentFullDetailPage,
+  IncidentLogPage,
 } from './features/incident';
 import {
   ResourceDashboardPage,
@@ -155,6 +156,7 @@ const MainPlatform: React.FC = () => {
     { id: 'Rejected', label: 'Rejected' },
     { id: 'MissionApproved', label: 'Approved' },
     { id: 'Closed', label: 'Closed' },
+    { id: 'logs', label: 'Activity Log' },
   ];
 
   // Navigation tabs for Recovery module (available across roles)
@@ -969,6 +971,16 @@ const MainPlatform: React.FC = () => {
                 {incidentTab === 'all' && (
                   <IncidentQueuePage
                     title="All Incidents"
+                    onNavigate={(tab, incidentId) => {
+                      if (tab === 'detail' && incidentId) {
+                        setSelectedIncidentId(incidentId);
+                      }
+                      setIncidentTab(tab);
+                    }}
+                  />
+                )}
+                {incidentTab === 'logs' && (
+                  <IncidentLogPage
                     onNavigate={(tab, incidentId) => {
                       if (tab === 'detail' && incidentId) {
                         setSelectedIncidentId(incidentId);

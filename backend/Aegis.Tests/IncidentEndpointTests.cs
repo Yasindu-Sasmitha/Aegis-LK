@@ -191,6 +191,21 @@ public class IncidentEndpointTests : IClassFixture<WebApplicationFactory<Program
             l => Assert.Equal(b, l.GetProperty("incidentId").GetGuid()));
     }
 
+    [Fact]
+    public async Task Logs_ShowWhoDidWhat_ForOfficerActions()
+    {
+        var id = await SeedIncidentAsync(_factory);
+        await Send(HttpMethod.Post, $"/api/incidents/{id}/hold", new { reason = "triage" });
+
+        var res = await Send(HttpMethod.Get, $"/api/incidents/logs?incidentId={id}");
+        var items = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").EnumerateArray().ToList();
+
+        var held = items.Single(l => l.GetProperty("action").GetString() == "Held");
+        Assert.Equal("officer", held.GetProperty("actorType").GetString());
+        Assert.Equal("DisasterOfficer", held.GetProperty("actorRole").GetString());
+        Assert.DoesNotContain("[by:", held.GetProperty("note").GetString());
+    }
+
     // ── Cross-module contract with Recovery ──────────────────────────────────
     [Fact]
     public async Task DamageReportContract_UnknownIncident_Returns404_OnSingularRoute()

@@ -20,6 +20,89 @@ public static class IncidentEndpoints
     private static Guid? CallerId(ClaimsPrincipal principal) =>
         Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
 
+    // ── Activity-log "who did what" ─────────────────────────────────────────────
+    // MissionLog has no actor column (and the DB is deployed, so no migration). Instead the
+    // acting user is appended to the note as a trailer: " [by:Name|Role|UserId]". The /logs
+    // endpoint parses it back out into structured fields. Entries written before this change
+    // simply have no trailer and are shown as agent/system/unknown.
+    private static readonly System.Text.RegularExpressions.Regex ActorTrailer =
+        new(@"\s*\[by:([^|\]]*)\|([^|\]]*)\|([^|\]]*)\]\s*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Text.RegularExpressions.Regex LegacyOfficerId =
+        new(@"approved by officer ([0-9a-fA-F-]{36})", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static string ActorTag(ClaimsPrincipal principal)
+    {
+        static string Clean(string? v) => (v ?? "").Replace("|", "/").Replace("[", "(").Replace("]", ")").Trim();
+        var name = Clean(principal.FindFirst(ClaimTypes.Name)?.Value);
+        var role = Clean(principal.FindFirst(ClaimTypes.Role)?.Value);
+        var id = Clean(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        return $" [by:{(name.Length == 0 ? "Unknown user" : name)}|{role}|{id}]";
+    }
+
+    private static object ToLogEntry(MissionLog l)
+    {
+        var note = l.Note ?? string.Empty;
+        string? actorName = null, actorRole = null, actorUserId = null;
+        string actorType;
+
+        var m = ActorTrailer.Match(note);
+        if (m.Success)
+        {
+            actorName = m.Groups[1].Value;
+            actorRole = m.Groups[2].Value;
+            actorUserId = m.Groups[3].Value;
+            note = note[..m.Index].TrimEnd();
+            actorType = actorRole == "Citizen" ? "citizen" : "officer";
+        }
+        else actorType = "system";
+
+        string action;
+        string? agentName = null;
+        if (note.StartsWith("Incident reported")) action = "Reported";
+        else if (note.StartsWith("Photo uploaded")) action = "Photo";
+        else if (note.StartsWith("Assessed:") || note.StartsWith("Assessment failed")) { action = "Assessment"; agentName = "Assessment Agent"; }
+        else if (note.StartsWith("Plausibility check")) { action = "Plausibility"; agentName = "Plausibility Agent"; }
+        else if (note.StartsWith("Dedup check")) { action = "Dedup"; agentName = "Dedup Agent"; }
+        else if (note.StartsWith("Mission approved")) action = "Approved";
+        else if (note.StartsWith("Dispatch request")) action = "Dispatch";
+        else if (note.StartsWith("Incident rejected")) action = "Rejected";
+        else if (note.StartsWith("Incident placed on hold")) action = "Held";
+        else if (note.StartsWith("Manually unlinked")) action = "Unlinked";
+        else if (note.StartsWith("Officer re-ran")) action = "Rescreened";
+        else if (note.StartsWith("Incident closed")) action = "Closed";
+        else if (note.StartsWith("Recovery")) action = "Recovery";
+        else action = "Other";
+
+        if (!m.Success)
+        {
+            if (agentName is not null) { actorType = "agent"; actorName = agentName; }
+            else if (action is "Dispatch" or "Recovery") actorName = action == "Dispatch" ? "System (Resource dispatch)" : "System (Recovery hand-off)";
+            else
+            {
+                var legacy = LegacyOfficerId.Match(note);
+                if (legacy.Success) { actorType = "officer"; actorName = "Officer"; actorUserId = legacy.Groups[1].Value; }
+                else actorName = "System / not recorded";
+            }
+        }
+
+        var failed = note.Contains("failed", StringComparison.OrdinalIgnoreCase);
+
+        return new
+        {
+            id = l.Id,
+            incidentId = l.IncidentId,
+            timestamp = l.Timestamp,
+            note,
+            action,
+            actorType,
+            actorName,
+            actorRole,
+            actorUserId,
+            failed
+        };
+    }
+
     public static void MapIncidentEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/incidents").WithTags("Incidents");
@@ -119,6 +202,11 @@ public static class IncidentEndpoints
             };
 
             db.Incidents.Add(incident);
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = incident.Id,
+                Note = $"Incident reported: {incident.DisasterType}, severity {incident.SeverityReported}." + ActorTag(principal)
+            });
             await db.SaveChangesAsync();
 
             // Fire-and-forget: the citizen gets their 201 immediately, the plausibility
@@ -131,7 +219,7 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents/{id}/assess — calls the Incident Assessment Agent
-        group.MapPost("/{id:guid}/assess", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, IncidentAgentClient agentClient) =>
+        group.MapPost("/{id:guid}/assess", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, IncidentAgentClient agentClient, ClaimsPrincipal principal) =>
         {
             var incident = await db.Incidents.FindAsync(id);
             if (incident is null) return Results.NotFound();
@@ -163,7 +251,7 @@ public static class IncidentEndpoints
             db.MissionLogs.Add(new MissionLog
             {
                 IncidentId = id,
-                Note = $"Assessed: severity={agentResult.SeverityAssessed}, teamsRequired={agentResult.TeamsRequired}. {agentResult.Recommendation}"
+                Note = $"Assessed: severity={agentResult.SeverityAssessed}, teamsRequired={agentResult.TeamsRequired}. {agentResult.Recommendation}" + ActorTag(principal)
             });
 
             await db.SaveChangesAsync();
@@ -179,7 +267,7 @@ public static class IncidentEndpoints
         });
 
         // POST /api/incidents/{id}/approve — officer approves, creates RescueMission
-        group.MapPost("/{id:guid}/approve", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, ApproveIncidentRequest request, IncidentDbContext db, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory) => //added integration for resource module (IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory)     
+        group.MapPost("/{id:guid}/approve", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, ApproveIncidentRequest request, IncidentDbContext db, IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory, ClaimsPrincipal principal) => //added integration for resource module (IHttpClientFactory httpClientFactory, ILoggerFactory loggerFactory)     
 
         {
 
@@ -211,7 +299,7 @@ public static class IncidentEndpoints
             db.MissionLogs.Add(new MissionLog
             {
                 IncidentId = id,
-                Note = $"Mission approved by officer {request.ApprovedByOfficerId}. Teams required: {teamsRequired}."
+                Note = $"Mission approved by officer {request.ApprovedByOfficerId}. Teams required: {teamsRequired}." + ActorTag(principal)
             });
 
             await db.SaveChangesAsync();
@@ -287,7 +375,7 @@ public static class IncidentEndpoints
             return Results.Ok(mission);
         });
 
-        group.MapPost("/{id:guid}/reject", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, RejectIncidentRequest request, IncidentDbContext db) =>
+        group.MapPost("/{id:guid}/reject", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, RejectIncidentRequest request, IncidentDbContext db, ClaimsPrincipal principal) =>
         {
             if (string.IsNullOrWhiteSpace(request.Reason))
                 return Results.BadRequest("A reason is required to reject an incident.");
@@ -304,14 +392,14 @@ public static class IncidentEndpoints
             db.MissionLogs.Add(new MissionLog
             {
                 IncidentId = id,
-                Note = $"Incident rejected. Reason: {request.Reason}"
+                Note = $"Incident rejected. Reason: {request.Reason}" + ActorTag(principal)
             });
 
             await db.SaveChangesAsync();
             return Results.Ok(incident);
         });
 
-        group.MapPost("/{id:guid}/hold", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, HoldIncidentRequest request, IncidentDbContext db) =>
+        group.MapPost("/{id:guid}/hold", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, HoldIncidentRequest request, IncidentDbContext db, ClaimsPrincipal principal) =>
         {
             var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
             if (incident is null) return Results.NotFound();
@@ -324,9 +412,9 @@ public static class IncidentEndpoints
             db.MissionLogs.Add(new MissionLog
             {
                 IncidentId = id,
-                Note = request.Reason is null
+                Note = (request.Reason is null
                     ? "Incident placed on hold."
-                    : $"Incident placed on hold. Reason: {request.Reason}"
+                    : $"Incident placed on hold. Reason: {request.Reason}") + ActorTag(principal)
             });
 
             await db.SaveChangesAsync();
@@ -391,6 +479,11 @@ public static class IncidentEndpoints
 
             incident.PhotoUrl = photoUrl;
             incident.UpdatedAt = DateTime.UtcNow;
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = "Photo uploaded." + ActorTag(principal)
+            });
             await db.SaveChangesAsync();
 
             return Results.Ok(new { incident.Id, incident.PhotoUrl });
@@ -421,9 +514,9 @@ public static class IncidentEndpoints
             db.MissionLogs.Add(new MissionLog
             {
                 IncidentId = id,
-                Note = isStaff
-                    ? $"Incident closed by officer {callerId.Value}."
-                    : $"Incident closed by the reporting citizen {callerId.Value}."
+                Note = (isStaff
+                    ? "Incident closed by an officer."
+                    : "Incident closed by the reporting citizen.") + ActorTag(principal)
             });
             await db.SaveChangesAsync();
 
@@ -432,7 +525,7 @@ public static class IncidentEndpoints
 
         // POST /api/incidents/{id}/rescreen — officer re-runs Plausibility + Dedup when the
         // automatic background screening did not complete (agent down, quota hit, timeout).
-        group.MapPost("/{id:guid}/rescreen", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
+        group.MapPost("/{id:guid}/rescreen", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, IServiceScopeFactory scopeFactory, ClaimsPrincipal principal) =>
         {
             var incident = await db.Incidents.FindAsync(id);
             if (incident is null) return Results.NotFound();
@@ -443,7 +536,7 @@ public static class IncidentEndpoints
             db.MissionLogs.Add(new MissionLog
             {
                 IncidentId = id,
-                Note = "Officer re-ran AI screening (Plausibility + Dedup)."
+                Note = "Officer re-ran AI screening (Plausibility + Dedup)." + ActorTag(principal)
             });
             await db.SaveChangesAsync();
 
@@ -513,11 +606,14 @@ public static class IncidentEndpoints
                 query = query.Where(l => l.Note.ToLower().Contains(search.ToLower()));
 
             var total = await query.CountAsync();
-            var items = await query
+            var rows = await query
                 .OrderByDescending(l => l.Timestamp)
                 .Skip((pageNum - 1) * size)
                 .Take(size)
                 .ToListAsync();
+
+            // Structured "who did what" view (actor parsed from the note trailer — see ToLogEntry).
+            var items = rows.Select(ToLogEntry).ToList();
 
             return Results.Ok(new { total, page = pageNum, pageSize = size, items });
         });
@@ -526,7 +622,7 @@ public static class IncidentEndpoints
         // Called on the DUPLICATE (not the primary): clears its link, restoring it as its own
         // primary incident, visible again in the main queue. No reason required — this corrects
         // an agent guess, not a judgment call about the incident itself — but always logged.
-        group.MapPost("/{id:guid}/unlink", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db) =>
+        group.MapPost("/{id:guid}/unlink", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, ClaimsPrincipal principal) =>
         {
             var incident = await db.Incidents.FirstOrDefaultAsync(i => i.Id == id);
             if (incident is null) return Results.NotFound();
@@ -544,7 +640,7 @@ public static class IncidentEndpoints
             db.MissionLogs.Add(new MissionLog
             {
                 IncidentId = id,
-                Note = $"Manually unlinked by officer — was linked to incident {previousPrimaryId} as a duplicate. Restored as its own primary incident."
+                Note = $"Manually unlinked by officer — was linked to incident {previousPrimaryId} as a duplicate. Restored as its own primary incident." + ActorTag(principal)
             });
 
             await db.SaveChangesAsync();
