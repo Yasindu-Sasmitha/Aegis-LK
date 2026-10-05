@@ -74,7 +74,7 @@ export async function fetchWarehouses(params?: {
     pageSize: params?.pageSize ?? 20,
   });
 
-  const res = await fetch(`${API_BASE}/warehouses/${query}`, {
+  const res = await fetch(`${API_BASE}/warehouses${query}`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error('Failed to fetch warehouses');
@@ -92,7 +92,7 @@ export async function fetchWarehouseById(id: string): Promise<Warehouse> {
 export async function createWarehouse(
   payload: CreateWarehouseDto,
 ): Promise<Warehouse> {
-  const res = await fetch(`${API_BASE}/warehouses/`, {
+  const res = await fetch(`${API_BASE}/warehouses`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
@@ -143,7 +143,7 @@ export async function fetchInventoryItems(params?: {
     pageSize: params?.pageSize ?? 20,
   });
 
-  const res = await fetch(`${API_BASE}/inventory/${query}`, {
+  const res = await fetch(`${API_BASE}/inventory${query}`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error('Failed to fetch inventory');
@@ -161,7 +161,7 @@ export async function fetchInventoryById(id: string): Promise<InventoryItem> {
 export async function createInventoryItem(
   payload: CreateInventoryDto,
 ): Promise<InventoryItem> {
-  const res = await fetch(`${API_BASE}/inventory/`, {
+  const res = await fetch(`${API_BASE}/inventory`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(payload),
@@ -251,7 +251,7 @@ export async function deleteDispatchPlan(id: string): Promise<void> {
 }
 
 export async function fetchDispatchPlans(): Promise<DispatchPlan[]> {
-  const res = await fetch(`${API_BASE}/dispatch/`, {
+  const res = await fetch(`${API_BASE}/dispatch`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error('Failed to fetch dispatch plans');
@@ -262,7 +262,7 @@ export async function fetchDispatchPlans(): Promise<DispatchPlan[]> {
 
 export async function fetchApprovedIncidents(): Promise<ApprovedIncidentSummary[]> {
   const res = await fetch(
-    `/api/incidents/?status=MissionApproved&pageSize=100`,
+    `/api/incidents?status=MissionApproved&pageSize=100`,
     { headers: getAuthHeaders() },
   );
 
