@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchNGOs, createNGO } from '../api/recoveryApi';
+import { fetchNGOs, createNGO, isValidSriLankanPhone } from '../api/recoveryApi';
 import { NGO } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
 import { Pagination } from '../components/Pagination';
@@ -74,7 +74,11 @@ export const NGOManagementPage: React.FC = () => {
     if (!form.contactEmail.trim() || !form.contactEmail.includes('@')) {
       errors.contactEmail = 'Valid contact email is required.';
     }
-    if (!form.contactPhone.trim()) errors.contactPhone = 'Contact phone number is required.';
+    if (!form.contactPhone.trim()) {
+      errors.contactPhone = 'Contact phone number is required.';
+    } else if (!isValidSriLankanPhone(form.contactPhone)) {
+      errors.contactPhone = 'Enter a valid Sri Lankan phone number (10 digits starting with 0, e.g. 0112691095, or with +94, e.g. +94112691095). Numbers exceeding 10 digits without country code are invalid.';
+    }
     if (form.sectors.length === 0) errors.sectors = 'Please select at least one humanitarian sector.';
     if (form.operatingDistricts.length === 0) errors.operatingDistricts = 'Please select at least one operating district.';
     if (form.assignedBudget < 0) errors.assignedBudget = 'Capacity budget cannot be negative.';
@@ -626,7 +630,7 @@ export const NGOManagementPage: React.FC = () => {
                       type="text"
                       value={form.contactPhone}
                       onChange={e => setForm({ ...form, contactPhone: e.target.value })}
-                      placeholder="e.g. +94 11 269 1095"
+                      placeholder="e.g. 0112691095 or +94112691095"
                       style={{
                         width: '100%',
                         boxSizing: 'border-box',

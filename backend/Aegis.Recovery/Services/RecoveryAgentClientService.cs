@@ -114,6 +114,12 @@ public class RecoveryAgentClientService
             var failedChecks = guardrails.Where(g => !g.Passed).Select(g => g.RuleName).ToList();
             var reasons = new List<string>();
 
+            // Statutory Policy Gate: Any budget exceeding LKR 2.5M requires human officer approval
+            if (computedBudget > RecoveryRules.HumanApprovalBudgetThresholdLkr)
+            {
+                reasons.Add($"Budget LKR {computedBudget:N0} exceeds the statutory auto-approval threshold of LKR {RecoveryRules.HumanApprovalBudgetThresholdLkr:N0}.");
+            }
+
             if (pyResponse?.Agent4Output != null)
             {
                 // Follow Agent 4's explicit safety & policy review verdict
@@ -123,11 +129,6 @@ public class RecoveryAgentClientService
                         ? "AI safety & policy review requested human approval."
                         : $"AI policy review requested human review: {pyResponse.Agent4Output.ApprovalReason}");
                 }
-            }
-            else if (computedBudget > RecoveryRules.HumanApprovalBudgetThresholdLkr)
-            {
-                // Fallback deterministic rule only when Python agent output is absent
-                reasons.Add($"Budget LKR {computedBudget:N0} exceeds the standard approval threshold.");
             }
 
             if (failedChecks.Count > 0)
