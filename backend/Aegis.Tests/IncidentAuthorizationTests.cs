@@ -89,6 +89,61 @@ public class IncidentAuthorizationTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 
+    private async Task<(Guid id, Guid owner)> SeedApproved()
+    {
+        var owner = Guid.NewGuid();
+        var id = await SeedIncidentAsync(_factory, status: "MissionApproved", reportedBy: owner);
+        return (id, owner);
+    }
+
+    [Fact]
+    public async Task Close_Anonymous_Returns401()
+    {
+        var (id, _) = await SeedApproved();
+        var res = await SendAsync(_client, HttpMethod.Post, $"/api/incidents/{id}/close");
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Close_OtherCitizen_Returns403()
+    {
+        var (id, _) = await SeedApproved();
+        var res = await SendAsync(_client, HttpMethod.Post, $"/api/incidents/{id}/close", Token("Citizen"));
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Close_OwnerCitizen_OnApprovedMission_ClosesIncident()
+    {
+        var (id, owner) = await SeedApproved();
+        var res = await SendAsync(_client, HttpMethod.Post, $"/api/incidents/{id}/close", Token("Citizen", owner));
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        var check = await SendAsync(_client, HttpMethod.Get, $"/api/incidents/{id}", Token("DisasterOfficer"));
+        var json = await check.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal("Closed", json.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Close_Officer_OnApprovedMission_Returns200()
+    {
+        var (id, _) = await SeedApproved();
+        var res = await SendAsync(_client, HttpMethod.Post, $"/api/incidents/{id}/close", Token("DisasterOfficer"));
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Close_NotApproved_Returns409_AndUnknownReturns404()
+    {
+        var owner = Guid.NewGuid();
+        var id = await SeedIncidentAsync(_factory, status: "Reported", reportedBy: owner);
+        var conflict = await SendAsync(_client, HttpMethod.Post, $"/api/incidents/{id}/close", Token("Citizen", owner));
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+
+        var missing = await SendAsync(_client, HttpMethod.Post, $"/api/incidents/{Guid.NewGuid()}/close", Token("DisasterOfficer"));
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
     [Fact]
     public async Task Rescreen_Anonymous_Returns401()
     {
