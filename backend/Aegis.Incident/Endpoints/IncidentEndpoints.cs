@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Aegis.Incident.Data;
 using Aegis.Incident.Dtos;
@@ -26,7 +27,7 @@ public static class IncidentEndpoints
         // GET /api/incidents — list all (primaries only; duplicates are hidden here,
         // available via GET /{id}/related-reports). Matches Recovery/Weather's
         // server-side filter + pagination convention: {status, district, page, pageSize} -> {total, page, pageSize, items}
-        group.MapGet("/", async (
+        group.MapGet("/", [Authorize(Roles = "DisasterOfficer,Admin")] async (
             string? status,
             string? district,
             int? page,
@@ -56,8 +57,15 @@ public static class IncidentEndpoints
         });
 
         // GET /api/incidents/nearby — internal, called by the Dedup Agent's search_nearby_incidents tool
-        group.MapGet("/nearby", async (double lat, double lng, double radiusKm, double hours, IncidentDbContext db) =>
+        group.MapGet("/nearby", async (double lat, double lng, double radiusKm, double hours, IncidentDbContext db, IConfiguration config, HttpRequest httpRequest) =>
         {
+            // Internal endpoint for the Dedup Agent. When AgenticAi:AgentKey is configured,
+            // the caller must present it; when not configured (local dev) it stays open.
+            var agentKey = config["AgenticAi:AgentKey"];
+            if (!string.IsNullOrWhiteSpace(agentKey) &&
+                httpRequest.Headers["X-Aegis-Agent-Key"].ToString() != agentKey)
+                return Results.Unauthorized();
+
             var cutoff = DateTime.UtcNow.AddHours(-hours);
 
             var candidates = await db.Incidents
@@ -82,7 +90,7 @@ public static class IncidentEndpoints
         });
 
         // GET /api/incidents/{id} — single incident
-        group.MapGet("/{id:guid}", async (Guid id, IncidentDbContext db) =>
+        group.MapGet("/{id:guid}", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db) =>
         {
             var incident = await db.Incidents.FindAsync(id);
             return incident is null ? Results.NotFound() : Results.Ok(incident);
@@ -117,9 +125,7 @@ public static class IncidentEndpoints
             // check runs in the background. This needs its own DI scope (and therefore its
             // own DbContext) because the original request's scope — and its `db` instance —
             // gets disposed the moment this handler returns.
-            _ = RunPlausibilityCheckAsync(incident.Id, scopeFactory);
-            
-            _ = RunDedupCheckAsync(incident.Id, scopeFactory);
+            _ = RunScreeningAsync(incident.Id, scopeFactory);
 
             return Results.Created($"/api/incidents/{incident.Id}", incident);
         });
@@ -390,8 +396,29 @@ public static class IncidentEndpoints
             return Results.Ok(new { incident.Id, incident.PhotoUrl });
         });
 
+        // POST /api/incidents/{id}/rescreen — officer re-runs Plausibility + Dedup when the
+        // automatic background screening did not complete (agent down, quota hit, timeout).
+        group.MapPost("/{id:guid}/rescreen", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
+        {
+            var incident = await db.Incidents.FindAsync(id);
+            if (incident is null) return Results.NotFound();
+
+            if (incident.Status is "Rejected" or "MissionApproved" or "Closed")
+                return Results.Conflict($"Cannot re-run screening: incident is already {incident.Status}.");
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = "Officer re-ran AI screening (Plausibility + Dedup)."
+            });
+            await db.SaveChangesAsync();
+
+            _ = RunScreeningAsync(id, scopeFactory);
+            return Results.Accepted($"/api/incidents/{id}", incident);
+        });
+
         // GET /api/incidents/{id}/related-reports — duplicate reports linked to this primary
-        group.MapGet("/{id:guid}/related-reports", async (Guid id, IncidentDbContext db) =>
+        group.MapGet("/{id:guid}/related-reports", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db) =>
         {
             var related = await db.Incidents
                 .Where(i => i.LinkedIncidentId == id)
@@ -519,14 +546,58 @@ public static class IncidentEndpoints
         });
     }
 
-    private static async Task RunPlausibilityCheckAsync(Guid incidentId, IServiceScopeFactory scopeFactory)
+    // Background screening (Plausibility + Dedup). Each agent is retried with backoff because
+    // the free Gemini tier (15 req/min) and slow tool-calling loops make single attempts flaky.
+    // A failure is only written to MissionLog after the final attempt, so officers see one
+    // honest message instead of noise. Nothing here blocks or changes the citizen's 201.
+    private static readonly TimeSpan[] ScreeningRetryDelays = { TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30) };
+
+    private static Task RunScreeningAsync(Guid incidentId, IServiceScopeFactory scopeFactory) =>
+        Task.WhenAll(
+            RunWithRetryAsync("Plausibility", incidentId, scopeFactory, RunPlausibilityCheckAsync),
+            RunWithRetryAsync("Dedup", incidentId, scopeFactory, RunDedupCheckAsync));
+
+    private static async Task RunWithRetryAsync(
+        string agentName,
+        Guid incidentId,
+        IServiceScopeFactory scopeFactory,
+        Func<Guid, IServiceScopeFactory, Task<string?>> run)
+    {
+        string? error = null;
+        for (var attempt = 0; attempt <= ScreeningRetryDelays.Length; attempt++)
+        {
+            if (attempt > 0) await Task.Delay(ScreeningRetryDelays[attempt - 1]);
+            try { error = await run(incidentId, scopeFactory); }
+            catch (Exception ex) { error = ex.Message; }
+            if (error is null) return;
+        }
+
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<IncidentDbContext>();
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = incidentId,
+                Note = $"{agentName} check failed (after {ScreeningRetryDelays.Length + 1} attempts): {error}"
+            });
+            await db.SaveChangesAsync();
+        }
+        catch
+        {
+            // Nothing more can be done from a background task.
+        }
+    }
+
+    // Returns null on success, or an error message so the caller can retry.
+    private static async Task<string?> RunPlausibilityCheckAsync(Guid incidentId, IServiceScopeFactory scopeFactory)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IncidentDbContext>();
         var agentClient = scope.ServiceProvider.GetRequiredService<IncidentPlausibilityAgentClient>();
 
         var incident = await db.Incidents.FindAsync(incidentId);
-        if (incident is null) return;
+        if (incident is null) return null;
 
         var result = await agentClient.CheckPlausibilityAsync(new PlausibilityRequestDto
         {
@@ -538,15 +609,7 @@ public static class IncidentEndpoints
         });
 
         if (result is null || result.OverallStatus != "Success")
-        {
-            db.MissionLogs.Add(new MissionLog
-            {
-                IncidentId = incidentId,
-                Note = $"Plausibility check failed: {result?.Error ?? "Agent service unreachable"}"
-            });
-            await db.SaveChangesAsync();
-            return;
-        }
+            return result?.Error ?? "Agent service unreachable or timed out";
 
         incident.PlausibilityScore = result.PlausibilityScore;
         incident.PlausibilityReasoning = result.PlausibilityReasoning;
@@ -558,16 +621,17 @@ public static class IncidentEndpoints
         });
 
         await db.SaveChangesAsync();
+        return null;
     }
 
-    private static async Task RunDedupCheckAsync(Guid incidentId, IServiceScopeFactory scopeFactory)
+    private static async Task<string?> RunDedupCheckAsync(Guid incidentId, IServiceScopeFactory scopeFactory)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IncidentDbContext>();
         var agentClient = scope.ServiceProvider.GetRequiredService<IncidentDedupAgentClient>();
 
         var incident = await db.Incidents.FindAsync(incidentId);
-        if (incident is null) return;
+        if (incident is null) return null;
 
         var result = await agentClient.CheckForDuplicateAsync(new DedupRequestDto
         {
@@ -579,15 +643,7 @@ public static class IncidentEndpoints
         });
 
         if (result is null || result.OverallStatus != "Success")
-        {
-            db.MissionLogs.Add(new MissionLog
-            {
-                IncidentId = incidentId,
-                Note = $"Dedup check failed: {result?.Error ?? "Agent service unreachable"}"
-            });
-            await db.SaveChangesAsync();
-            return;
-        }
+            return result?.Error ?? "Agent service unreachable or timed out";
 
         db.MissionLogs.Add(new MissionLog
         {
@@ -609,6 +665,7 @@ public static class IncidentEndpoints
         }
 
         await db.SaveChangesAsync();
+        return null;
     }
 
     private static async Task RunRecoveryWorkflowTriggerAsync(Guid incidentId, IServiceScopeFactory scopeFactory)

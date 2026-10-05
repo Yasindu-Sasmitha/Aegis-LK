@@ -29,7 +29,7 @@ public class IncidentDedupAgentClient
     public IncidentDedupAgentClient(HttpClient http)
     {
         _http = http;
-        _http.Timeout = TimeSpan.FromSeconds(60); // tool-calling loops with multiple LLM calls take real time
+        _http.Timeout = TimeSpan.FromSeconds(120); // tool-calling loops with multiple LLM calls take real time
     }
 
     public async Task<DedupResponseDto?> CheckForDuplicateAsync(DedupRequestDto request)

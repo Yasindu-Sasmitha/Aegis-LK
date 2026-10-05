@@ -69,6 +69,50 @@ public class IncidentAuthorizationTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 
+    [Theory]
+    [InlineData("/api/incidents")]
+    [InlineData("/api/incidents/00000000-0000-0000-0000-000000000001")]
+    [InlineData("/api/incidents/00000000-0000-0000-0000-000000000001/related-reports")]
+    public async Task IncidentReads_Anonymous_Return401(string url)
+    {
+        var res = await SendAsync(_client, HttpMethod.Get, url);
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/api/incidents")]
+    [InlineData("/api/incidents/00000000-0000-0000-0000-000000000001")]
+    [InlineData("/api/incidents/00000000-0000-0000-0000-000000000001/related-reports")]
+    public async Task IncidentReads_Citizen_Return403(string url)
+    {
+        var res = await SendAsync(_client, HttpMethod.Get, url, Token("Citizen"));
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rescreen_Anonymous_Returns401()
+    {
+        var res = await Post("rescreen", null);
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rescreen_Citizen_Returns403()
+    {
+        var res = await Post("rescreen", Token("Citizen"));
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Rescreen_Officer_Returns202_AndUnknownIncident404()
+    {
+        var res = await Post("rescreen", Token("DisasterOfficer"));
+        Assert.Equal(HttpStatusCode.Accepted, res.StatusCode);
+
+        var missing = await SendAsync(_client, HttpMethod.Post, $"/api/incidents/{Guid.NewGuid()}/rescreen", Token("DisasterOfficer"));
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
     [Fact]
     public async Task NearbyEndpoint_RemainsAnonymous_ForInternalDedupAgent()
     {

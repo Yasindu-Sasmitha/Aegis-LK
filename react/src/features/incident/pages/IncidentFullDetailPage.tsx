@@ -6,6 +6,7 @@ import {
   approveIncident,
   rejectIncident,
   holdIncident,
+  rescreenIncident,
 } from '../api/incidentApi';
 import { IncidentReport, ReporterProfile } from '../types/incidentTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
@@ -76,6 +77,41 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
     load();
   }, [load]);
 
+  // AI screening (Plausibility + Dedup) runs in the background after a report is created.
+  // While it is expected to still be running, quietly re-fetch every 5s so results appear
+  // without a manual reload. After SCREENING_WINDOW_MS we treat it as "did not complete".
+  const SCREENING_WINDOW_MS = 3 * 60 * 1000;
+  const [screeningStartedAt, setScreeningStartedAt] = useState<number | null>(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!incident || incident.plausibilityScore !== null) return;
+    const start = Math.max(new Date(incident.createdAt).getTime(), screeningStartedAt ?? 0);
+    if (Date.now() - start >= SCREENING_WINDOW_MS) return;
+
+    const timer = setInterval(() => {
+      setTick((t) => t + 1); // re-evaluate running -> stalled
+      fetchIncidentById(incidentId)
+        .then((fresh) => setIncident(fresh))
+        .catch(() => undefined);
+      if (Date.now() - start >= SCREENING_WINDOW_MS) clearInterval(timer);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [incident?.id, incident?.plausibilityScore, incident?.createdAt, screeningStartedAt, incidentId]);
+
+  const handleRescreen = async () => {
+    setActionBusy('rescreen');
+    setActionError(null);
+    try {
+      await rescreenIncident(incidentId);
+      setScreeningStartedAt(Date.now());
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to re-run screening');
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
   const runAction = async (fn: () => Promise<IncidentReport>, key: string) => {
     setActionBusy(key);
     setActionError(null);
@@ -113,6 +149,14 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
   const canAssess = isOfficerOrAdmin && incident.status === 'Reported';
   const canApproveOrTriage = isOfficerOrAdmin && ['Assessed', 'OnHold', 'Reported'].includes(incident.status);
   const isFinal = ['Rejected', 'MissionApproved', 'Closed'].includes(incident.status);
+
+  const screeningStart = Math.max(new Date(incident.createdAt).getTime(), screeningStartedAt ?? 0);
+  const screeningState: 'done' | 'running' | 'stalled' =
+    incident.plausibilityScore !== null
+      ? 'done'
+      : Date.now() - screeningStart < SCREENING_WINDOW_MS
+        ? 'running'
+        : 'stalled';
 
   const d = 0.01;
   const bbox = `${incident.longitude - d},${incident.latitude - d},${incident.longitude + d},${incident.latitude + d}`;
@@ -286,7 +330,11 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
                 <InfoHint text="Checks real rainfall data for the district against what was reported, to flag reports that seem inconsistent with actual weather. A score, not a hoax detector — always a signal for officer attention, never a hard pass/fail." />
               </h3>
               <span className={`ae-chip ${scoreChipClass(incident.plausibilityScore)}`}>
-                {incident.plausibilityScore !== null ? `${incident.plausibilityScore}/100` : 'Not screened'}
+                {screeningState === 'done'
+                  ? `${incident.plausibilityScore}/100`
+                  : screeningState === 'running'
+                    ? 'Screening…'
+                    : 'Not completed'}
               </span>
             </div>
             {incident.plausibilityReasoning ? (
@@ -294,9 +342,22 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
                 {incident.plausibilityReasoning}
               </p>
             ) : (
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
-                Runs automatically in the background shortly after a report is created.
-              </p>
+              <>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                  {screeningState === 'running'
+                    ? 'AI screening is running in the background — this page updates automatically.'
+                    : 'AI screening did not complete (agent busy, rate-limited or timed out). Check the Activity Log for details.'}
+                </p>
+                {screeningState === 'stalled' && isOfficerOrAdmin && !isFinal && (
+                  <button
+                    onClick={handleRescreen}
+                    disabled={actionBusy !== null}
+                    style={{ ...actionButtonStyle('#0c2242', '#ffffff', actionBusy === 'rescreen'), marginTop: '0.75rem' }}
+                  >
+                    {actionBusy === 'rescreen' ? 'Starting…' : '🔄 Re-run screening'}
+                  </button>
+                )}
+              </>
             )}
           </div>
 
@@ -319,7 +380,9 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
               </p>
             ) : (
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
-                Not linked as a duplicate of any other report — treated as its own primary incident.
+                {screeningState === 'running'
+                  ? 'Checking for duplicate reports nearby…'
+                  : 'Not linked as a duplicate of any other report — treated as its own primary incident.'}
               </p>
             )}
           </div>
@@ -348,7 +411,7 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
 
                 {canApproveOrTriage && user && (
                   <button
-                    onClick={() => runAction(() => approveIncident(incidentId, { approvedByOfficerId: user.id }), 'approve')}
+                    onClick={() => runAction(() => approveIncident(incidentId, { approvedByOfficerId: user.id }).then(() => fetchIncidentById(incidentId)), 'approve')}
                     disabled={actionBusy !== null}
                     style={actionButtonStyle('#059669', '#ffffff', actionBusy === 'approve')}
                   >

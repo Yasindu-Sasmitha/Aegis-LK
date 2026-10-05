@@ -28,7 +28,7 @@ public class IncidentPlausibilityAgentClient
     public IncidentPlausibilityAgentClient(HttpClient http)
     {
         _http = http;
-        _http.Timeout = TimeSpan.FromSeconds(60); // tool-calling loops can take longer than a single LLM call
+        _http.Timeout = TimeSpan.FromSeconds(120); // tool-calling loops can take longer than a single LLM call
     }
 
     public async Task<PlausibilityResponseDto?> CheckPlausibilityAsync(PlausibilityRequestDto request)
