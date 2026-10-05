@@ -34,6 +34,41 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     await _future;
   }
 
+  Future<void> _confirmClose(MyIncidentReportModel report) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Close incident'),
+        content: const Text(
+            'Has the rescue been completed? Closing this incident marks it as resolved.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not yet'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, close it'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await _service.closeIncident(report.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Incident closed.')));
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
   // Colors/icons per status. "Confirmed — merged..." gets its own distinct
   // treatment so a citizen can tell it apart from an ignored report.
   ({Color color, IconData icon, String hint}) _statusStyle(String displayStatus) {
@@ -107,7 +142,13 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: reports.length,
-            itemBuilder: (context, i) => _ReportCard(report: reports[i], style: _statusStyle(reports[i].displayStatus)),
+            itemBuilder: (context, i) => _ReportCard(
+              report: reports[i],
+              style: _statusStyle(reports[i].displayStatus),
+              onClose: reports[i].displayStatus == 'MissionApproved'
+                  ? () => _confirmClose(reports[i])
+                  : null,
+            ),
           );
         },
       ),
@@ -125,7 +166,8 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 class _ReportCard extends StatelessWidget {
   final MyIncidentReportModel report;
   final ({Color color, IconData icon, String hint}) style;
-  const _ReportCard({required this.report, required this.style});
+  final VoidCallback? onClose;
+  const _ReportCard({required this.report, required this.style, this.onClose});
 
   @override
   Widget build(BuildContext context) {
@@ -192,6 +234,21 @@ class _ReportCard extends StatelessWidget {
               ],
             ),
           ),
+          if (onClose != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onClose,
+                icon: const Icon(Icons.task_alt, size: 18),
+                label: const Text('Close incident'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kSuccess,
+                  side: const BorderSide(color: kSuccess),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
