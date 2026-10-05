@@ -23,7 +23,7 @@ class ApiConfig {
   /// Defaults to the local dev server; override via --dart-define at build time.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:5012',
+    defaultValue: 'https://aegis-lk.onrender.com',
   );
 
   // ── Convenience sub-paths ─────────────────────────────────────────────────
