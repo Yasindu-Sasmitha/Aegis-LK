@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Aegis.Incident.Data;
 using Aegis.Incident.Dtos;
@@ -26,7 +27,7 @@ public static class IncidentEndpoints
         // GET /api/incidents — list all (primaries only; duplicates are hidden here,
         // available via GET /{id}/related-reports). Matches Recovery/Weather's
         // server-side filter + pagination convention: {status, district, page, pageSize} -> {total, page, pageSize, items}
-        group.MapGet("/", async (
+        group.MapGet("/", [Authorize(Roles = "DisasterOfficer,Admin")] async (
             string? status,
             string? district,
             int? page,
@@ -56,8 +57,15 @@ public static class IncidentEndpoints
         });
 
         // GET /api/incidents/nearby — internal, called by the Dedup Agent's search_nearby_incidents tool
-        group.MapGet("/nearby", async (double lat, double lng, double radiusKm, double hours, IncidentDbContext db) =>
+        group.MapGet("/nearby", async (double lat, double lng, double radiusKm, double hours, IncidentDbContext db, IConfiguration config, HttpRequest httpRequest) =>
         {
+            // Internal endpoint for the Dedup Agent. When AgenticAi:AgentKey is configured,
+            // the caller must present it; when not configured (local dev) it stays open.
+            var agentKey = config["AgenticAi:AgentKey"];
+            if (!string.IsNullOrWhiteSpace(agentKey) &&
+                httpRequest.Headers["X-Aegis-Agent-Key"].ToString() != agentKey)
+                return Results.Unauthorized();
+
             var cutoff = DateTime.UtcNow.AddHours(-hours);
 
             var candidates = await db.Incidents
@@ -82,7 +90,7 @@ public static class IncidentEndpoints
         });
 
         // GET /api/incidents/{id} — single incident
-        group.MapGet("/{id:guid}", async (Guid id, IncidentDbContext db) =>
+        group.MapGet("/{id:guid}", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db) =>
         {
             var incident = await db.Incidents.FindAsync(id);
             return incident is null ? Results.NotFound() : Results.Ok(incident);
@@ -391,7 +399,7 @@ public static class IncidentEndpoints
         });
 
         // GET /api/incidents/{id}/related-reports — duplicate reports linked to this primary
-        group.MapGet("/{id:guid}/related-reports", async (Guid id, IncidentDbContext db) =>
+        group.MapGet("/{id:guid}/related-reports", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db) =>
         {
             var related = await db.Incidents
                 .Where(i => i.LinkedIncidentId == id)
