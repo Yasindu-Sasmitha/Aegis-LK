@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchDonations, createDonation, fetchShelters, updateDonationAllocation } from '../api/recoveryApi';
+import { fetchDonations, createDonation, fetchShelters, updateDonationAllocation, isValidSriLankanPhone } from '../api/recoveryApi';
 import { DonationTracker } from '../components/DonationTracker';
 import { Donation, Shelter } from '../types/recoveryTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
@@ -61,9 +61,16 @@ export const DonationsPage: React.FC = () => {
     }
 
     const cleanContact = newDonation.donorContact.trim();
-    if (cleanContact && cleanContact.length < 5) {
-      alert('Please provide a valid contact phone number or email address.');
-      return;
+    if (cleanContact) {
+      if (cleanContact.includes('@')) {
+        if (!cleanContact.includes('.')) {
+          alert('Please provide a valid email address or Sri Lankan contact phone number.');
+          return;
+        }
+      } else if (!isValidSriLankanPhone(cleanContact)) {
+        alert('Please provide a valid Sri Lankan phone number (10 digits starting with 0, e.g. 0771234567, or with country code +94, e.g. +94771234567) or a valid email address.');
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -277,7 +284,7 @@ export const DonationsPage: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. donor@example.org or 0112345678"
+                  placeholder="e.g. 0771234567, +94771234567, or donor@example.org"
                   value={newDonation.donorContact}
                   onChange={(e) => setNewDonation({ ...newDonation, donorContact: e.target.value })}
                   style={{ width: '100%', padding: '0.65rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box' }}

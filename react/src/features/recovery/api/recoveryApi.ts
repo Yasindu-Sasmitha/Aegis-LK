@@ -13,6 +13,21 @@ import {
   DamageIntakeFormData,
 } from '../types/recoveryTypes';
 
+// ── Sri Lanka Phone Number Validator ──────────────────────────────────────────
+/**
+ * Validates Sri Lankan phone numbers:
+ * - Local 10-digit format starting with 0 (e.g., 0771234567, 0112345678)
+ * - International format with +94, 0094, or 94 followed by 9 digits (e.g., +94771234567)
+ * - Rejects any numbers with > 10 digits (without country code) or invalid formats.
+ */
+export function isValidSriLankanPhone(phone: string): boolean {
+  if (!phone) return false;
+  const cleaned = phone.trim().replace(/[\s\-\(\)]/g, '');
+  const local10Regex = /^0\d{9}$/;
+  const intlRegex = /^(?:\+94|0094|94)[1-9]\d{8}$/;
+  return local10Regex.test(cleaned) || intlRegex.test(cleaned);
+}
+
 // ── Approved Incidents (cross-module, from Incident API) ──────────────────────
 export interface ApprovedIncident {
   id: string;
