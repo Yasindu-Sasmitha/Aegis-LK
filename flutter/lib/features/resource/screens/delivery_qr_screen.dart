@@ -128,7 +128,7 @@ class _DeliveryQrScreenState extends State<DeliveryQrScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          'DELIVERY CONFIRMED',
+                          'DELIVERY CODE VERIFIED',
                           style: TextStyle(
                             color: Colors.greenAccent,
                             fontSize: 12,
