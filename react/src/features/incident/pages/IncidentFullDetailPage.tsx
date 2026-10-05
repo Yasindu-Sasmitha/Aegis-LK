@@ -7,6 +7,7 @@ import {
   rejectIncident,
   holdIncident,
   rescreenIncident,
+  closeIncident,
 } from '../api/incidentApi';
 import { IncidentReport, ReporterProfile } from '../types/incidentTypes';
 import { useAuth } from '../../../shared/auth/AuthContext';
@@ -465,6 +466,33 @@ export const IncidentFullDetailPage: React.FC<Props> = ({ incidentId, onBack }) 
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Close an approved mission once it has concluded (the citizen can also do this from the mobile app) */}
+          {isOfficerOrAdmin && incident.status === 'MissionApproved' && (
+            <div className="ae-card">
+              <h3 style={{ margin: '0 0 0.6rem', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+                ⚡ Officer Actions
+              </h3>
+              {actionError && (
+                <p style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', color: '#b91c1c' }}>⚠️ {actionError}</p>
+              )}
+              <p style={{ margin: '0 0 0.85rem', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
+                The rescue mission is approved. When it has concluded, close the incident. The reporting
+                citizen can also close it from the mobile app.
+              </p>
+              <button
+                onClick={() => {
+                  if (window.confirm('Close this incident? This marks the rescue mission as concluded.')) {
+                    runAction(() => closeIncident(incidentId).then(() => fetchIncidentById(incidentId)), 'close');
+                  }
+                }}
+                disabled={actionBusy !== null}
+                style={actionButtonStyle('#334155', '#ffffff', actionBusy === 'close')}
+              >
+                {actionBusy === 'close' ? 'Closing…' : '📁 Close Incident'}
+              </button>
             </div>
           )}
         </div>

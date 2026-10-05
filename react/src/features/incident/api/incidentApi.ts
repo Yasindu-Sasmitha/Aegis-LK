@@ -177,6 +177,15 @@ export async function unlinkIncident(id: string): Promise<IncidentReport> {
   return handle<IncidentReport>(res, 'Failed to unlink incident');
 }
 
+// ── POST /api/incidents/{id}/close — mission concluded (officer/admin, or the reporting citizen) ──
+export async function closeIncident(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/${id}/close`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  await handle<unknown>(res, 'Failed to close incident');
+}
+
 // ── POST /api/incidents/{id}/rescreen — officer re-runs Plausibility + Dedup ──
 export async function rescreenIncident(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/${id}/rescreen`, {
