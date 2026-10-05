@@ -23,18 +23,24 @@ logs damage, which becomes available to the Recovery module.
 Base route `/api/incidents` (plural). One exception below uses singular `/api/incident` —
 this is a deliberate, contract-verified match to how the Recovery module calls it.
 
-| Method | Route | Purpose |
-|---|---|---|
-| GET | `/api/incidents` | List all **primary** incidents (duplicates hidden — see §5) |
-| GET | `/api/incidents/{id}` | Single incident, full detail |
-| GET | `/api/incidents/nearby?lat=&lng=&radiusKm=&hours=` | Internal — used by the Dedup Agent's `search_nearby_incidents` tool |
-| GET | `/api/incidents/{id}/related-reports` | Duplicate reports linked to a primary incident |
-| POST | `/api/incidents` | Citizen creates a report. Triggers the Plausibility and Dedup agents in the background (non-blocking) |
-| POST | `/api/incidents/{id}/photo` | Attach a photo (multipart/form-data, field name `file`) — uploads to Cloudinary, stores the public URL |
-| POST | `/api/incidents/{id}/assess` | Officer-triggered — calls the Assessment Agent, stores `severityAssessed`, `teamsRequired`-derived recommendation |
-| POST | `/api/incidents/{id}/approve` | Officer approves, creates a `RescueMission` (the required human-approval gate) |
-| POST | `/api/incidents/{id}/damage-report` | Closes the incident, records damage. Deliberately **not** agentic — see §6 |
-| GET | `/api/incident/{id}/damage-report` | **Singular "incident"** — cross-module contract Recovery pulls from |
+| Method | Route | Access | Purpose |
+|---|---|---|---|
+| GET | `/api/incidents` | Officer, Admin | List all **primary** incidents (duplicates hidden — see §5); paginated, `status`/`district` filters |
+| GET | `/api/incidents/{id}` | Officer, Admin | Single incident, full detail |
+| GET | `/api/incidents/nearby?lat=&lng=&radiusKm=&hours=` | Agent key if `AgenticAi:AgentKey` is set, else open | Internal — used by the Dedup Agent's `search_nearby_incidents` tool |
+| GET | `/api/incidents/{id}/related-reports` | Officer, Admin | Duplicate reports linked to a primary incident |
+| GET | `/api/incidents/my-reports?reportedByUserId=` | Authenticated (own reports; officer/admin any) | Citizen's own reports with an honest `displayStatus` (merged duplicates show "Confirmed — merged with an existing report") |
+| GET | `/api/incidents/logs` | Officer, Admin | Global searchable activity log over `MissionLog` |
+| POST | `/api/incidents` | Authenticated | Citizen creates a report (reporter ID taken from the JWT). Starts Plausibility + Dedup screening in the background (non-blocking) |
+| POST | `/api/incidents/{id}/photo` | Authenticated (owner) | Attach a photo (multipart/form-data, field name `file`) — uploads to Cloudinary, stores the public URL |
+| POST | `/api/incidents/{id}/assess` | Officer, Admin | Calls the Assessment Agent, stores `severityAssessed` and the recommendation |
+| POST | `/api/incidents/{id}/approve` | Officer, Admin | Creates a `RescueMission` (the human-approval gate) and sends a dispatch request to Resource. **Returns the mission, not the incident** |
+| POST | `/api/incidents/{id}/reject` | Officer, Admin | Reason required; sets `Rejected` |
+| POST | `/api/incidents/{id}/hold` | Officer, Admin | Reason optional; sets `OnHold` |
+| POST | `/api/incidents/{id}/unlink` | Officer, Admin | Reverses a wrong Dedup match; always logged |
+| POST | `/api/incidents/{id}/rescreen` | Officer, Admin | Re-runs Plausibility + Dedup when automatic screening did not complete; `409` if Rejected/MissionApproved/Closed |
+| POST | `/api/incidents/{id}/damage-report` | Officer, Admin | Closes the incident, records damage, triggers Recovery's workflow. Deliberately **not** agentic — see §6 |
+| GET | `/api/incident/{id}/damage-report` | Anonymous (by design) | **Singular "incident"** — cross-module contract Recovery pulls from server-to-server |
 
 ## 3. The three agents
 
@@ -57,7 +63,7 @@ the same prompt renamed.
 ### 3b. Plausibility Agent — Pattern B (genuine tool-calling)
 - **File:** `agentic-ai/agents/incident_plausibility_agent.py`
 - **Trigger:** automatic, fires as a background task the instant `POST /api/incidents` succeeds
-  — the citizen's `201` response never waits for this
+  — the citizen's `201` response never waits for this. Retried up to 3 times (see §3d)
 - **Framework:** LangGraph's `create_react_agent` — the LLM itself decides which tools to call
   and when, not a fixed fetch-then-prompt sequence
 - **Tools:**
@@ -82,10 +88,10 @@ the same prompt renamed.
 
 ### 3c. Dedup/Clustering Agent — Pattern B (genuine tool-calling)
 - **File:** `agentic-ai/agents/incident_dedup_agent.py`
-- **Trigger:** automatic, fires concurrently alongside the Plausibility Agent on report creation
+- **Trigger:** automatic, fires concurrently alongside the Plausibility Agent on report creation (retried up to 3 times, see §3d)
 - **Tools:**
   - `search_nearby_incidents(lat, lng, radius_km, hours)` — calls back into **this module's
-    own** `GET /api/incidents/nearby` endpoint over HTTP, rather than querying Postgres
+    own** `GET /api/incidents/nearby` endpoint over HTTP (sending `X-Aegis-Agent-Key` when `AEGIS_AGENT_KEY` is set), rather than querying Postgres
     directly from Python. This keeps all data access in one place (the C# API), matching the
     project's rule that Python agents call into ASP.NET Core rather than around it.
   - `compare_reports(report_a, report_b, disaster_type)` — one focused LLM call per candidate,
@@ -97,6 +103,18 @@ the same prompt renamed.
   reasoning. If matched, the new report's `LinkedIncidentId` is set, pointing at the primary.
   A safety check prevents chaining — a report is never linked to an incident that is itself
   already a duplicate.
+
+### 3d. Screening reliability (retries, timeouts, re-run)
+Plausibility and Dedup run as fire-and-forget background tasks, so they must survive a slow or
+rate-limited LLM without ever blocking the citizen:
+- Each agent gets **3 attempts** (10s then 30s backoff) — this covers the Gemini free-tier `429`.
+- The HTTP timeout for the Plausibility and Dedup clients is **120s**.
+- A failure is written to `MissionLog` **once, after the final attempt**
+  (`"<Agent> check failed (after 3 attempts): <reason>"`); exceptions are caught, never unobserved.
+- An officer can call `POST /{id}/rescreen` (or click **Re-run screening** in React) to run both agents again.
+- The React detail page shows "Screening…" and refreshes every 5s for up to 3 minutes, then
+  "Not completed" with the re-run button.
+- No database change was needed for any of this.
 
 ## 4. Database fields added beyond the original model
 
@@ -180,8 +198,13 @@ Routes exposed: `POST /assess`, `POST /plausibility`, `POST /dedup`, `GET /healt
 `http://127.0.0.1:8002` — same service, different routes.
 
 **If this service isn't running:** `/assess` degrades gracefully (502, logged). The background
-Plausibility/Dedup checks fail silently and log to `MissionLog` rather than crashing report
-creation — a citizen can always submit a report even if the AI layer is down.
+Plausibility/Dedup checks are retried, then log a single failure to `MissionLog` rather than crashing
+report creation — a citizen can always submit a report even if the AI layer is down, and an officer
+can re-run screening later.
+
+**Agent key:** if you set `AEGIS_AGENT_KEY` for the agent service, set the same value as
+`AgenticAi:AgentKey` for the API. A mismatch makes the Dedup Agent's `/nearby` search return `401`,
+so it quietly finds no duplicates.
 
 ## 9. Full local setup checklist
 
@@ -198,16 +221,40 @@ creation — a citizen can always submit a report even if the AI layer is down.
 ## 10. Testing evidence
 
 Each agent was verified at three levels before merging:
-1. **Standalone** — running the `.py` file directly (`python incident_agent.py`, etc.),
-   confirming real Gemini/tool output
+1. **Standalone** — running the `.py` file directly, confirming real Gemini/tool output
 2. **HTTP** — via `curl.exe` against the FastAPI service directly
 3. **Full end-to-end** — through the actual C# endpoint in Scalar, confirming the whole chain
    (citizen request → C# → Python agent → Gemini/tools → back through C# → Postgres) works
    together, including the fire-and-forget background triggering for Plausibility and Dedup
 
+Automated tests:
+- **Backend:** `backend/Aegis.Tests/IncidentEndpointTests.cs` (business rules, state transitions, 409
+  guards, pagination regression, merged-duplicate status, logs, Recovery contract route) and
+  `IncidentAuthorizationTests.cs` (role checks, open-by-design routes, rescreen). Run with
+  `dotnet test` from `backend/`.
+- **Agents:** `agentic-ai/tests/test_incident_agents.py` — golden cases and rule-based assertions
+  (district lookup, plausibility parsing/clamping/fallbacks, prompt-injection bounds, dedup
+  duplicate/distinct/malformed handling, agent-key enforcement). Runs without calling Gemini.
+
 ## 11. Integration Status & Role-Based Authorization
 
-- **Outbound POST to Resource on mission approval (Completed):** `POST /{id}/approve` now dispatches a request directly to the Resource module (`POST /api/resource/dispatch-requests`), automatically queuing resource allocation for the approved rescue mission.
-- **Role-based authorization (Completed):** Endpoints are secured with JWT authentication (`[Authorize(Roles = "DisasterOfficer,Admin")]` for mission approvals, incident rejection, hold, and damage logging; citizen endpoints require appropriate citizen/authenticated claims).
-- **Rescue mission ETA:** Sourced from the Resource module's dispatch plan rather than computed in this module, maintaining clean module boundaries.
+- **Outbound POST to Resource on mission approval (Completed):** `POST /{id}/approve` sends
+  `POST /api/resource/dispatch/requests` via the `ResourceModule` HttpClient. The outcome is written to
+  `MissionLog`; if Resource is down the approval still succeeds and the log says it will be retried
+  manually.
+- **Outbound to Recovery (Completed):** Recovery pulls `GET /api/incident/{id}/damage-report`; saving a
+  damage report also triggers Recovery's workflow in the background.
+- **Role-based authorization (Completed):** every officer action and every incident read endpoint requires
+  `DisasterOfficer` or `Admin`. Citizens can create reports, upload a photo to their own report and read
+  their own reports through `my-reports`. Two routes are intentionally reachable without a user token:
+  Recovery's damage-report contract and `/nearby` (protected by the agent key when configured).
+- **Rescue mission ETA:** Sourced from the Resource module's dispatch plan rather than computed in this
+  module, maintaining clean module boundaries.
 
+## 12. Known limitations
+
+- The React damage-report form is not built yet (the endpoint and API client exist).
+- The incident list cards still show the older "Not screened" wording; only the detail page shows the
+  "Screening…" / "Not completed" states.
+- If the Gemini free-tier quota is genuinely exhausted, retries can still fail; use **Re-run screening**.
+- Plausibility is screening, not hoax/deepfake detection — see §3b.
