@@ -363,9 +363,12 @@ def run_agent_4_validation(payload: AgentRequestPayload, agent3: Agent3Output) -
     ]
     
     requires_approval = computed_budget > 2500000 or mismatch_detected
-    reason = f"Plan budget LKR {computed_budget:,.0f} evaluated. Variance handled under policy rules."
-    if mismatch_detected:
-        reason = f"Budget variance detected between declared (LKR {declared_budget:,.0f}) and computed costs (LKR {computed_budget:,.0f}). Adjusted with threshold tolerance."
+    if computed_budget > 2500000:
+        reason = f"Plan budget of LKR {computed_budget:,.0f} exceeds the statutory threshold of LKR 2,500,000, requiring Disaster Officer review."
+    elif mismatch_detected:
+        reason = f"Budget variance detected between declared (LKR {declared_budget:,.0f}) and computed costs (LKR {computed_budget:,.0f}). Requiring Officer review."
+    else:
+        reason = f"Plan budget LKR {computed_budget:,.0f} is within statutory threshold (≤ LKR 2.5M). Auto-approved under policy rules."
 
     return Agent4Output(
         requiresHumanApproval=requires_approval,
