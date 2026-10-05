@@ -149,11 +149,20 @@ export interface ReporterProfile {
 }
 
 // ── GET /api/incidents/logs ──────────────────────────────────────────────────
+export type LogActorType = 'officer' | 'citizen' | 'agent' | 'system';
+
 export interface MissionLogEntry {
   id: string;
   incidentId: string;
   note: string;
   timestamp: string;
+  // "Who did what" — parsed server-side (older entries may lack a recorded user)
+  action?: string;
+  actorType?: LogActorType;
+  actorName?: string | null;
+  actorRole?: string | null;
+  actorUserId?: string | null;
+  failed?: boolean;
 }
 
 export interface MissionLogListResponse {
