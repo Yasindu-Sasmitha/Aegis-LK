@@ -396,6 +396,40 @@ public static class IncidentEndpoints
             return Results.Ok(new { incident.Id, incident.PhotoUrl });
         });
 
+        // POST /api/incidents/{id}/close — the rescue mission has concluded. Allowed for an officer/admin,
+        // or for the citizen who reported the incident (mobile "Close incident" button). Only an incident
+        // with an approved mission can be closed. Unlike /damage-report this saves no damage data and
+        // does not trigger Recovery's workflow, so nothing outside this module is affected.
+        group.MapPost("/{id:guid}/close", [Authorize] async (Guid id, IncidentDbContext db, ClaimsPrincipal principal) =>
+        {
+            var callerId = CallerId(principal);
+            if (callerId is null) return Results.Unauthorized();
+
+            var incident = await db.Incidents.FindAsync(id);
+            if (incident is null) return Results.NotFound();
+
+            var isStaff = principal.IsInRole("DisasterOfficer") || principal.IsInRole("Admin");
+            if (!isStaff && incident.ReportedByUserId != callerId.Value)
+                return Results.Forbid();
+
+            if (incident.Status != "MissionApproved")
+                return Results.Conflict("Only an incident with an approved mission can be closed.");
+
+            incident.Status = "Closed";
+            incident.UpdatedAt = DateTime.UtcNow;
+
+            db.MissionLogs.Add(new MissionLog
+            {
+                IncidentId = id,
+                Note = isStaff
+                    ? $"Incident closed by officer {callerId.Value}."
+                    : $"Incident closed by the reporting citizen {callerId.Value}."
+            });
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new { id = incident.Id, status = incident.Status });
+        });
+
         // POST /api/incidents/{id}/rescreen — officer re-runs Plausibility + Dedup when the
         // automatic background screening did not complete (agent down, quota hit, timeout).
         group.MapPost("/{id:guid}/rescreen", [Authorize(Roles = "DisasterOfficer,Admin")] async (Guid id, IncidentDbContext db, IServiceScopeFactory scopeFactory) =>
