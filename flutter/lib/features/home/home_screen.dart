@@ -71,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _buildHero(context),
               _buildLatestAlertsSection(context),
+              _buildReportIncidentSection(context),
               _buildFeaturesGrid(context),
               _buildStatusBar(context),
               const SizedBox(height: 32),
@@ -329,6 +330,132 @@ class _HomeScreenState extends State<HomeScreen> {
             Column(
               children: _latestAlerts.map((alert) => _buildAlertItem(alert)).toList(),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportIncidentSection(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Text('🚨', style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    const Flexible(
+                      child: Text(
+                        'Report Incident',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: kTextPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                      ),
+                      child: const Text(
+                        'URGENT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFDC2626),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: const Color(0xFF0284C7),
+                ),
+                onPressed: () => widget.onNavigate?.call('incident', subIndex: 1),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('My Reports', style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward, size: 14),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.report_problem_outlined,
+                      color: Color(0xFFDC2626), size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'See a flood, landslide or other disaster? Report it with a photo and your location so rescue teams can respond quickly.',
+                    style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              icon: const Icon(Icons.add_alert_outlined, size: 18),
+              label: const Text('Report an Incident'),
+              onPressed: () => widget.onNavigate?.call('incident', subIndex: 0),
+            ),
+          ),
         ],
       ),
     );

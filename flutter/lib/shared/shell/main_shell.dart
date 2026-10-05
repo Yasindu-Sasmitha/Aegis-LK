@@ -102,16 +102,31 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
+      bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
+  // ── Primary destinations (shown as icons in the bottom bar) ────────────────
+  // List order = DISPLAY order in the bottom bar.
+  // `index` = the internal _primaryIndex value (unchanged, so app_router and
+  // _navigateTo keep working): 0 Home, 1 Weather, 2 Recovery, 3 Resource, 4 Incident.
+  static const List<_PrimaryDest> _primaryDests = [
+    _PrimaryDest(0, 'Home', Icons.home_outlined, Icons.home, Color(0xFF38BDF8)),
+    _PrimaryDest(1, 'Weather & Alerts', Icons.thunderstorm_outlined, Icons.thunderstorm, Color(0xFF60A5FA)),
+    _PrimaryDest(4, 'Report Incident', Icons.report_problem_outlined, Icons.report_problem, Color(0xFFF87171)),
+    _PrimaryDest(2, 'Recovery & Relief', Icons.healing_outlined, Icons.healing, Color(0xFF34D399)),
+    _PrimaryDest(3, 'Resource & Logistics', Icons.inventory_2_outlined, Icons.inventory_2, Color(0xFFFBBF24)),
+  ];
+
+  /// Slim top header: shows the current section's name (the bottom bar is
+  /// icon-only) plus the signed-in user and sign-out.
   Widget _buildTopNavbar(BuildContext context, AuthProvider auth) {
     final user = auth.user;
     final roleColor = kRoleColors[user?.role] ?? const Color(0xFF60A5FA);
+    final dest = _primaryDests.firstWhere((d) => d.index == _primaryIndex);
+    final isHome = _primaryIndex == 0;
 
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
         color: kNavBg,
         boxShadow: [
@@ -122,218 +137,170 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // Logo & Title
-          InkWell(
-            onTap: () => setState(() => _primaryIndex = 0),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.all(4.0),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: kAccent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: kAccent.withValues(alpha: 0.5)),
-                    ),
-                    child: const Icon(Icons.shield_outlined, color: kAccent, size: 22),
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 56,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                // Section icon badge
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: kAccent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: kAccent.withValues(alpha: 0.5)),
                   ),
-                  const SizedBox(width: 10),
-                  const Column(
+                  child: Icon(
+                    isHome ? Icons.shield_outlined : dest.activeIcon,
+                    color: kAccent,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // Section title (Home keeps the app brand)
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'AEGIS-LK',
-                        style: TextStyle(
+                        isHome ? 'AEGIS-LK' : dest.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.3,
                         ),
                       ),
-                      Text(
-                        'Disaster Management',
+                      if (isHome)
+                        const Text(
+                          'Disaster Management',
+                          style: TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // User avatar + Logout
+                if (user != null) ...[
+                  Tooltip(
+                    message:
+                        '${user.fullName.isNotEmpty ? user.fullName : user.email} • ${user.role}',
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: roleColor.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: roleColor, width: 1.5),
+                      ),
+                      child: Text(
+                        (user.fullName.isNotEmpty ? user.fullName : user.email)
+                            .substring(0, 1)
+                            .toUpperCase(),
                         style: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
+                          color: roleColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.logout, size: 20, color: Color(0xFF94A3B8)),
+                    tooltip: 'Sign Out',
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Sign Out'),
+                          content: const Text('Are you sure you want to sign out?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: kDanger),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await auth.logout();
+                      }
+                    },
                   ),
                 ],
-              ),
+              ],
             ),
           ),
-          const SizedBox(width: 24),
-
-          // Primary Navigation Links
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildPrimaryNavItem(
-                    label: 'Home',
-                    icon: Icons.home_outlined,
-                    isActive: _primaryIndex == 0,
-                    onTap: () => setState(() => _primaryIndex = 0),
-                  ),
-                  const SizedBox(width: 4),
-                  _buildPrimaryNavItem(
-                    label: 'Weather & Alerts',
-                    icon: Icons.thunderstorm_outlined,
-                    isActive: _primaryIndex == 1,
-                    onTap: () => setState(() => _primaryIndex = 1),
-                  ),
-                  const SizedBox(width: 4),
-                  _buildPrimaryNavItem(
-                    label: 'Recovery & Relief',
-                    icon: Icons.healing_outlined,
-                    isActive: _primaryIndex == 2,
-                    onTap: () => setState(() => _primaryIndex = 2),
-                  ),
-                  const SizedBox(width: 4),
-                  _buildPrimaryNavItem(
-                    label: 'Resource & Logistics',
-                    icon: Icons.inventory_2_outlined,
-                    isActive: _primaryIndex == 3,
-                    onTap: () => setState(() => _primaryIndex = 3),
-                  ),
-                  const SizedBox(width: 4),
-                  _buildPrimaryNavItem(
-                    label: 'Report Incident',
-                    icon: Icons.report_problem_outlined,
-                    isActive: _primaryIndex == 4,
-                    onTap: () => setState(() => _primaryIndex = 4),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // User Profile & Logout
-          if (user != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F2B48),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E3A8A)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: roleColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    user.fullName.isNotEmpty ? user.fullName : user.email,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: roleColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      user.role,
-                      style: TextStyle(
-                        color: roleColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.logout, size: 18, color: Color(0xFF94A3B8)),
-              tooltip: 'Sign Out',
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Sign Out'),
-                    content: const Text('Are you sure you want to sign out?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: kDanger),
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm == true) {
-                  await auth.logout();
-                }
-              },
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildPrimaryNavItem({
-    required String label,
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? kAccent.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? kAccent.withValues(alpha: 0.4) : Colors.transparent,
+  /// Icon-only bottom navigation. No selection shape: the active icon simply
+  /// switches to its filled variant, takes its section colour and scales up.
+  /// Names are shown in the top header and as tooltips / screen-reader labels.
+  Widget _buildBottomNavBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: kNavBg,
+        border: Border(top: BorderSide(color: Color(0xFF1E3A8A), width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 58,
+          child: Row(
+            children: [
+              for (final d in _primaryDests)
+                Expanded(
+                  child: Tooltip(
+                    message: d.label,
+                    child: Semantics(
+                      button: true,
+                      selected: _primaryIndex == d.index,
+                      label: d.label,
+                      child: InkResponse(
+                        onTap: () => setState(() => _primaryIndex = d.index),
+                        radius: 28,
+                        highlightShape: BoxShape.circle,
+                        child: Center(
+                          child: AnimatedScale(
+                            scale: _primaryIndex == d.index ? 1.2 : 1.0,
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutBack,
+                            child: Icon(
+                              _primaryIndex == d.index ? d.activeIcon : d.icon,
+                              size: 26,
+                              color: _primaryIndex == d.index
+                                  ? d.color
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isActive ? kAccent : const Color(0xFF94A3B8),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? Colors.white : const Color(0xFFCBD5E1),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -783,4 +750,13 @@ class _MainShellState extends State<MainShell> {
 
     return HomeScreen(onNavigate: _navigateTo);
   }
+}
+
+class _PrimaryDest {
+  final int index;
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+  final Color color;
+  const _PrimaryDest(this.index, this.label, this.icon, this.activeIcon, this.color);
 }
