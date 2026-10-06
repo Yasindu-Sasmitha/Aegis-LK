@@ -24,7 +24,7 @@ assert API_KEY and "XXXX" not in API_KEY, (
 # Production: set INCIDENT_API_BASE to the deployed ASP.NET Core API URL, e.g.:
 #   INCIDENT_API_BASE=https://aegis-api.onrender.com
 # Agents must NEVER connect directly to PostgreSQL — always go through the API.
-INCIDENT_API_BASE = os.getenv("INCIDENT_API_BASE", "http://localhost:5012")
+INCIDENT_API_BASE = os.getenv("INCIDENT_API_BASE", "https://aegis-lk.onrender.com")
 # Shared secret for the internal /nearby endpoint (same value as the API's AgenticAi:AgentKey).
 AGENT_KEY = os.getenv("AEGIS_AGENT_KEY", "")
 
