@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/resource_models.dart';
 import '../services/resource_service.dart';
+import '../../../shared/auth/auth_provider.dart';
+import '../../../shared/theme/aegis_theme.dart';
 
-/// Read-only browser for field officers: warehouses + their stock.
+/// Sri Lankan districts for the dropdown picker.
+const _sriLankaDistricts = [
+  'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo',
+  'Galle', 'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara',
+  'Kandy', 'Kegalle', 'Kilinochchi', 'Kurunegala', 'Mannar',
+  'Matale', 'Matara', 'Monaragala', 'Mullaitivu', 'Nuwara Eliya',
+  'Polonnaruwa', 'Puttalam', 'Ratnapura', 'Trincomalee', 'Vavuniya',
+];
+
+/// Warehouse browser with optional write access for officers/admins.
 ///
 /// Supports search by warehouse name or district, filter by stock status,
 /// and shows a summary bar with total warehouses and low-stock items.
+/// Officers and Admins see an "Add Warehouse" button and can create new ones.
 class WarehouseInventoryScreen extends StatefulWidget {
   const WarehouseInventoryScreen({super.key});
 
@@ -73,12 +86,365 @@ class _WarehouseInventoryScreenState extends State<WarehouseInventoryScreen> {
     return items;
   }
 
+  // ── Add Warehouse Dialog ──────────────────────────────────────────────────
+
+  void _showAddWarehouseDialog() {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final latCtrl = TextEditingController();
+    final lngCtrl = TextEditingController();
+    String? selectedDistrict;
+    bool submitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return Dialog(
+              backgroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFF1E3A8A)),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ── Header
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: kAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.add_business_outlined,
+                                    color: kAccent, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Add New Warehouse',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Fill in the details to register a new warehouse',
+                                      style: TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close,
+                                    color: Color(0xFF94A3B8), size: 20),
+                                onPressed: () => Navigator.pop(ctx),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          const Divider(color: Color(0xFF1E3A8A), height: 1),
+                          const SizedBox(height: 20),
+
+                          // ── Name
+                          _dialogField(
+                            label: 'Warehouse Name',
+                            icon: Icons.warehouse_outlined,
+                            child: TextFormField(
+                              controller: nameCtrl,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDeco('e.g. Colombo Central Hub'),
+                              validator: (v) =>
+                                  (v == null || v.trim().isEmpty) ? 'Required' : null,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ── District
+                          _dialogField(
+                            label: 'District',
+                            icon: Icons.location_city_outlined,
+                            child: DropdownButtonFormField<String>(
+                              value: selectedDistrict,
+                              dropdownColor: const Color(0xFF0F2B48),
+                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                              decoration: _inputDeco('Select district'),
+                              items: _sriLankaDistricts
+                                  .map((d) => DropdownMenuItem(
+                                      value: d, child: Text(d)))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setDialogState(() => selectedDistrict = v),
+                              validator: (v) => v == null ? 'Required' : null,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ── Lat / Lng row
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _dialogField(
+                                  label: 'Latitude',
+                                  icon: Icons.explore_outlined,
+                                  child: TextFormField(
+                                    controller: latCtrl,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true, signed: true),
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: _inputDeco('e.g. 6.9271'),
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) return 'Required';
+                                      if (double.tryParse(v.trim()) == null) {
+                                        return 'Invalid';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _dialogField(
+                                  label: 'Longitude',
+                                  icon: Icons.explore_outlined,
+                                  child: TextFormField(
+                                    controller: lngCtrl,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true, signed: true),
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: _inputDeco('e.g. 79.8612'),
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) return 'Required';
+                                      if (double.tryParse(v.trim()) == null) {
+                                        return 'Invalid';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ── Contact Phone
+                          _dialogField(
+                            label: 'Contact Phone (optional)',
+                            icon: Icons.phone_outlined,
+                            child: TextFormField(
+                              controller: phoneCtrl,
+                              keyboardType: TextInputType.phone,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDeco('e.g. 0771234567'),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // ── Actions
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: submitting
+                                    ? null
+                                    : () => Navigator.pop(ctx),
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kAccent,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onPressed: submitting
+                                    ? null
+                                    : () async {
+                                        if (!formKey.currentState!.validate()) return;
+                                        setDialogState(() => submitting = true);
+                                        try {
+                                          await _service.createWarehouse(
+                                            name: nameCtrl.text.trim(),
+                                            district: selectedDistrict!,
+                                            latitude:
+                                                double.parse(latCtrl.text.trim()),
+                                            longitude:
+                                                double.parse(lngCtrl.text.trim()),
+                                            contactPhone:
+                                                phoneCtrl.text.trim().isEmpty
+                                                    ? null
+                                                    : phoneCtrl.text.trim(),
+                                          );
+                                          if (ctx.mounted) Navigator.pop(ctx);
+                                          _load(); // refresh list
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    'Warehouse created successfully'),
+                                                backgroundColor:
+                                                    Color(0xFF059669),
+                                              ),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          setDialogState(
+                                              () => submitting = false);
+                                          if (ctx.mounted) {
+                                            ScaffoldMessenger.of(ctx)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Failed: ${e.toString().replaceFirst("Exception: ", "")}'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                icon: submitting
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.add, size: 18),
+                                label: Text(
+                                    submitting ? 'Creating…' : 'Create Warehouse'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Labelled field wrapper used inside the dialog.
+  Widget _dialogField({
+    required String label,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 14, color: const Color(0xFF94A3B8)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFFCBD5E1),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+
+  InputDecoration _inputDeco(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 13),
+      filled: true,
+      fillColor: const Color(0xFF0F2B48),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF1E3A8A)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF1E3A8A)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: kAccent, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final isOfficer = auth.isOfficerOrAdmin;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Warehouse Inventory'),
         actions: [
+          if (isOfficer)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kAccent,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Warehouse',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                onPressed: _showAddWarehouseDialog,
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _load,

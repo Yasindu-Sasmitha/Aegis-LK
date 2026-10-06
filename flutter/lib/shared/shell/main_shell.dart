@@ -19,7 +19,6 @@ import '../../features/incident/screens/my_reports_screen.dart';
 import '../../features/recovery/screens/compensation_claim_screen.dart';
 import '../../features/resource/screens/warehouse_inventory_screen.dart';
 import '../../features/resource/screens/dispatch_plan_screen.dart';
-import '../../features/resource/screens/delivery_qr_screen.dart';
 
 class MainShell extends StatefulWidget {
   final int initialPrimaryIndex;
@@ -95,7 +94,7 @@ class _MainShellState extends State<MainShell> {
           _buildTopNavbar(context, auth),
           if (_primaryIndex == 1) _buildWeatherSubNav(context, isOfficer),
           if (_primaryIndex == 2) _buildRecoverySubNav(context),
-          if (_primaryIndex == 3) _buildResourceSubNav(context),
+          if (_primaryIndex == 3) _buildResourceSubNav(context, isOfficer),
           if (_primaryIndex == 4) _buildIncidentSubNav(context),
           Expanded(
             child: _buildCurrentBody(isOfficer),
@@ -384,7 +383,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildResourceSubNav(BuildContext context) {
+  Widget _buildResourceSubNav(BuildContext context, bool isOfficer) {
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -401,20 +400,16 @@ class _MainShellState extends State<MainShell> {
             isActive: _resourceSubIndex == 0,
             onTap: () => setState(() => _resourceSubIndex = 0),
           ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Dispatch Plans',
-            icon: Icons.local_shipping_outlined,
-            isActive: _resourceSubIndex == 1,
-            onTap: () => setState(() => _resourceSubIndex = 1),
-          ),
-          const SizedBox(width: 6),
-          _buildSubNavItem(
-            label: 'Delivery QR',
-            icon: Icons.qr_code_scanner,
-            isActive: _resourceSubIndex == 2,
-            onTap: () => setState(() => _resourceSubIndex = 2),
-          ),
+          if (isOfficer) ...[
+            const SizedBox(width: 6),
+            _buildSubNavItem(
+              label: 'Dispatch Plans',
+              icon: Icons.local_shipping_outlined,
+              isActive: _resourceSubIndex == 1,
+              onTap: () => setState(() => _resourceSubIndex = 1),
+            ),
+          ],
+          
         ],
       ),
     );
@@ -758,9 +753,8 @@ class _MainShellState extends State<MainShell> {
         case 0:
           return const WarehouseInventoryScreen();
         case 1:
+          if (!isOfficer) return const WarehouseInventoryScreen();
           return const DispatchPlanScreen();
-        case 2:
-          return const DeliveryQrScreen();
         default:
           return const WarehouseInventoryScreen();
       }

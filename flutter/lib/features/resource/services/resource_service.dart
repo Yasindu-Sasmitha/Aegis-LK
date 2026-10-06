@@ -43,6 +43,33 @@ class ResourceService {
     throw _buildException(response);
   }
 
+  Future<Warehouse> createWarehouse({
+    required String name,
+    required String district,
+    required double latitude,
+    required double longitude,
+    String? contactPhone,
+  }) async {
+    final uri = Uri.parse('$baseUrl/warehouses/');
+    final headers = await _getAuthHeaders();
+    headers['Content-Type'] = 'application/json';
+    final body = jsonEncode({
+      'name': name,
+      'district': district,
+      'latitude': latitude,
+      'longitude': longitude,
+      if (contactPhone != null && contactPhone.isNotEmpty)
+        'contactPhone': contactPhone,
+    });
+    final response = await http.post(uri, headers: headers, body: body);
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return Warehouse.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    }
+    throw _buildException(response);
+  }
+
   // ── 2. Inventory ────────────────────────────────────────────────────────────
 
   Future<ResourceListResponse<InventoryItem>> fetchInventoryItems({

@@ -9,10 +9,10 @@ namespace Aegis.Resource.Endpoints
     {
         public static void MapWarehouseEndpoints(this WebApplication app)
         {
-            // READ endpoints — Admin, DisasterOfficer, Responder
+            // READ endpoints — Admin, DisasterOfficer, Responder,citizen 
             var readGroup = app.MapGroup("/api/resource/warehouses")
                 .RequireAuthorization(p => p.RequireRole(
-                    "Admin", "DisasterOfficer", "Responder"))
+                    "Admin", "DisasterOfficer", "Responder", "Citizen"))
                 .WithTags("Resource - Warehouses");
 
             readGroup.MapGet("/", async (
