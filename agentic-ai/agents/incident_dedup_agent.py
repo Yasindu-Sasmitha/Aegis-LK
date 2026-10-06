@@ -1,6 +1,5 @@
 import os
 import json
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -36,25 +35,17 @@ def search_nearby_incidents(lat: float, lng: float, radius_km: float, hours: flo
     worth a wider search (e.g. 20-50km, 24-48h); landslides are much more localized
     (e.g. 2-5km, 12-24h). Returns a JSON list of candidate incidents, excluding the
     new report itself and anything already linked as a duplicate."""
-    last_error = "unknown error"
-    # A few quick attempts absorb a briefly-unreachable API (e.g. a cold start) without
-    # making the whole agent run fail. A permanent misconfiguration (wrong INCIDENT_API_BASE)
-    # still fails after the last attempt and is reported honestly by check_for_duplicate().
-    for attempt in range(3):
-        try:
-            response = requests.get(
-                f"{INCIDENT_API_BASE}/api/incidents/nearby",
-                params={"lat": lat, "lng": lng, "radiusKm": radius_km, "hours": hours},
-                headers={"X-Aegis-Agent-Key": AGENT_KEY} if AGENT_KEY else {},
-                timeout=15,
-            )
-            response.raise_for_status()
-            return json.dumps(response.json())
-        except Exception as e:
-            last_error = str(e)
-            if attempt < 2:
-                time.sleep(2)
-    return json.dumps({"error": f"Nearby search failed: {last_error}"})
+    try:
+        response = requests.get(
+            f"{INCIDENT_API_BASE}/api/incidents/nearby",
+            params={"lat": lat, "lng": lng, "radiusKm": radius_km, "hours": hours},
+            headers={"X-Aegis-Agent-Key": AGENT_KEY} if AGENT_KEY else {},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return json.dumps(response.json())
+    except Exception as e:
+        return json.dumps({"error": f"Nearby search failed: {str(e)}"})
 
 
 @tool
@@ -86,24 +77,6 @@ REASONING: <one sentence>"""
 def build_dedup_agent():
     llm = ChatGoogleGenerativeAI(model=CHAT_MODEL, google_api_key=API_KEY, temperature=0, timeout=60, max_retries=2)
     return create_react_agent(llm, [search_nearby_incidents, compare_reports])
-
-
-def _nearby_search_error(messages) -> Optional[str]:
-    """If the search_nearby_incidents tool returned an error, return its text.
-
-    The LLM would otherwise paper over a failed search with "no candidates found, so this is
-    a new incident" - a silent false negative that looks like a successful check."""
-    for m in messages:
-        if getattr(m, "type", None) != "tool" or getattr(m, "name", "") != "search_nearby_incidents":
-            continue
-        content = m.content if isinstance(m.content, str) else str(m.content)
-        try:
-            data = json.loads(content)
-        except Exception:
-            continue
-        if isinstance(data, dict) and "error" in data:
-            return str(data["error"])
-    return None
 
 
 def check_for_duplicate(
@@ -141,20 +114,6 @@ REASONING: <your reasoning trail, mentioning which candidates you checked>
 """
 
     result = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
-
-    # Fail honestly (so the API retries and logs a real failure) instead of reporting
-    # "not a duplicate" when the candidate search could not even run.
-    search_error = _nearby_search_error(result["messages"])
-    if search_error:
-        return {
-            "is_duplicate": False,
-            "matched_incident_id": None,
-            "confidence": 0,
-            "reasoning": "",
-            "overall_status": "Failed",
-            "error": f"Nearby-incident search failed: {search_error}",
-        }
-
     raw_content = result["messages"][-1].content
 
     if isinstance(raw_content, list):
