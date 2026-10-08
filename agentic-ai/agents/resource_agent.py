@@ -12,7 +12,7 @@ approves it. This keeps the LLM out of the authorisation decision.
 """
 import logging
 import os
-from typing import Annotated, Any, Dict, List, Optional, TypedDict
+from typing import Annotated, Any, Dict, List, Optional, TypedDict, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -28,6 +28,8 @@ from resource_tools import (
     get_warehouse_candidates,
     validate_dispatch_plan,
 )
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -94,9 +96,26 @@ def dispatch_coordinator(state: State) -> Dict[str, Any]:
         f"Available warehouses: {len(state.get('warehouses') or [])}, "
         f"inventory rows: {len(state.get('inventory') or [])}."
     )
-    raw: Plan = llm.with_structured_output(Plan).invoke(   #type:ignore
+    raw_output = llm.with_structured_output(Plan).invoke(  # type:ignore
         [SystemMessage(system), HumanMessage(user)]
     )
+    # DEF-001 guard: structured output can return None if the LLM is unavailable
+    # or returns an empty/malformed response. Fail-closed rather than crash.
+    if raw_output is None:
+        msg = "Coordinator received no structured output from LLM (GOOGLE_API_KEY missing or LLM error)."
+        return {
+            "steps": state.get("steps", []) + [{
+                "agent": "dispatch_coordinator",
+                "action": "plan",
+                "status": "failed",
+                "summary": msg,
+            }],
+            "validation_errors": [msg],
+            "approval_status": "SafeFailure",
+            "overall_status": "Failed",
+            "error": msg,
+        }
+    raw = cast(Plan, raw_output)
     plan_steps = [raw.step_1, raw.step_2, raw.step_3, raw.step_4]
     step = {
         "agent": "dispatch_coordinator",
@@ -239,14 +258,6 @@ def validation_safety(state: State) -> Dict[str, Any]:
     }
 
 
-def route_after_validation(state: State) -> str:
-    if state["validation_errors"]:
-        if state["retries"] < MAX_RETRIES:
-            return "retry"
-        return "fail"
-    return "approve"
-
-
 # ---------------------------------------------------------------------------
 # Routing functions
 # ---------------------------------------------------------------------------
@@ -270,9 +281,48 @@ def route_after_validation(state: State) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Checkpointer factory
+# ---------------------------------------------------------------------------
+def _build_checkpointer():
+    """Return the best available checkpointer.
+
+    - If RESOURCE_AGENT_DATABASE_URL (or DATABASE_URL) is set, try to use
+      PostgresSaver for durable, cross-process state.
+    - Fall back to InMemorySaver when no DB URL is configured (CI / dev).
+
+    Raises RuntimeError if a DB URL is set but the required package is missing,
+    so the service fails closed rather than silently using in-memory state.
+    """
+    db_url = os.getenv("RESOURCE_AGENT_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if db_url:
+        try:
+            from langgraph.checkpoint.postgres import PostgresSaver  # type: ignore
+            saver = PostgresSaver.from_conn_string(db_url)  # type: ignore
+            saver.setup()  # type: ignore
+            logger.info("ResourceAgent: using PostgresSaver checkpointer.")
+            return saver
+        except ImportError as exc:
+            raise RuntimeError(
+                "RESOURCE_AGENT_DATABASE_URL is set but the "
+                "'langgraph-checkpoint-postgres' package is not installed. "
+                "Run: pip install langgraph-checkpoint-postgres"
+            ) from exc
+    logger.info("ResourceAgent: using InMemorySaver checkpointer (no DB URL set).")
+    return InMemorySaver()
+
+
+# ---------------------------------------------------------------------------
 # Graph wiring
 # ---------------------------------------------------------------------------
-def build_resource_graph():
+def build_resource_graph(checkpointer=None):
+    """Compile the 4-agent resource allocation LangGraph.
+
+    Args:
+        checkpointer: Optional LangGraph checkpointer to inject.  When None
+            (the default) the graph uses InMemorySaver via _build_checkpointer().
+            Pass an explicit InMemorySaver in unit tests to avoid touching env vars.
+    """
+    cp = checkpointer if checkpointer is not None else _build_checkpointer()
     g = StateGraph(State)   #type: ignore
     g.add_node("coordinator", dispatch_coordinator)
     g.add_node("analyst", warehouse_analyst)
@@ -297,7 +347,7 @@ def build_resource_graph():
         {"retry": "analyst", "fail": END, "approve": END},
     )
 
-    return g.compile(checkpointer=InMemorySaver())
+    return g.compile(checkpointer=cp)
 
 
 GRAPH = build_resource_graph()

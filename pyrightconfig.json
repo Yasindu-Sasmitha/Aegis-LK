@@ -1,0 +1,12 @@
+{
+  "pythonVersion": "3.14",
+  "include": [
+    "agentic-ai/agents",
+    "agentic-ai/tests",
+    "agentic-ai/orchestrator"
+  ],
+  "extraPaths": [
+    "agentic-ai/agents"
+  ],
+  "typeCheckingMode": "basic"
+}
