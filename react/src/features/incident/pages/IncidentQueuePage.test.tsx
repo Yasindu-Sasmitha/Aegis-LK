@@ -31,8 +31,6 @@ describe('IncidentQueuePage Component', () => {
       updatedAt: '2026-10-08T06:00:00Z',
       rescueMission: null,
       damageReport: null,
-      victims: [],
-      logs: [],
     },
     {
       id: 'inc-102',
@@ -56,8 +54,6 @@ describe('IncidentQueuePage Component', () => {
       updatedAt: '2026-10-08T07:15:00Z',
       rescueMission: null,
       damageReport: null,
-      victims: [],
-      logs: [],
     },
   ];
 
