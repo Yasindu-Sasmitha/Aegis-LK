@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import TypedDict, Optional, Literal
+from typing import TypedDict, Optional, Literal, cast
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -126,7 +126,7 @@ with risk_probability_pct and confidence_pct.
     for attempt in range(1, 3):
         started = datetime.now(timezone.utc)
         try:
-            result: WeatherAgentOutput = _get_assessor_llm().invoke(prompt)
+            result = cast(WeatherAgentOutput, _get_assessor_llm().invoke(prompt))
             summary = f"Assessed {len(result.hazards)} hazard(s): " + ", ".join(
                 f"{h.hazard_type} {h.risk_probability_pct:.0f}%" for h in result.hazards
             )
@@ -144,7 +144,7 @@ def critique_assessment(state: WeatherAgentState) -> WeatherAgentState:
     """Agent 2 — the Critic. An independent second opinion checking the Assessor's output for
     internal consistency before the code gate finalizes anything — the 'validation/safety' role
     as an actual model step, not just a hardcoded rule."""
-    if state.get("error"):
+    if state.get("error") or not state.get("llm_output"):
         return state
 
     started = datetime.now(timezone.utc)
@@ -172,7 +172,7 @@ Only flag genuine inconsistencies or errors — not stylistic disagreement or mi
 If the assessment is sound, agrees=true with an empty concerns list.
 """
     try:
-        result: CritiqueOutput = _get_critic_llm().invoke(prompt)
+        result = cast(CritiqueOutput, _get_critic_llm().invoke(prompt))
         summary = "Agrees with assessment" if result.agrees else \
             f"Disagreement flagged: {'; '.join(c.issue for c in result.concerns)}"
         steps.append(_log_step("critique_assessment", f"gemini:{CHAT_MODEL}", started, "success", summary))
@@ -186,7 +186,8 @@ If the assessment is sound, agrees=true with an empty concerns list.
 
 
 def validate_and_decide(state: WeatherAgentState) -> WeatherAgentState:
-    if state.get("error"):
+    llm_output = state.get("llm_output")
+    if state.get("error") or not llm_output:
         return state
 
     started = datetime.now(timezone.utc)
@@ -201,7 +202,7 @@ def validate_and_decide(state: WeatherAgentState) -> WeatherAgentState:
     disagreed_hazards = {c["hazard_type"] for c in critique["concerns"]} if critique and not critique["agrees"] else set()
 
     overridden = []
-    for hazard in state["llm_output"]["hazards"]:
+    for hazard in llm_output.get("hazards", []):
         h = dict(hazard)
         h["risk_probability_pct"] = min(100, max(0, h["risk_probability_pct"]))
         h["confidence_pct"] = min(100, max(0, h["confidence_pct"]))
