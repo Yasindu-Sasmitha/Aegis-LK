@@ -9,7 +9,7 @@ public class IncidentAgentClient
     public IncidentAgentClient(HttpClient http)
     {
         _http = http;
-        _http.Timeout = TimeSpan.FromSeconds(30); // LLM calls are slow — give it real room
+        _http.Timeout = TimeSpan.FromSeconds(45); // LLM calls are slow — give it real room
     }
 
     public async Task<AssessResponseDto?> AssessAsync(AssessRequestDto request)
