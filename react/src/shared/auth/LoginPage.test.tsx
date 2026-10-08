@@ -92,7 +92,7 @@ describe('LoginPage Component', () => {
         id: 'user-1',
         email: 'officer@aegis.lk',
         fullName: 'DMC Officer',
-        role: 'DisasterOfficer',
+        role: 'DisasterOfficer' as const,
         district: 'Colombo',
         isActive: true,
         createdAt: '2026-01-01',
