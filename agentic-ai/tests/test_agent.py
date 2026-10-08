@@ -1,9 +1,36 @@
+import sys
+from pathlib import Path
 import unittest
+from unittest.mock import MagicMock, patch
+
+_agents_dir = Path(__file__).resolve().parent.parent / "agents"
+if str(_agents_dir) not in sys.path:
+    sys.path.insert(0, str(_agents_dir))
+
 from resource_tools import (
     ToolError, compute_allocation,
     get_warehouse_candidates, validate_dispatch_plan,
 )
 from resource_agent import run_resource_workflow
+
+_LLM_PATCH = "resource_agent._llm"
+
+
+def _make_mock_plan():
+    mock_plan = MagicMock()
+    mock_plan.objective = "Dispatch relief teams to Colombo."
+    mock_plan.step_1 = "rank_warehouses"
+    mock_plan.step_2 = "compute_allocation"
+    mock_plan.step_3 = "validate_plan"
+    mock_plan.step_4 = "await_human_approval"
+    mock_plan.reasoning = "Standard four-step dispatch protocol."
+    return mock_plan
+
+
+def _mock_llm_returning_plan():
+    llm_mock = MagicMock()
+    llm_mock.with_structured_output.return_value.invoke.return_value = _make_mock_plan()
+    return llm_mock
 
 WAREHOUSES = [
     {"id": "w-1", "name": "Colombo Central Depot", "district": "Colombo",
@@ -23,7 +50,8 @@ class ResourceAgentGoldenCaseTests(unittest.TestCase):
     """Covers planning, delegation, tool selection, structured output,
     deterministic validation, safe failure — the SE3090 §9.1 acceptance set."""
 
-    def test_full_workflow_produces_plan_pending_approval(self):
+    @patch(_LLM_PATCH, side_effect=_mock_llm_returning_plan)
+    def test_full_workflow_produces_plan_pending_approval(self, _mock):
         result = run_resource_workflow({
             "mission_id": "mission-golden-001",
             "teams_required": 3,

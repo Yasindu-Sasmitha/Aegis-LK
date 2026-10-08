@@ -296,3 +296,43 @@ jobs:
       - name: Run Incident agent tests
         working-directory: "${{ github.workspace }}/agentic-ai"
         run: python -m pytest tests/test_incident_agents.py --tb=short --no-header -v
+
+  # ── 8. Python: Resource Agent deterministic offline tests ────────────────────
+  #    Uses mocked LLM responses — no live GOOGLE_API_KEY required.
+  #    Tests the 4-agent resource allocation pipeline, checkpointer factory,
+  #    and safe-failure behaviour (AI-RES-01 to AI-RES-04).
+  resource-agent-tests:
+    name: Resource Agent Tests (Python)
+    runs-on: ubuntu-latest
+
+    env:
+      GOOGLE_API_KEY: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-resource-${{ hashFiles('agentic-ai/agents/requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-resource-
+
+      - name: Install CI dependencies
+        working-directory: "${{ github.workspace }}/agentic-ai/agents"
+        run: pip install -r requirements-ci.txt
+
+      - name: Run Resource Agent tests
+        working-directory: "${{ github.workspace }}/agentic-ai"
+        run: |
+          python -m pytest tests/test_resource_agent.py \
+            --tb=short \
+            --no-header \
+            -v
